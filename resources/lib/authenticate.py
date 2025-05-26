@@ -67,8 +67,8 @@ def get_authenticated_session(username: str = None, password: str = None):
 
     # Step 2: Parse state from login page
     soup = BeautifulSoup(login_page_response.content, "html.parser")
-    state = next((inp.get('value') for inp in soup.find_all('input')
-                  if inp.get('id') == 'state' and inp.get('name') == 'state'), None)
+    state = next((input_element.get('value') for input_element in soup.find_all('input')
+                  if input_element.get('id') == 'state' and input_element.get('name') == 'state'), None)
 
     email_payload = {'email': username, 'state': state}
     xbmc.log(f"Email payload: {email_payload}", xbmc.LOGDEBUG)
@@ -85,11 +85,11 @@ def get_authenticated_session(username: str = None, password: str = None):
     soup = BeautifulSoup(email_response.content, "html.parser")
     state2 = None
     csrf_token = None
-    for inp in soup.find_all('input'):
-        if inp.get('id') == 'state' and inp.get('name') == 'state':
-            state2 = inp.get('value')
-        elif inp.get('name') == '_csrf_token':
-            csrf_token = inp.get('value')
+    for input_element in soup.find_all('input'):
+        if input_element.get('id') == 'state' and input_element.get('name') == 'state':
+            state2 = input_element.get('value')
+        elif input_element.get('name') == '_csrf_token':
+            csrf_token = input_element.get('value')
 
     password_uri = f"https://auth.angel.com/u/login?{urllib.parse.urlencode({'state': state2})}"
     password_payload = {
