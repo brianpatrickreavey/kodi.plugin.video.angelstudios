@@ -118,6 +118,7 @@ with open('project_tuttle_twins.json', 'w') as f:
     json.dump(show_data, f, indent=2)
     
 
+
 # logger.debug(f"{response2.content=}")
 # logger.debug(f"{response2.text=}")
 # logger.debug(f"{response2.status_code=}")

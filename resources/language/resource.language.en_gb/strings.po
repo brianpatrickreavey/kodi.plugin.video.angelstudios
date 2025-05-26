@@ -2,6 +2,10 @@ msgid ""
 msgstr ""
 "Language: en_GB\n"
 
+msgctxt "#30011"
+msgid "General"
+msgstr ""
+
 msgctxt "#32011"
 msgid "Username"
 msgstr "Username"

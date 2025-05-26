@@ -12,7 +12,7 @@
   <extension point="xbmc.addon.metadata">
     <summary lang="en_GB">Angel Studios</summary>
     <description lang="en_GB">An app providing the Angel Studios content. CURENTLY IN DEVELOPMENT.</description>
-    <disclaimer lang="en_GB">Unathorized.  Please visit Angel Studios Website https://www.angel.com/</disclaimer>
+    <disclaimer lang="en_GB">Unauthorized.  Please visit Angel Studios Website https://www.angel.com/</disclaimer>
     <license>GPL-3.0-only	</license>
     <assets>
       <icon>resources/images/icons/Angel_Studios_Logo.png</icon>
