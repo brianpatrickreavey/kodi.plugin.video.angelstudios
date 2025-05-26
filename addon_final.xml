@@ -1,6 +1,6 @@
 <?xml version="0.0.1" encoding="UTF-8"?>
-<addon id="plugin.video.angelstudios_development"
-       version="0.1.0" name="Angel Studios DEVELOPMENT" provider-name="Brian and Peter Reavey">
+<addon id="plugin.video.angelstudios"
+       version="0.1.0" name="Angel Studios" provider-name="Brian and Peter Reavey">
   <requires>
     <import addon="xbmc.python" version="3.0.1"/>
     <import addon="script.module.beautifulsoup4" version="4.12.2"/>

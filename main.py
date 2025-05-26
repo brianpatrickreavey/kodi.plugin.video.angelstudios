@@ -17,7 +17,7 @@ Example video plugin that is compatible with Kodi 20.x "Nexus" and above
 """
 import os
 import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'lib'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'resources/lib'))
 
 from urllib.parse import urlencode, parse_qsl
 import hashlib
@@ -56,7 +56,6 @@ session = authenticate.get_authenticated_session(
     username=angel_username,
     password=angel_password,
 )
-
 
 
 'We need: Login, and Whole Site'
@@ -208,9 +207,13 @@ def get_seasons(project_url):
         for raw_episode in raw_season['episodes']:
         # xmbcplugin.log(raw_episode['subtitle'])
             #xmbcplugin.log(raw_episode['source']['url'])
-            if raw_episode['source']== None:
-                continue            
+            if raw_episode['source'] == None:
+                xbmc.log(f"Skipping episode {raw_episode['name']} - no source", xbmc.LOGINFO)
+                xbmc.log(f"raw_episode: {raw_episode}", xbmc.LOGDEBUG)
+                continue
             elif raw_episode['source']['url'] == None:
+                xbmc.log(f"Skipping episode {raw_episode['name']} - no URL", xbmc.LOGINFO)
+                xbmc.log(f"raw_episode: {raw_episode}", xbmc.LOGDEBUG)
                 continue       
             # find out how to use 'continue' to skip episodes
             episode = {
@@ -241,6 +244,11 @@ def get_episodes(raw_season):
     :return: the list of videos in the category
     :rtype: list
     """
+
+    # TODO This needs to make a call to the tager stub page to get all of the episodes some other way
+    # It does not seem that the __NEXT_DATA__ contains all of the episodes.
+    # Stub page also does not contain the episodes at all within NEXT_DATA.
+    # Nees to use BeautifulSoup to parse the page and get the episodes.
 
     # episodes = []
     # xbmc.log(f"{raw_season=}", xbmc.LOGINFO)
@@ -351,6 +359,7 @@ def list_episodes(season):
     for episode in episodes:
         # Create a list item with a text label
         list_item = xbmcgui.ListItem(label=episode['name'])
+        xbmc.log(f"Adding episode: {episode['name']}", xbmc.LOGINFO)
         # Set graphics (thumbnail, fanart, banner, poster, landscape etc.) for the list item.
         # Here we use only poster for simplicity's sake.
         # In a real-life plugin you may need to set multiple image types.
@@ -412,7 +421,7 @@ def router(paramstring):
     # Parse a URL-encoded paramstring to the dictionary of
     # {<parameter>: <value>} elements
     params = dict(parse_qsl(paramstring))
-    xbmc.log(f"params={params}", xbmc.LOGINFO)
+    xbmc.log(f"ROUTER params={params}", xbmc.LOGINFO)
     # Check the parameters passed to the plugin
     if not params:
         # If the plugin is called from Kodi UI without any parameters,
