@@ -1,0 +1,8 @@
+# ProjectMetadata GraphQL Fragment
+
+fragment ProjectMetadata on Metadata {
+    contentRating
+    externalLinks
+    genres
+    __typename
+}

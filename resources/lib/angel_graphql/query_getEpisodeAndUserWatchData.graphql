@@ -1,0 +1,215 @@
+fragment EpisodeGuildEarlyAccess on Episode {
+  isAngelGuildOnly
+  prereleaseAvailableFor
+  isTrailer
+  guildAvailableDate
+  publiclyAvailableDate
+  earlyAccessDate
+  unavailableReason
+  __typename
+}
+
+query getEpisodeAndUserWatchData($guid: ID!, $projectSlug: String!, $includePrerelease: Boolean = false, $authenticated: Boolean = false, $reactionsRollupInterval: Int = 4000) {
+  project(slug: $projectSlug) {
+    id
+    projectType
+    pifEnabled
+    metadata {
+      contentRating
+      externalLinks
+      genres
+      __typename
+    }
+    primaryFlowPhases {
+      status
+      phaseSlugEnum
+      __typename
+    }
+    discoveryPosterCloudinaryPath
+    discoveryPosterLandscapeCloudinaryPath
+    discoveryPosterTransformation
+    discoveryVideoLandscapeUrl
+    name
+    slug
+    seasons {
+      id
+      seasonNumber
+      name
+      episodes(
+        includePrerelease: $includePrerelease
+        includePresale: $includePrerelease
+      ) {
+        id
+        guid
+        slug
+        episodeNumber
+        seasonNumber
+        seasonId
+        subtitle
+        description
+        name
+        posterCloudinaryPath
+        posterLandscapeCloudinaryPath
+        projectSlug
+        earlyAccessDate
+        publiclyAvailableDate
+        guildAvailableDate
+        releaseDate
+        source {
+          credits
+          duration
+          url(input: {segmentFormat: TS})
+          __typename
+        }
+        unavailableReason
+        upNext {
+          id
+          projectSlug
+          guid
+          seasonNumber
+          episodeNumber
+          subtitle
+          __typename
+        }
+        watchPosition {
+          position
+          __typename
+        }
+        introEndTime
+        introStartTime
+        ...EpisodeGuildEarlyAccess
+        __typename
+      }
+      __typename
+    }
+    logoCloudinaryPath
+    publisher {
+      name
+      __typename
+    }
+    trailers {
+      id
+      name
+      source {
+        duration
+        url(input: {segmentFormat: TS})
+        __typename
+      }
+      __typename
+    }
+    title {
+      ... on ContentSharable {
+        isGuildShareAvailable
+        __typename
+      }
+      ... on ContentWatchableAvailability {
+        watchableAvailabilityStatus
+        __typename
+      }
+      ... on ContentDisplayable {
+        id
+        landscapeTitleImage: image(aspect: "16:9", category: TITLE_ART) {
+          aspect
+          category
+          cloudinaryPath
+          __typename
+        }
+        landscapeAngelImage: image(aspect: "16:9", category: ANGEL_KEY_ART_1) {
+          aspect
+          category
+          cloudinaryPath
+          __typename
+        }
+        landscapeAngelImage2: image(aspect: "16:9", category: ANGEL_KEY_ART_2) {
+          aspect
+          category
+          cloudinaryPath
+          __typename
+        }
+        landscapeAngelImage3: image(aspect: "16:9", category: ANGEL_KEY_ART_3) {
+          aspect
+          category
+          cloudinaryPath
+          __typename
+        }
+        portraitTitleImage: image(aspect: "2:3", category: TITLE_ART) {
+          aspect
+          category
+          cloudinaryPath
+          __typename
+        }
+        portraitAngelImage: image(aspect: "2:3", category: ANGEL_KEY_ART_1) {
+          aspect
+          category
+          cloudinaryPath
+          __typename
+        }
+        portraitAngelImage2: image(aspect: "2:3", category: ANGEL_KEY_ART_2) {
+          aspect
+          category
+          cloudinaryPath
+          __typename
+        }
+        portraitAngelImage3: image(aspect: "2:3", category: ANGEL_KEY_ART_3) {
+          aspect
+          category
+          cloudinaryPath
+          __typename
+        }
+        __typename
+      }
+      __typename
+    }
+    __typename
+  }
+  episode(guid: $guid) {
+    description
+    episodeNumber
+    guid
+    id
+    name
+    posterCloudinaryPath
+    posterLandscapeCloudinaryPath
+    projectSlug
+    releaseDate
+    seasonId
+    seasonNumber
+    slug
+    subtitle
+    source {
+      credits
+      duration
+      url(input: {segmentFormat: TS})
+      __typename
+    }
+    unavailableReason
+    upNext {
+      id
+      projectSlug
+      guid
+      seasonNumber
+      episodeNumber
+      subtitle
+      __typename
+    }
+    vmapUrl
+    watchPosition {
+      position
+      __typename
+    }
+    ...EpisodeGuildEarlyAccess
+    __typename
+  }
+  user @include(if: $authenticated) {
+    id
+    videoReactions(videoId: $guid, rollupInterval: $reactionsRollupInterval) {
+      id
+      momentId
+      reactedAt
+      videoGuid
+      viewerId
+      __typename
+    }
+    __typename
+  }
+}

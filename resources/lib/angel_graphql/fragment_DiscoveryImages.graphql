@@ -1,0 +1,7 @@
+# DiscoveryImages GraphQL Fragment
+
+fragment DiscoveryImages on Project {
+    discoveryPosterCloudinaryPath
+    discoveryPosterLandscapeCloudinaryPath
+    logoCloudinaryPath
+}

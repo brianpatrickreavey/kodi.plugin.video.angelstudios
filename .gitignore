@@ -3,6 +3,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Test credentials - DO NOT COMMIT
+test_credentials.json
+test_cache/
+
 # C extensions
 *.so
 
@@ -181,3 +185,4 @@ temp
 addon_development.xml
 credentials.json
 .vscode
+archive

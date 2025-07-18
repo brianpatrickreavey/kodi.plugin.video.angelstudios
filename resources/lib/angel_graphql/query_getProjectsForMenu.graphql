@@ -1,0 +1,18 @@
+# GraphQL query to fetch projects for the content menus.
+# This query retrieves detailed information about a project, including its title,
+# seasons, episodes, and various metadata. It also includes early access information
+# for episodes if applicable.
+# 
+# Constructed from scratch.  Nothing captured from the website provided a full
+# listing of all proejcts to use.
+
+query getProjectsForMenu {
+    projects {
+        ...ProjectBasic
+        ...DiscoveryImages
+        theaterDescription
+        metadata {
+            ...ProjectMetadata
+        }
+    }
+}

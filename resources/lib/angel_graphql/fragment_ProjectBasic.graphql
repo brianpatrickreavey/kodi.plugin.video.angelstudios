@@ -1,0 +1,9 @@
+# ProjectBasic GraphQL Fragment
+
+fragment ProjectBasic on Project {
+    id
+    name
+    slug
+    projectType
+    public
+}

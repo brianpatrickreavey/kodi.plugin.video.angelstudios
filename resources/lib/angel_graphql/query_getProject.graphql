@@ -1,0 +1,220 @@
+# GraphQL query to fetch project details by slug, including episodes and seasons.
+# This query retrieves detailed information about a project, including its title,
+# seasons, episodes, and various metadata. It also includes early access information
+# for episodes if applicable.
+# 
+# Captured from https://www.angel.com/watch/{slug}.
+
+fragment EpisodeGuildEarlyAccess on Episode {
+  isAngelGuildOnly
+  prereleaseAvailableFor
+  isTrailer
+  guildAvailableDate
+  publiclyAvailableDate
+  earlyAccessDate
+  unavailableReason
+  __typename
+}
+
+query getProject($slug: String!, $includePrerelease: Boolean = false, $includeSeasons: Boolean = true) {
+  project(slug: $slug) {
+    id
+    releaseDate
+    highestScore
+    continueWatching @include(if: $includeSeasons) {
+      id
+      duration
+      guid
+      posterCloudinaryPath
+      seasonId
+      slug
+      projectSlug
+      episodeNumber
+      season {
+        id
+        seasonNumber
+        __typename
+      }
+      watchPosition {
+        id
+        position
+        __typename
+      }
+      __typename
+    }
+    title {
+      __typename
+      ... on ContentSeries {
+        id
+        seasons(first: 20) {
+          edges {
+            node {
+              id
+              seasonNumber
+              episodes(first: 100) {
+                edges {
+                  node {
+                    __typename
+                    id
+                    name
+                    watchableAvailabilityStatus
+                  }
+                  __typename
+                }
+                __typename
+              }
+              __typename
+            }
+            __typename
+          }
+          __typename
+        }
+        __typename
+      }
+      ... on Node {
+        id
+        __typename
+      }
+      ... on ContentSharable {
+        isGuildShareAvailable
+        __typename
+      }
+      ... on ContentWatchableAvailability {
+        watchableAvailabilityStatus
+        actionsToWatch {
+          __typename
+        }
+        watchableReasons {
+          __typename
+          ... on LinkshareAvailabilityAction {
+            startDatetime
+            __typename
+          }
+        }
+        __typename
+      }
+      ... on ContentDisplayable {
+        id
+        ratings
+        landscapeNonTitleImage: image(aspect: "16:9", category: NON_TITLE_ART) {
+          aspect
+          category
+          cloudinaryPath
+          __typename
+        }
+        portraitNonTitleImage: image(aspect: "2:3", category: NON_TITLE_ART) {
+          aspect
+          category
+          cloudinaryPath
+          __typename
+        }
+        squareNonTitleImage: image(aspect: "1:1", category: NON_TITLE_ART) {
+          aspect
+          category
+          cloudinaryPath
+          __typename
+        }
+        landscapeBackdrop: image(aspect: "16:9", category: BACKDROP) {
+          aspect
+          category
+          cloudinaryPath
+          __typename
+        }
+        portraitBackdrop: image(aspect: "9:16", category: BACKDROP) {
+          aspect
+          category
+          cloudinaryPath
+          __typename
+        }
+        logo: image(aspect: "9:5", category: LOGO) {
+          aspect
+          category
+          cloudinaryPath
+          __typename
+        }
+        __typename
+      }
+    }
+    primaryFlowPhases {
+      status
+      phaseSlugEnum
+      __typename
+    }
+    discoveryPosterLandscapeCloudinaryPath
+    discoveryVideoLandscapeUrl
+    logoCloudinaryPath
+    name
+    pifEnabled
+    projectType
+    seasons @include(if: $includeSeasons) {
+      id
+      episodes(
+        includePrerelease: $includePrerelease
+        includePresale: $includePrerelease
+      ) {
+        id
+        currentUserHasEarlyAccess
+        earlyAccessDate
+        publiclyAvailableDate
+        guildAvailableDate
+        description
+        episodeNumber
+        guid
+        id
+        name
+        posterCloudinaryPath
+        posterLandscapeCloudinaryPath
+        projectSlug
+        seasonId
+        seasonNumber
+        source {
+          credits
+          duration
+          url(input: {segmentFormat: TS})
+          __typename
+        }
+        slug
+        subtitle
+        unavailableReason
+        upNext {
+          id
+          episodeNumber
+          guid
+          projectSlug
+          seasonNumber
+          subtitle
+          __typename
+        }
+        watchPosition {
+          id
+          position
+          __typename
+        }
+        ...EpisodeGuildEarlyAccess
+        __typename
+      }
+      id
+      name
+      __typename
+    }
+    slug
+    theaterDescription
+    trailers {
+      id
+      name
+      source {
+        duration
+        url(input: {segmentFormat: TS})
+        __typename
+      }
+      __typename
+    }
+    franchiseDetails {
+      watchSequence
+      franchiseId
+      slug
+      __typename
+    }
+    __typename
+  }
+}
