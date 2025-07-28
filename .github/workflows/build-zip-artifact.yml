@@ -44,7 +44,7 @@ jobs:
           ADDON_ID=$(xmllint --xpath "string(//addon/@id)" addon.xml)
           ADDON_VERSION=$(xmllint --xpath "string(//addon/@version)" addon.xml)
           ZIP_SUFFIX=""
-          if [[ "${GITHUB_REF##*/}" =~ ^release/ ]]; then
+          if [[ "${GITHUB_REF}" =~ ^refs/heads/release/ ]]; then
             ZIP_SUFFIX="-rc1"
           fi
           ZIP_NAME="${ADDON_ID}-${ADDON_VERSION}${ZIP_SUFFIX}.zip"
