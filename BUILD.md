@@ -21,7 +21,7 @@ ln -sf {your_code_directory} {addon_directory}
 For example, on my system it looks like:
 
 ```bash
-ln -sf ~/Code/kodi.plugin.video.angelstudios ~/.kodi/addons/plugin.video.angelstudios
+ln -sfT ~/Code/kodi.plugin.video.angelstudios ~/.kodi/addons/plugin.video.angelstudios
 ls -l ~/.kodi/addons/plugin.video.angelstudios
 ```
 
