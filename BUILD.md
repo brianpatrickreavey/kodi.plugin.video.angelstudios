@@ -1,17 +1,53 @@
 # BUILD.md
 
-## Kodi Addon Build & Release Process
+## Kodi Addon Development, Build & Release Process
 
-This document describes the build and release workflow for this Kodi addon, including versioning, branch conventions, and GitHub Actions automation.
+This document describes the development, build and release workflow for this
+Kodi addon, including versioning, branch conventions, and GitHub Actions automation.
 
 ---
+
+## Development
+
+Development is best done with a local instance of KODI configured to use your
+live code as an addon.  In Linux, this can be accomplished by creating a
+symbolic link between your code directory and a directory in the KODI addons
+directory.
+
+```bash
+ln -sf {your_code_directory} {addon_directory}
+```
+
+For example, on my system it looks like:
+
+```bash
+ln -sf ~/Code/kodi.plugin.video.angelstudios ~/.kodi/addons/plugin.video.angelstudios
+ls -l ~/.kodi/addons/plugin.video.angelstudios
+```
+
+You should see output similar to:
+
+```bash
+lrwxrwxrwx 1 bpreavey bpreavey 50 Jul 28 14:53
+/home/bpreavey/.kodi/addons/plugin.video.angelstudios -> /home/bpreavey/Code/kodi.plugin.video.angelstudios
+```
+
+The first time you launch KODI after creating the symlnk, KODI will prompt you
+if you want to enable the addon, and you should answer yes.  At this point,
+the plugin is live within KODI.
+
+While some changes to code may take effect "live, it is best to quit KODI and
+re-launch it to ensure you are running the latest code.
 
 ## Branching & Versioning Strategy
 
 - **Development** occurs on the `develop` branch.
+- **Release candidates** are created from branches named `release/x.y.z`
+    (e.g., `release/1.2.0`).
+  - The version in `addon.xml` **must match** the version in the release branch
+    name (e.g., `release/1.2.0` → `1.2.0` in `addon.xml`).
 - **Production releases** are merged to the `main` branch.
-- **Release candidates** are created from branches named `release/x.y.z` (e.g., `release/1.2.0`).
-- The version in `addon.xml` **must match** the version in the release branch name (e.g., `release/1.2.0` → `1.2.0` in `addon.xml`).
+- **Cleanup** the `develop` branch by rebasing on `main`
 
 ---
 
@@ -34,7 +70,8 @@ This document describes the build and release workflow for this Kodi addon, incl
 
 3. **Zip Build**
    - Builds a zip file named `<addon-id>-<version>.zip` for `main` and `develop`.
-   - For release branches, appends `-rcN` (e.g., `plugin.video.angelstudios-1.2.0-rc2.zip`).
+   - For release branches, appends `-rcN`
+     (e.g., `plugin.video.angelstudios-1.2.0-rc2.zip`).
 
 4. **Artifact Upload**
    - Uploads the zip file as a workflow artifact.
@@ -50,7 +87,8 @@ This document describes the build and release workflow for this Kodi addon, incl
 
 ## Pre-commit Hook
 
-A pre-commit hook is provided to enforce correct versioning and branch discipline:
+A pre-commit hook is provided to enforce correct versioning and branch
+discipline:
 
 ```bash
 #!/bin/bash
@@ -70,22 +108,26 @@ fi
 
 # Block direct commits to main
 if [[ "$BRANCH" == "main" ]]; then
-    echo "❌ Direct commits to main are not allowed. Please use a release branch and open a pull request."
+    echo "❌ Direct commits to main are not allowed."
+    echo "Please use a release branch and open a pull request."
     exit 1
 fi
 ```
 
 Place this in `.git/hooks/pre-commit` and make it executable (`chmod +x .git/hooks/pre-commit`).
 
-- On `release/x.y.z` branches, the hook enforces that the version in `addon.xml` matches the branch version.
-- On `main`, the hook blocks direct commits (all changes should come from a release branch via pull request).
+- On `release/x.y.z` branches, the hook enforces that the version in
+  `addon.xml` matches the branch version.
+- On `main`, the hook blocks direct commits (all changes should come from a
+  release branch via pull request).
 - On `develop` and feature branches, no checks are enforced.
 
 ---
 
 ## Manual Version Bumping
 
-- Always update the `version` attribute in `addon.xml` before creating a release branch or merging to `main`.
+- Always update the `version` attribute in `addon.xml` before creating a
+  release branch or merging to `main`.
 - The workflow will enforce this for release branches.
 
 ---
@@ -103,8 +145,73 @@ Place this in `.git/hooks/pre-commit` and make it executable (`chmod +x .git/hoo
 
 ---
 
-## Notes
+## Recommended Release Workflow
 
-- Only stable releases should be merged to `main`.
-- Pre-releases (`-rcN`) are for testing and review.
-- The workflow automates artifact creation and release management, reducing manual steps
+Follow these steps to ensure a clean, reproducible, and automated release
+process:
+
+### 1. Develop Features
+
+- Work on new features or bugfixes in feature branches (`feature/xyz`) or
+  directly on `develop`.
+- Merge feature branches into `develop` as features are completed.
+
+### 2. Create a Release Branch
+
+- When ready to prepare a release, create a release branch from `develop`:
+
+  ```bash
+  git checkout develop
+  git pull
+  git checkout -b release/x.y.z
+  ```
+
+- Update the `version` attribute in `addon.xml` to match the release version
+  (`x.y.z`).
+
+### 3. Finalize the Release Branch
+
+- Perform final testing, bugfixes, and polish on the `release/x.y.z` branch.
+- Each push to the release branch triggers a build and creates a pre-release
+  (`-rcN`).
+
+### 4. Merge Release Branch into Main
+
+- When the release is ready, merge the release branch into `main` (squash
+  commits for a clean history):
+
+  ```bash
+  git checkout main
+  git pull
+  git merge --squash release/x.y.z
+  git commit -m "Release x.y.z"
+  git push
+  ```
+
+- The workflow will build and create the final release artifact from `main`.
+
+### 5. Rebase Develop Off Main
+
+- Bring `develop` up to date with `main` to ensure it contains all hotfixes and
+  release changes:
+
+  ```bash
+  git checkout develop
+  git pull
+  git rebase main
+  ```
+
+### Summary Table
+
+| Step | Branch         | Action                                      |
+|------|---------------|---------------------------------------------|
+| 1    | feature/*, develop | Develop features, merge to develop         |
+| 2    | release/x.y.z | Create from develop, bump version           |
+| 3    | release/x.y.z | Finalize, test, fix bugs, pre-releases      |
+| 4    | main          | Merge release branch (squash), final release|
+| 5    | develop       | Rebase develop off main                     |
+
+---
+
+This process keeps `main` clean and production-ready, allows for parallel
+feature development, and ensures version discipline and reproducible releases.
