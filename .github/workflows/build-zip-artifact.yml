@@ -2,7 +2,10 @@ name: Build and Release Kodi Addon Zip
 
 on:
   push:
-    branches: [ main, develop ]
+    branches:
+      - main
+      - develop
+      - 'release/*'
   workflow_dispatch:
 
 jobs:
@@ -36,6 +39,7 @@ jobs:
 
       # Step 2: Build the zip, append -rc1 for release branches
       - name: Create zip file for Kodi addon
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')
         run: |
           ADDON_ID=$(xmllint --xpath "string(//addon/@id)" addon.xml)
           ADDON_VERSION=$(xmllint --xpath "string(//addon/@version)" addon.xml)
@@ -51,6 +55,7 @@ jobs:
           echo "ZIP_SUFFIX=$ZIP_SUFFIX" >> $GITHUB_ENV
 
       - name: Upload zip artifact
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')
         uses: actions/upload-artifact@v4
         with:
           name: kodi-addon-zip
@@ -58,6 +63,7 @@ jobs:
 
       # Step 3: Set prerelease flag for release branches
       - name: Set prerelease flag
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')
         id: set_prerelease
         run: |
           if [[ "${GITHUB_REF##*/}" == "main" ]]; then
@@ -68,6 +74,7 @@ jobs:
 
       # Step 4: Create GitHub Release (with -rc1 for release branches)
       - name: Create GitHub Release and Upload Asset
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.ADDON_VERSION }}${{ env.ZIP_SUFFIX }}
