@@ -30,7 +30,7 @@ You should see output similar to:
 
 ```bash
 lrwxrwxrwx 1 bpreavey bpreavey 50 Jul 28 14:53
-/home/bpreavey/.kodi/addons/plugin.video.angelstudios -> /home/bpreavey/Code/kodi.plugin.video.angelstudios
+/home/bpreavey/.kodi/addons/kodi.plugin.video.angelstudios/plugin.video.angelstudios -> /home/bpreavey/Code/plugin.video.angelstudios
 ```
 
 The first time you launch KODI after creating the symlnk, KODI will prompt you
@@ -41,14 +41,17 @@ While some changes to code may take effect "live", it is best to quit KODI and
 re-launch it to ensure you are running the latest code.
 
 ## Branching & Versioning Strategy
+We are following trunk-based development.  All commits are made to `main`
+unless there is a need for a short-lived release branch.
 
-- **Development** occurs on the `develop` branch.
-- **Release candidates** are created from branches named `release/x.y.z`
-    (e.g., `release/1.2.0`).
-  - The version in `addon.xml` **must match** the version in the release branch
-    name (e.g., `release/1.2.0` → `1.2.0` in `addon.xml`).
-- **Production releases** are merged to the `main` branch.
-- **Cleanup** the `develop` branch by rebasing on `main`
+When the code is ready for a release, update addon.xml to the next correct
+version.  This project followss `semver` versioning.
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<addon id="plugin.video.angelstudios" version="1.0.1" name="Angel Studios">
+...
+```
 
 ---
 
