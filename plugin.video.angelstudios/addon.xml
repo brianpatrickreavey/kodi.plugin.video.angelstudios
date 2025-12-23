@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<addon id="plugin.video.angelstudios" version="0.1.4" name="Angel Studios">
+<addon id="plugin.video.angelstudios" version="0.2.0" name="Angel Studios">
   <provider-name>Brian Reavey, Peter Reavey</provider-name>
   <requires>
     <import addon="xbmc.python" version="3.0.1"/>
@@ -19,6 +19,6 @@
       <icon>resources/images/icons/Angel_Studios_Logo.png</icon>
       <fanart>resources/images/fanart/Angel_Studios_Fanart.webp</fanart>
     </assets>
-    <news>0.1.4 - testing tag-based workflow</news>
+    <news>0.2.0 - Fix episode handling for unavailable episodes</news>
   </extension>
 </addon>

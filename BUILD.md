@@ -57,15 +57,20 @@ but there are a few steps to follow:
 2. Commit the new `addon.xml`.
    ``` bash
    git add plugin.video.angelstudios/addon.xml
-
+   git commit -m "Your News Here"
    ```
-
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<addon id="plugin.video.angelstudios" version="1.0.1" name="Angel Studios">
-...
-```
+3. Push the new `addon.xml` to GitHub
+   ``` bash
+   git push
+   ```
+4. Tag the build with the version from `bump_version.py`
+   ``` bash
+   git tag v0.1.5
+   ```
+5. Push the tag to origin with the same version number
+   ``` bash
+   git push origin v0.1.5
+   ```
 
 ---
 
