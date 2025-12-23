@@ -45,7 +45,21 @@ We are following trunk-based development.  All commits are made to `main`
 unless there is a need for a short-lived release branch.
 
 When the code is ready for a release, update addon.xml to the next correct
-version.  This project followss `semver` versioning.
+version.  This project follows `semver` versioning.  Every releage must
+include "news" describing the updates.  Most of this process is automated,
+but there are a few steps to follow:
+
+1. Bump the version: run `bump_version.py`.  The script will prompt for a
+   type of bump (major|minor|patch) and for the "news" related to the
+   release.  These will be substituted into the `addon.xml` file with the
+   new version number.  The new version number will also be output to the
+   terminal (you will need this later).
+2. Commit the new `addon.xml`.
+   ``` bash
+   git add plugin.video.angelstudios/addon.xml
+
+   ```
+
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>

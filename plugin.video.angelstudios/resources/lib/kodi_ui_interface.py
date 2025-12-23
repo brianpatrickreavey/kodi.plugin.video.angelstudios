@@ -30,7 +30,7 @@ kodi_content_mapper = {
 
 class KodiUIInterface:
     """Helper class for Kodi UI operations"""
-    
+
     def __init__(self, handle, url, logger, angel_interface):
         '''
         Initialize the Kodi UI interface.
@@ -40,7 +40,7 @@ class KodiUIInterface:
         self.log = logger
         self.angel_interface = angel_interface
         self.cache = SimpleCache()  # Initialize cache
-        
+
         # Log initialization
         self.log.info("KodiUIInterface initialized")
         self.log.debug(f"{self.handle=}, {self.kodi_url=}")
@@ -52,7 +52,7 @@ class KodiUIInterface:
     def create_plugin_url(self, **kwargs):
         """Create a URL for calling the plugin recursively"""
         return f'{self.kodi_url}?{urlencode(kwargs)}'
-    
+
     def main_menu(self):
         """Show the main menu with content type options"""
         self.angel_interface.session_check()  # Ensure session is authenticated
@@ -119,20 +119,20 @@ class KodiUIInterface:
                 'description': 'Play a test video'
             }
         ]
-        
-        # Create directory items for each menu option      
+
+        # Create directory items for each menu option
         for item in menu_items:
             # Create list item
             list_item = xbmcgui.ListItem(label=item['label'])
-            
+
             # Set info tags
             info_tag = list_item.getVideoInfoTag()
             info_tag.setPlot(item['description'])
-            
+
             # Create URL
             self.log.debug(f"Creating URL for action: {item['action']}, content_type: {item['content_type']}")
             url = self.create_plugin_url(base_url=self.kodi_url, action=item['action'], content_type=item['content_type'])
-            
+
             # Add to directory (True = is folder)
             xbmcplugin.addDirectoryItem(self.handle, url, list_item, isFolder=True)
 
@@ -185,13 +185,13 @@ class KodiUIInterface:
                     content_type=content_type,
                     project_slug=project['slug']
                 )
-                
+
                 # Add to directory
                 xbmcplugin.addDirectoryItem(self.handle, url, list_item, isFolder=True)
 
             xbmcplugin.addSortMethod(self.handle, xbmcplugin.SORT_METHOD_LABEL)
             xbmcplugin.endOfDirectory(self.handle)
-            
+
         except Exception as e:
             self.log.error(f"Error listing movies: {e}")
             self.log.error(f"Last processing: {project['name']}")
@@ -280,19 +280,30 @@ class KodiUIInterface:
 
             for episode in season.get('episodes', []):
                 self.log.info(f"Processing episode: {episode['name']}")
-                self.log.debug(f"Episode dictionary: {json.dumps(episode, indent=2)}")
+                if not episode.get('source', None):
+                    self.log.warning(f"No source found for episode: {episode['name']}, unavailable")
+                    episode_available = False
+                    stream_url = None
+                    episode_subtitle = episode.get('subtitle', 'Unknown') + " (Unavailable)"
+                else:
+                    episode_available = True
+                    stream_url = episode['source'].get('url', None)
+                    episode_subtitle = episode.get('subtitle', 'Unknown')
+
+                self.log.info(f"Episode source: {episode.get('source', {})}")
+                self.log.info(f"Episode dictionary: {json.dumps(episode, indent=2)}")
 
                 season_number = episode.get('seasonNumber', 0)
 
                 # Create list item
-                list_item = xbmcgui.ListItem(label=episode['subtitle'])
+                list_item = xbmcgui.ListItem(label=episode_subtitle)
                 info_tag = list_item.getVideoInfoTag()
                 info_tag.setMediaType(kodi_content_mapper.get(content_type, 'video'))
-                info_tag.setTitle(f"{episode['subtitle']} ({episode['name']})")
+                info_tag.setTitle(f"{episode_subtitle} ({episode['name']})")
                 self._process_attributes_to_infotags(list_item, episode)
 
                 if season_number > 0:
-                    info_tag.setTitle(f"{episode['subtitle']}")
+                    info_tag.setTitle(f"{episode_subtitle}")
                 else:
                     info_tag.setSortTitle('-'.join([
                         str(episode.get('seasonNumber', 0)),
@@ -301,19 +312,21 @@ class KodiUIInterface:
                     ]))
                     info_tag.setTitle(f"{episode.get('subtitle', '')} ({episode.get('name', '')})")
 
+
                 # Create URL for seasons listing
                 url = self.create_plugin_url(
                     base_url=self.kodi_url,
-                    action='play_content',
+                    action='play_content' if episode_available else 'info',
                     content_type=content_type,
                     project_slug=project_slug,
                     season_id=season['id'],
                     episode_id=episode['id'],
                     episode_guid=episode.get('guid', ''),
-                    stream_url=episode['source']['url'] if episode.get('source') else 'no good man'
+                    stream_url=stream_url
                 )
-                list_item.setProperty('IsPlayable', 'true')
-                self.log.info(f"Creating playable URL for episode: {episode['name']} with stream URL: {episode['source']['url']}")
+
+                list_item.setProperty('IsPlayable', 'true' if episode_available else 'false')
+                self.log.info(f"Creating URL for episode: {episode['name']} with stream URL: {stream_url}")
                 xbmcplugin.addDirectoryItem(self.handle, url, list_item, isFolder=False)
 
             if season['episodes'][0].get('seasonNumber', 0) > 0:
@@ -325,6 +338,7 @@ class KodiUIInterface:
             xbmcplugin.endOfDirectory(self.handle)
 
         except Exception as e:
+            # TODO: this needs to handle episodes that are stubs.  Should not fail completely if one episode is bad.
             self.log.error(f"Error fetching season {season_id}: {e}")
             self.show_error(f"Error fetching season {season_id}: {str(e)}")
             return
@@ -337,12 +351,12 @@ class KodiUIInterface:
             # Create playable item
             play_item = xbmcgui.ListItem(offscreen=True)
             play_item.setPath(stream_url)
-            
+
             # Set stream info if available
             play_item.addStreamInfo('video', {
                 'codec': 'h264'  # Most Angel Studios content is H.264
             })
-            
+
             # Resolve and play
             xbmcplugin.setResolvedUrl(self.handle, True, listitem=play_item)
             self.log.info(f"Playing stream: {stream_url}")
@@ -435,7 +449,7 @@ class KodiUIInterface:
                 return
         except Exception as e:
             xbmc.log(f"Error playing episode {episode_guid}: {e}", xbmc.LOGERROR)
-            self.show_error(f"Failed to play episode: {str(e)}")            
+            self.show_error(f"Failed to play episode: {str(e)}")
 
         # Extract stream URL and metadata
         stream_url = data['episode']['source']['url']
@@ -443,10 +457,10 @@ class KodiUIInterface:
         if not stream_url:
             self.show_error("No playable stream URL found for this episode")
             return
-        
+
         # Play the video with enhanced metadata
         self.play_video_enhanced(stream_url, data)
-    
+
     def play_video_enhanced(self, stream_url, episode_data):
         """Play a video stream with enhanced metadata"""
         try:
@@ -460,14 +474,14 @@ class KodiUIInterface:
             list_item.setPath(stream_url)
             list_item.setIsFolder(False)
             xbmcplugin.setResolvedUrl(self.handle, True, listitem=list_item)
-            
+
             # Set playable property
-            list_item.setProperty('IsPlayable','true')            
+            list_item.setProperty('IsPlayable','true')
 
             # Set detailed info tags
             info_tag = list_item.getVideoInfoTag()
             info_tag.setMediaType('video')
-            
+
             if episode.get('name'):
                 info_tag.setTitle(episode['name'])
             if episode.get('subtitle'):
@@ -482,7 +496,7 @@ class KodiUIInterface:
                 info_tag.setSeason(episode['season_number'])
             if episode.get('duration'):
                 info_tag.setDuration(episode['duration'])
-            
+
             # Set artwork
             art_dict = {}
             if episode.get('poster'):
@@ -491,7 +505,7 @@ class KodiUIInterface:
                 art_dict['fanart'] = episode['fanart']
             if project and project.get('poster'):
                 art_dict['poster'] = project['poster']
-            
+
             list_item.setArt(art_dict)
 
             video_stream_detail = xbmc.VideoStreamDetail()
@@ -503,7 +517,7 @@ class KodiUIInterface:
             # Handle resume position if available
             if episode.get('watch_position'):
                 info_tag.setResumePoint(episode['watch_position'])
-            
+
             self.log.info(f"Playing enhanced video: {episode.get('subtitle', 'Unknown')} from project: {project.get('name', 'Unknown')}")
             self.log.info(f"Stream URL: {stream_url}")
             # Resolve and play
@@ -515,12 +529,12 @@ class KodiUIInterface:
             xbmc.log(f"Error playing enhanced video: {e}", xbmc.LOGERROR)
             # Fallback to basic play
             return
-       
+
     def show_error(self, message, title="Angel Studios"):
         """Show error dialog to user"""
         xbmcgui.Dialog().ok(title, message)
         xbmc.log(f"Error shown to user: {message}", xbmc.LOGERROR)
-    
+
     def show_notification(self, message, title="Angel Studios", time=5000):
         """Show notification to user"""
         xbmcgui.Dialog().notification(title, message, time=time)

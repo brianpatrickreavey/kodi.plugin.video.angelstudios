@@ -32,7 +32,7 @@ class AngelStudioSession:
     def authenticate(self, force_reauthentication=False):
         """
         Get a session object for making requests to the Angel.com API.
-        
+
         Todo:
             - return an unauthenticated session if no credentials are provided
             - Handle session expiration and re-authentication
@@ -59,7 +59,7 @@ class AngelStudioSession:
             self.log.warning(f"Unexpected state: session={self.session}, session_valid={self.session_valid}")
             raise Exception("Unexpected state in authentication flow")
         self.session = requests.Session()
-        
+
         # Try to load existing session cookies
         if self.__load_session_cookies():
             self.log.info("Loaded cookies from file.")
@@ -179,7 +179,7 @@ class AngelStudioSession:
                 jwt_token = cookie.value
                 self.log.debug(f"Found JWT token in cookies: {jwt_token[:10]}...")  # Log first 10 chars for brevity
                 break
-        
+
         if jwt_token:
             self.log.info("Found JWT token in cookies, setting Authorization header")
             # Set the Authorization header for all future requests
@@ -198,7 +198,7 @@ class AngelStudioSession:
     def get_session(self):
         """
         Get an authenticated session for making requests to the Angel.com API.
-        
+
         Returns:
             requests.Session: Authenticated session object
         """
@@ -210,9 +210,10 @@ class AngelStudioSession:
     def _validate_session(self):
         """Check if the current session is valid"""
         try:
-            response = self.session.get(f"{self.web_url}/account", timeout=5)
+            response = self.session.get(f"{self.web_url}/account", timeout=15)
             return response.status_code == 200
         except requests.RequestException as e:
+            # TODO: more specific error handling - check for timeouts specifically
             self.log.error(f"Session validation failed: {e}")
             return False
 
@@ -230,7 +231,7 @@ class AngelStudioSession:
                         jwt_token = cookie.value
                         self.log.info(f"Loaded JWT token from cookies: {jwt_token[:10]}...")
                         break
-                        
+
                 if jwt_token:
                     self.session.headers.update({
                         'Authorization': f'Bearer {jwt_token}'
@@ -258,4 +259,3 @@ class AngelStudioSession:
         except Exception as e:
             self.log.error(f"Error clearing session cache: {e}")
         return False
-
