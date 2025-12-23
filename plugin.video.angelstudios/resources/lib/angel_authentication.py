@@ -99,8 +99,8 @@ class AngelStudioSession:
         # Step 2: Parse state from login page
         soup = BeautifulSoup(login_page_response.content, "html.parser")
 
-        with open('login_page_content.html', 'w') as f:
-            f.write(str(login_page_response.content))
+        # with open('login_page_content.html', 'w') as f:
+        #     f.write(str(login_page_response.content))
 
         state = self.session.cookies.get('angelSession', 'asdfasdf')
         for element in soup.find_all('input'):
