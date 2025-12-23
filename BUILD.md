@@ -21,7 +21,8 @@ ln -sf {your_code_directory} {addon_directory}
 For example, on my system it looks like:
 
 ```bash
-ln -sfT ~/Code/kodi.plugin.video.angelstudios ~/.kodi/addons/plugin.video.angelstudios
+ln -sfT ~/Code/kodi.plugin.video.angelstudios/plugin.video.angelstudios \
+    ~/.kodi/addons/plugin.video.angelstudios
 ls -l ~/.kodi/addons/plugin.video.angelstudios
 ```
 
@@ -36,7 +37,7 @@ The first time you launch KODI after creating the symlnk, KODI will prompt you
 if you want to enable the addon, and you should answer yes.  At this point,
 the plugin is live within KODI.
 
-While some changes to code may take effect "live, it is best to quit KODI and
+While some changes to code may take effect "live", it is best to quit KODI and
 re-launch it to ensure you are running the latest code.
 
 ## Branching & Versioning Strategy
@@ -135,7 +136,7 @@ Place this in `.git/hooks/pre-commit` and make it executable (`chmod +x .git/hoo
 ## Example Release Flow
 
 1. Finish development on `develop`.
-2. Create a release branch:  
+2. Create a release branch:
    `git checkout -b release/1.2.0`
 3. Update `addon.xml` to `1.2.0`.
 4. Push the branch to GitHub.

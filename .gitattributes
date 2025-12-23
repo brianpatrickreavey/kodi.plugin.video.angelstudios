@@ -1,0 +1,17 @@
+.gitattributes export-ignore
+.github/ export-ignore
+.gitignore export-ignore
+.pytest_cache/ export-ignore
+.venv/ export-ignore
+.vscode/ export-ignore
+BUILD.md export-ignore
+CHANGELOG.md export-ignore
+LICENSE.txt export-ignore
+README.md export-ignore
+__pycache__/ export-ignore
+archive/ export-ignore
+test_cache/ export-ignore
+test_credentials.json export-ignore
+test_credentials.json.example export-ignore
+tests/ export-ignore
+tools/ export-ignore
