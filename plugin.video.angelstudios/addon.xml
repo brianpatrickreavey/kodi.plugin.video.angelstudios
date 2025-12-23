@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<addon id="plugin.video.angelstudios" version="0.2.0" name="Angel Studios">
+<addon id="plugin.video.angelstudios" version="0.2.1" name="Angel Studios">
   <provider-name>Brian Reavey, Peter Reavey</provider-name>
   <requires>
     <import addon="xbmc.python" version="3.0.1"/>
     <import addon="script.module.beautifulsoup4" version="4.12.2"/>
     <import addon="script.module.requests" version="2.31.0"/>
-    <import addon="script.module.simplecache" version="2.6.1"/>
+    <import addon="script.module.simplecache" version="2.0.0"/>
   </requires>
   <extension point="xbmc.python.pluginsource" library="main.py">
     <provides>video</provides>
@@ -19,6 +19,6 @@
       <icon>resources/images/icons/Angel_Studios_Logo.png</icon>
       <fanart>resources/images/fanart/Angel_Studios_Fanart.webp</fanart>
     </assets>
-    <news>0.2.0 - Fix episode handling for unavailable episodes</news>
+    <news>0.2.1 - fixing simplecache install issues</news>
   </extension>
 </addon>
