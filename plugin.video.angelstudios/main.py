@@ -68,7 +68,7 @@ def router(paramstring):
     # Parse URL parameters
     params = dict(parse_qsl(paramstring))
     xbmc.log(f"Router called with params: {params}", xbmc.LOGINFO)
-    
+
     try:
         # Route to appropriate function
         if not params:
@@ -103,31 +103,17 @@ def router(paramstring):
             elif params['action'] == 'episodes_menu':
                 # Show episodes for a season using individual parameters
                 ui_interface.episodes_menu(params['content_type'], params['project_slug'], params['season_id'])
-            elif params['action'] == 'play_content':
+            elif params['action'] == 'play_episode':
                 # Play an episode
                 ui_interface.play_episode(params['episode_guid'], params['project_slug'])
-                # ui_interface.play_content(params['stream_url'])
-            elif params['action'] == 'play_episode_enhanced': # WHAT IS THIS?
-                # Play an episode with enhanced data
-                #play_episode_enhanced(params['episode_guid'], params['project_slug'])
-                pass
             elif params['action'] == 'info':
                 # Show info message for unavailable episodes
                 message = params.get('message', 'This content is not available.')
                 ui_interface.show_error(message)
-            elif params['action'] == 'test_video':
-                # Test video playback
-                test_url = 'https://ia904601.us.archive.org/16/items/CC_1916_07_10_TheVagabond/CC_1916_07_10_TheVagabond.mp4'
-                xbmc.log(f"Testing video playback with URL: {test_url}", xbmc.LOGINFO)
-                play_item = xbmcgui.ListItem(offscreen=True)
-                play_item.setPath(test_url)
-                # li = xbmcgui.ListItem(path=test_url)  # Create a dummy list item
-                xbmcplugin.setResolvedUrl(int(sys.argv[1]), True, play_item)
-                # ui_interface.play_video(test_url)
             else:
                 # Unknown action
                 raise ValueError(f'Invalid action: {params.get("action", "unknown")}')
-            
+
     except KeyError as e:
         xbmc.log(f"Missing required parameter: {e}", xbmc.LOGERROR)
         ui_interface.show_error(f"Missing parameter: {str(e)}")
@@ -153,7 +139,7 @@ if __name__ == '__main__':
                 '/resources/lib/angel_graphql/'
             )
             logger.info(f"Using query path: {query_path}")
-            
+
             # Initialize Angel Studios interface with session management
             asi = AngelStudiosInterface(
                 username=USERNAME,
@@ -169,8 +155,7 @@ if __name__ == '__main__':
             # Call the router with parameters from the command line
             logger.info(f"Calling router with params: {sys.argv[2][1:]}")
             router(sys.argv[2][1:])
-            
+
     except Exception as e:
         logger.error(f"Addon initialization error: {e}")
         ui_interface.show_error(f"Addon failed to start: {str(e)}")
-

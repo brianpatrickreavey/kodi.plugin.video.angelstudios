@@ -5,6 +5,10 @@ import sys
 import requests
 from bs4 import BeautifulSoup
 import urllib.parse
+import base64
+import json
+import time
+from datetime import datetime, timezone
 
 class AngelStudioSession:
     """Class to handle Angel Studios authentication and session management"""
@@ -38,6 +42,9 @@ class AngelStudioSession:
             - Handle session expiration and re-authentication
             - Add more robust error handling and logging
             - maybe break this into smaller private functions for clarity
+              - authenticate_with_credentials
+              - authenticate_with_cookies
+              - validate_session
         """
         self.log.info("Getting authenticated session for Angel.com")
 
@@ -98,9 +105,6 @@ class AngelStudioSession:
 
         # Step 2: Parse state from login page
         soup = BeautifulSoup(login_page_response.content, "html.parser")
-
-        # with open('login_page_content.html', 'w') as f:
-        #     f.write(str(login_page_response.content))
 
         state = self.session.cookies.get('angelSession', 'asdfasdf')
         for element in soup.find_all('input'):
@@ -209,13 +213,33 @@ class AngelStudioSession:
 
     def _validate_session(self):
         """Check if the current session is valid"""
-        try:
-            response = self.session.get(f"{self.web_url}/account", timeout=15)
-            return response.status_code == 200
-        except requests.RequestException as e:
-            # TODO: more specific error handling - check for timeouts specifically
-            self.log.error(f"Session validation failed: {e}")
+        token_exp_timestamp = self.__get_jwt_expiration_timestamp(self.session.cookies.get('angel_jwt'))
+        if token_exp_timestamp:
+            now_timestamp = int(datetime.now(timezone.utc).timestamp())
+            now_datetime = datetime.fromtimestamp(now_timestamp, tz=timezone.utc)
+            exp_datetime = datetime.fromtimestamp(token_exp_timestamp, tz=timezone.utc)
+            self.log.info(f"Current UTC datetime: {now_datetime.isoformat()}")
+            self.log.info(f"JWT token expiration datetime: {exp_datetime.isoformat()}")
+            if token_exp_timestamp < now_timestamp:
+                self.log.info("JWT token has expired based on expiration timestamp.")
+                return False
+            else:
+                exp_datetime = datetime.fromtimestamp(token_exp_timestamp, tz=timezone.utc)
+                self.log.info("JWT token is valid based on expiration timestamp.")
+        else:
+            self.log.warning("Could not determine JWT token expiration timestamp.")
             return False
+        return True
+
+    def __get_jwt_expiration_timestamp(self, jwt_token):
+        # Split and decode payload
+        header, payload, signature = jwt_token.split('.')
+        payload_decoded = base64.urlsafe_b64decode(payload + '==')  # Add padding
+        claims = json.loads(payload_decoded)
+        exp_timestamp = claims.get('exp')
+        if exp_timestamp:
+            return exp_timestamp
+        return None
 
     def __load_session_cookies(self):
         if self.session_file:

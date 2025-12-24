@@ -41,7 +41,7 @@ class KodiLogger:
 
         handler = f"{class_name}.{function_name}" if class_name and function_name else "Unknown Handler"
         xbmc.log(f"Handler: {handler} (stack_len:{len(stack)})", xbmc.LOGDEBUG)
-        xbmc.log(f"Angel Studios Addon: {handler}: {message}", level)
+        xbmc.log(f"Angel Studios: {handler}: {message}", level)
 
 
 def get_session_file():

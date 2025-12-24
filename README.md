@@ -164,3 +164,12 @@ Build a catalog cache as the queries are made, and then check for missing data
 in the cache before making another query.  This might be doable with the
 native KODI caching if we're resuing the exact same function calls, but it
 might work better if we do it ourselves.
+
+Cache is somewhat working - need to check which queries get us extra
+information (e.g. does the project query get us all the seasons and episodes
+as well), and pre-cache those results so that they are immediately available
+when a project or season is selected.
+
+Also, it seems we're doing quite a bit to validate the session on every call.
+This can be much simpler if we just try to make the call, and re-authenticate
+and retry the call if the session had timed out (check error messages).
