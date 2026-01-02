@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<addon id="plugin.video.angelstudios" version="0.2.2" name="Angel Studios">
+<addon id="plugin.video.angelstudios" version="0.3.0" name="Angel Studios">
   <provider-name>Brian Reavey, Peter Reavey</provider-name>
   <requires>
     <import addon="xbmc.python" version="3.0.1"/>
@@ -19,6 +19,6 @@
       <icon>resources/images/icons/Angel_Studios_Logo.png</icon>
       <fanart>resources/images/fanart/Angel_Studios_Fanart.webp</fanart>
     </assets>
-    <news>0.2.2 - remove unecessary file operation</news>
+    <news>0.3.0 - Unit Test coverage at 100%.  Small tweaks to code as unit tests uncovered minor issues.</news>
   </extension>
 </addon>

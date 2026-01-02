@@ -188,31 +188,24 @@ class KodiUIInterface:
             xbmcplugin.endOfDirectory(self.handle)
 
         except Exception as e:
-            self.log.error(f"Error listing movies: {e}")
-            self.log.error(f"Last processing: {project['name']}")
-            self.show_error(f"Failed to load movies: {str(e)}")
+            self.log.error(f"Error listing {content_type}: {e}")
+            self.show_error(f"Failed to load {angel_menu_content_mapper.get(content_type)}: {str(e)}")
             raise e
 
     def seasons_menu(self, content_type, project_slug):
         """Display a menu of seasons for a specific project, with persistent caching."""
-        xbmc.log(f"Fetching seasons for project: {project_slug}", xbmc.LOGINFO)
+        self.log.info(f"Fetching seasons for project: {project_slug}")
         try:
             self.log.info(f"Fetching seasons for project: {project_slug}")
-            cache_key = f"seasons_{project_slug}"
-            project = self.cache.get(cache_key)
-            if project:
-                self.log.info(f"Using cached project data for: {project_slug}")
-            else:
-                self.log.info(f"Fetching project data from AngelStudiosInterface for: {project_slug}")
-                project = self.angel_interface._get_project(project_slug)
-                self.cache.set(cache_key, project, expiration=timedelta(hours=4))
+            project = self._get_project(project_slug)
             if not project:
                 self.log.error(f"Project not found: {project_slug}")
                 self.show_error(f"Project not found: {project_slug}")
                 return
-            self.log.debug(f"Project details: {json.dumps(project, indent=2)}")
+            self.log.info(f"Project details: {json.dumps(project, indent=2)}")
             self.log.info(f"Processing {len(project.get('seasons', []))} seasons for project: {project_slug}")
 
+            # TODO Map this, this is gross.
             kodi_content_type = 'movies' if content_type == 'movies' else 'tvshows' if content_type == 'series' else 'videos'
             self.log.info(f"Setting content type for Kodi: {content_type} ({kodi_content_type})")
             xbmcplugin.setContent(self.handle, kodi_content_type)
@@ -256,15 +249,12 @@ class KodiUIInterface:
         """Display a menu of episodes for a specific season, with persistent caching."""
         self.log.info(f"Fetching episodes for project: {project_slug}, season: {season_id}")
         try:
-            cache_key = f"episodes_{project_slug}_{season_id}"
-            project = self.cache.get(cache_key)
-            if project is None:
-                project = self.angel_interface._get_project(project_slug)
-                self.cache.set(cache_key, project, expiration=timedelta(hours=1))
+            project = self._get_project(project_slug)
             if not project:
                 self.log.error(f"Project not found: {project_slug}")
                 self.show_error(f"Project not found: {project_slug}")
                 return
+
             season = next((s for s in project.get('seasons', []) if s.get('id') == season_id), None)
             if not season:
                 self.log.error(f"Season not found: {season_id}")
@@ -321,24 +311,34 @@ class KodiUIInterface:
                 data = self.angel_interface.get_episode_data(episode_guid, project_slug)
                 self.cache.set(cache_key, data, expiration=timedelta(hours=1))
             if not data:
+                self.log.info(f"No data: {data}")
+                self.log.info(f"Episode not found: {episode_guid}")
                 self.show_error(f"Episode not found: {episode_guid}")
                 return
         except Exception as e:
-            xbmc.log(f"Error playing episode {episode_guid}: {e}", xbmc.LOGERROR)
+            self.log.error(f"Error playing episode {episode_guid}: {e}")
             self.show_error(f"Failed to play episode: {str(e)}")
-
-        # Extract stream URL and metadata
-        stream_url = data['episode']['source']['url']
-        self.log.info(f"Playing episode: {data['episode']['name']} from project: {project_slug}")
-        if not stream_url:
-            self.show_error("No playable stream URL found for this episode")
             return
 
-        # Play the video with enhanced metadata
-        self.play_video(stream_url, data)
+        # Extract stream URL and metadata
+        source = data.get('episode', {}).get('source')
+        if not source or not source.get('url'):
+            self.show_error("No playable stream URL found for this episode")
+            self.log.error(f"No stream URL for episode: {episode_guid} in project: {project_slug}")
+            print("No stream URL found")
+            print(f"Data: {data}")
+            return
 
-    def play_video(self, stream_url, episode_data=None):
+        stream_url = source['url']
+        self.log.info(f"Playing episode: {data['episode']['name']} from project: {project_slug}")
+        self.play_video(episode_data=data)
+
+    def play_video(self, stream_url=None, episode_data=None):
         """Play a video stream with optional enhanced metadata"""
+        if stream_url and episode_data:
+            raise ValueError("Provide only stream_url or episode_data, not both")
+        if not stream_url and not episode_data:
+            raise ValueError("Must provide either stream_url or episode_data to play video")
         try:
             if episode_data:
                 # Enhanced playback with metadata
@@ -349,7 +349,7 @@ class KodiUIInterface:
 
                 # Create ListItem with metadata using helper
                 list_item = self._create_list_item_from_episode(
-                    episode,
+                    episode=episode,
                     project=project,
                     content_type=None,
                     stream_url=stream_url,
@@ -357,7 +357,7 @@ class KodiUIInterface:
                 )
 
                 self.log.info(f"Playing enhanced video: {episode.get('subtitle', 'Unknown')} from project: {project.get('name', 'Unknown')}")
-            else:
+            elif stream_url:
                 # Basic playback (fallback for play_content)
                 list_item = xbmcgui.ListItem(offscreen=True)
                 list_item.setPath(stream_url)
@@ -369,11 +369,11 @@ class KodiUIInterface:
 
             # Resolve and play
             xbmcplugin.setResolvedUrl(self.handle, True, listitem=list_item)
-            xbmc.log(f"Playing stream: {list_item.getPath()}", xbmc.LOGINFO)
+            self.log.info(f"Playing stream: {list_item.getPath()}")
 
         except Exception as e:
-            xbmc.log(f"Error playing video: {e}", xbmc.LOGERROR)
-            xbmcplugin.setResolvedUrl(self.handle, False, listitem=xbmcgui.ListItem())
+            self.show_error(f"Error playing video: {e}")
+            self.log.error(f"Error playing video: {e}")
 
     def show_error(self, message, title="Angel Studios"):
         """Show error dialog to user"""
@@ -384,6 +384,21 @@ class KodiUIInterface:
         """Show notification to user"""
         xbmcgui.Dialog().notification(title, message, time=time)
         xbmc.log(f"Notification: {message}", xbmc.LOGINFO)
+
+    def _get_project(self, project_slug):
+        """
+        Helper function to handle fetching and caching project data.
+        """
+        cache_key = f"project_{project_slug}"
+        project = self.cache.get(cache_key)
+        if project is None:
+            self.log.info(f"Fetching project data from AngelStudiosInterface for: {project_slug}")
+            project = self.angel_interface.get_project(project_slug)
+            if project:
+                self.cache.set(cache_key, project, expiration=timedelta(hours=4))
+        else:
+            self.log.info(f"Using cached project data for: {project_slug}")
+        return project
 
     def _create_list_item_from_episode(self, episode, project=None, content_type=None, stream_url=None, is_playback=False):
         """
@@ -419,7 +434,8 @@ class KodiUIInterface:
                 info_tag.setResumePoint(episode['watch_position'])
         else:
             list_item = xbmcgui.ListItem(label=episode_subtitle)
-            list_item.setProperty('IsPlayable', 'true' if episode_available else 'false')
+            list_item.setIsFolder(True)
+            list_item.setProperty('IsPlayable', 'true' if is_playback else 'false')
 
         # Set common metadata
         self._process_attributes_to_infotags(list_item, episode)

@@ -24,7 +24,7 @@ class AngelStudiosInterface:
     """
     Interface for Angel Studios website HTML and GraphQL queries.
     - GraphQL queries are used to fetch project data, seasons, episodes, and more.
-    - helpers translate native graphql queries into useable data    
+    - helpers translate native graphql queries into useable data
     """
     def __init__(self, username=None, password=None, session_file=None, logger=None, query_path=None):
         # Use the provided logger, or default to the module logger
@@ -40,7 +40,7 @@ class AngelStudiosInterface:
 
         # Use provided session file or get authenticated session
         self.angel_studios_session = angel_authentication.AngelStudioSession(
-            username=username, 
+            username=username,
             password=password,
             session_file=session_file,
             logger=self.log
@@ -123,6 +123,9 @@ class AngelStudiosInterface:
         except requests.RequestException as e:
             self.log.error(f"GraphQL request failed: {e}")
             return {}
+        except Exception as e:
+            self.log.error(f"Unexpected error during GraphQL query: {e}")
+            return {}
 
     def get_projects(self, project_type=None):
         """Get all projects available in the catalog of the matching content type"""
@@ -148,7 +151,7 @@ class AngelStudiosInterface:
             return None
         return f"https://images.angelstudios.com/image/upload/{cloudinary_path}"
 
-    def _get_project(self, project_slug):
+    def get_project(self, project_slug):
         """Get a specific project by its slug"""
         try:
             result = self._graphql_query(
@@ -197,4 +200,3 @@ class AngelStudiosInterface:
                 raise Exception("Session re-authentication failed")
         else:
             self.log.info("Session is valid")
-

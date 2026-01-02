@@ -60,11 +60,8 @@ class AngelStudioSession:
         if self.session and self.session_valid:
             self.log.info("Session is already authenticated and valid.")
             return True
-        elif not self.session or not self.session_valid:
-            self.log.info("No valid session found, starting authentication flow.")
-        else:
-            self.log.warning(f"Unexpected state: session={self.session}, session_valid={self.session_valid}")
-            raise Exception("Unexpected state in authentication flow")
+
+        self.log.info("No valid session found, starting authentication flow.")
         self.session = requests.Session()
 
         # Try to load existing session cookies
