@@ -345,14 +345,11 @@ class KodiUIInterface:
                 episode = episode_data.get('episode', {})
                 project = episode_data.get('project', {})
 
-                stream_url = episode.get('source', {}).get('url', stream_url)
-
                 # Create ListItem with metadata using helper
                 list_item = self._create_list_item_from_episode(
                     episode=episode,
                     project=project,
                     content_type=None,
-                    stream_url=stream_url,
                     is_playback=True
                 )
 
@@ -409,20 +406,23 @@ class KodiUIInterface:
         - stream_url: If provided, enables playback mode.
         - is_playback: True for playback mode (sets offscreen, path, etc.).
         """
+        self.log.info(f"Creating ListItem for episode: {episode.get('name', 'Unknown Episode')}, is_playback={is_playback}")
         episode_available = bool(episode.get('source'))
         episode_subtitle = episode.get('subtitle', episode.get('name', 'Unknown Episode'))
         if not episode_available:
-            episode_subtitle += " (Unavailable)"
+            episode_subtitle = f"[I] {episode_subtitle} (Unavailable)[/I]"
+
+        list_item = xbmcgui.ListItem(label=episode_subtitle, offscreen=is_playback)
+        list_item.setProperty('IsPlayable', 'true' if episode_available else 'false')
 
         # Create ListItem
         if is_playback:
-            list_item = xbmcgui.ListItem(offscreen=True)
-            list_item.setPath(stream_url)
+            list_item.setPath(episode.get('source', {}).get('url', stream_url))
             list_item.setIsFolder(False)
-            list_item.setProperty('IsPlayable', 'true')
 
             # Stream details
             video_stream_detail = xbmc.VideoStreamDetail()
+            # TODO these should not be hardcoded, but programmatically determined from source metadata
             video_stream_detail.setCodec('h264')
             video_stream_detail.setWidth(1920)
             video_stream_detail.setHeight(1080)
@@ -433,9 +433,7 @@ class KodiUIInterface:
             if episode.get('watch_position'):
                 info_tag.setResumePoint(episode['watch_position'])
         else:
-            list_item = xbmcgui.ListItem(label=episode_subtitle)
             list_item.setIsFolder(True)
-            list_item.setProperty('IsPlayable', 'true' if is_playback else 'false')
 
         # Set common metadata
         self._process_attributes_to_infotags(list_item, episode)

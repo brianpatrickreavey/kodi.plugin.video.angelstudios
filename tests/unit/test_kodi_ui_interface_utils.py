@@ -45,12 +45,12 @@ class TestUtils:
             # Ensure ListItem was created
             mock_list_item.assert_called_once()
             list_item_instance = mock_list_item.return_value
+            list_item_instance.setProperty.assert_called_once_with('IsPlayable', 'true' if episode_available else 'false')
 
             # Conditional assertions based on is_playback
             if is_playback:
                 list_item_instance.setPath.assert_called_once_with(stream_url)
                 list_item_instance.setIsFolder.assert_called_once_with(False)
-                list_item_instance.setProperty.assert_called_once_with('IsPlayable', 'true')
 
                 # Ensure _process_attributes_to_infotags was called
                 mock_video_stream_detail.assert_called_once_with()
@@ -61,7 +61,6 @@ class TestUtils:
 
             else:
                 list_item_instance.setIsFolder.assert_called_once_with(True)
-                list_item_instance.setProperty.assert_called_once_with('IsPlayable', 'false')
 
             mock_process_attrs.assert_called_once_with(list_item_instance, episode)
 
