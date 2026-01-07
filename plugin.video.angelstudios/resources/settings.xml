@@ -1,35 +1,155 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <settings version="1">
-    <section id="plugin.video.angelstudios" label="Angel Studios">
-        <category id="general" label="30011" help="General settings">
-            <group id="1" label="30012" help="Authentication settings">
-                <setting id="username" type="string" label="32011" help="Angel Studios Username (usually email)">
+    <section id="plugin.video.angelstudios" label="30000">
+        <category id="general" label="128" help="30100">
+            <group id="general_group" label="128" help="30100">
+                <setting id="video_quality" type="string" label="30102" help="30103">
+                    <level>0</level>
+                    <default>auto</default>
+                    <constraints>
+                        <options>
+                            <option label="30110">auto</option>
+                            <option label="30111">manual</option>
+                            <option label="30112">1080p</option>
+                            <option label="30113">720p</option>
+                            <option label="30114">480p</option>
+                            <option label="30115">360p</option>
+                        </options>
+                    </constraints>
+                    <control type="spinner" format="string" />
+                </setting>
+            </group>
+        </category>
+
+        <category id="authentication" label="30200" help="30201">
+            <group id="auth_group" label="30200" help="30201">
+                <setting id="username" type="string" label="1014" help="Angel Studios Username (usually email)">
                     <level>0</level>
                     <default/>
                     <constraints>
                         <allowempty>true</allowempty>
                     </constraints>
                     <control type="edit" format="string">
-                        <heading>32001</heading>
+                        <heading>30204</heading>
                     </control>
                 </setting>
-                <setting id="password" type="string" label="32012" help="Angel Studios Password">
+                <setting id="password" type="string" label="733" help="Angel Studios Password">
                     <level>0</level>
                     <default/>
                     <constraints>
                         <allowempty>true</allowempty>
                     </constraints>
                     <control type="edit" format="string">
-                        <heading>32002</heading>
+                        <heading>12326</heading>
                         <hidden>true</hidden>
                     </control>
                 </setting>
+                <setting id="show_auth_details" type="action" label="30206" help="30207">
+                    <level>0</level>
+                    <data>RunPlugin(plugin://plugin.video.angelstudios/?action=show_information)</data>
+                    <control type="button" format="action" />
+                </setting>
             </group>
-            <group id="2" label="32013" help="Debug settings">
-                <setting id="debug_mode" type="boolean" label="32013" help="Enables debug logging at the info level.">
+        </category>
+
+        <category id="folders" label="30300" help="30301">
+            <group id="folders_group" label="30300" help="30301">
+                <setting id="show_movies" type="boolean" label="20342" help="30311">
+                    <level>0</level>
+                    <default>true</default>
+                    <control type="toggle" />
+                </setting>
+                <setting id="show_series" type="boolean" label="30312" help="30313">
+                    <level>0</level>
+                    <default>true</default>
+                    <control type="toggle" />
+                </setting>
+                <setting id="show_specials" type="boolean" label="30314" help="30315">
+                    <level>0</level>
+                    <default>true</default>
+                    <control type="toggle" />
+                </setting>
+                <setting id="show_podcasts" type="boolean" label="30316" help="30317">
+                    <level>0</level>
+                    <default>false</default>
+                    <control type="toggle" />
+                </setting>
+                <setting id="show_livestreams" type="boolean" label="30318" help="30319">
+                    <level>0</level>
+                    <default>false</default>
+                    <control type="toggle" />
+                </setting>
+                <setting id="show_continue_watching" type="boolean" label="30320" help="30321">
+                    <level>0</level>
+                    <default>false</default>
+                    <control type="toggle" />
+                </setting>
+                <setting id="show_top_picks" type="boolean" label="30322" help="30323">
+                    <level>0</level>
+                    <default>false</default>
+                    <control type="toggle" />
+                </setting>
+                <setting id="show_other_content" type="boolean" label="30324" help="30325">
+                    <level>0</level>
+                    <default>false</default>
+                    <control type="toggle" />
+                </setting>
+            </group>
+        </category>
+
+        <category id="advanced" label="10038" help="30401">
+            <group id="advanced_group" label="10038" help="30401">
+                <setting id="use_isa" type="boolean" label="30104" help="30105">
+                    <level>0</level>
+                    <default>true</default>
+                    <control type="toggle" />
+                </setting>
+                <setting id="debug_mode" type="string" label="30402" help="30403">
+                    <level>3</level>
+                    <default>off</default>
+                    <constraints>
+                        <options>
+                            <option label="30404">off</option>
+                            <option label="30405">debug</option>
+                            <option label="30406">trace</option>
+                        </options>
+                    </constraints>
+                    <control type="spinner" format="string" />
+                </setting>
+                <setting id="disable_cache" type="boolean" label="30407" help="30408">
                     <level>3</level>
                     <default>false</default>
-                    <control type="toggle"/>
+                    <control type="toggle" />
+                </setting>
+                <setting id="cache_expiration_hours" type="integer" label="30409" help="30410">
+                    <level>3</level>
+                    <default>12</default>
+                    <constraints>
+                        <minimum>1</minimum>
+                        <maximum>168</maximum>
+                        <step>1</step>
+                    </constraints>
+                    <control type="spinner" format="integer" />
+                </setting>
+            </group>
+        </category>
+
+        <category id="maintenance" label="14280" help="30501">
+            <group id="maintenance_group" label="14280" help="30501">
+                <setting id="clear_cache" type="action" label="30510" help="30511">
+                    <level>3</level>
+                    <data>RunPlugin(plugin://plugin.video.angelstudios/?action=clear_cache)</data>
+                    <control type="button" format="action" />
+                </setting>
+                <setting id="force_logout" type="action" label="30512" help="30513">
+                    <level>3</level>
+                    <data>RunPlugin(plugin://plugin.video.angelstudios/?action=force_logout)</data>
+                    <control type="button" format="action" />
+                </setting>
+                <setting id="clear_debug_data" type="action" label="30514" help="30515">
+                    <level>3</level>
+                    <data>RunPlugin(plugin://plugin.video.angelstudios/?action=clear_debug_data)</data>
+                    <control type="button" format="action" />
                 </setting>
             </group>
         </category>

@@ -2,22 +2,302 @@ msgid ""
 msgstr ""
 "Language: en_GB\n"
 
+# ============================================================================
+# 30000-30099: Addon Metadata & Core Labels
+# ============================================================================
+
+msgctxt "#30000"
+msgid "Angel Studios"
+msgstr "Angel Studios"
+
+msgctxt "#30010"
+msgid "Information"
+msgstr "Information"
+
 msgctxt "#30011"
-msgid "General"
-msgstr ""
+msgid "Show Information"
+msgstr "Show Information"
 
 msgctxt "#30012"
+msgid "View addon version, login state, and news."
+msgstr "View addon version, login state, and news."
+
+msgctxt "#30013"
+msgid "Addon Version"
+msgstr "Addon Version"
+
+msgctxt "#30014"
+msgid "Login Status"
+msgstr "Login Status"
+
+msgctxt "#30015"
+msgid "News and Updates"
+msgstr "News and Updates"
+
+# ============================================================================
+# 30100-30199: General Settings (Video Quality, Playback)
+# ============================================================================
+
+msgctxt "#30100"
+msgid "General settings"
+msgstr "General settings"
+
+msgctxt "#30101"
+msgid "Playback"
+msgstr "Playback"
+
+msgctxt "#30102"
+msgid "Preferred video quality"
+msgstr "Preferred video quality"
+
+msgctxt "#30103"
+msgid "Choose a preferred HLS rendition; Auto uses stream adaptation."
+msgstr "Choose a preferred HLS rendition; Auto uses stream adaptation."
+
+msgctxt "#30104"
+msgid "Use InputStream Adaptive (HLS)"
+msgstr "Use InputStream Adaptive (HLS)"
+
+msgctxt "#30105"
+msgid "Enable the InputStream Adaptive addon for HLS playback; disable to fall back to Kodi's built-in player."
+msgstr "Enable the InputStream Adaptive addon for HLS playback; disable to fall back to Kodi's built-in player."
+
+msgctxt "#30110"
+msgid "Auto"
+msgstr "Auto"
+
+msgctxt "#30111"
+msgid "Manual Picker"
+msgstr "Manual Picker"
+
+msgctxt "#30112"
+msgid "1080p"
+msgstr "1080p"
+
+msgctxt "#30113"
+msgid "720p"
+msgstr "720p"
+
+msgctxt "#30114"
+msgid "480p"
+msgstr "480p"
+
+msgctxt "#30115"
+msgid "360p"
+msgstr "360p"
+
+msgctxt "#30120"
+msgid "Enable subtitles"
+msgstr "Enable subtitles"
+
+msgctxt "#30121"
+msgid "Turn subtitles on when available."
+msgstr "Turn subtitles on when available."
+
+msgctxt "#30122"
+msgid "Preferred subtitle language"
+msgstr "Preferred subtitle language"
+
+msgctxt "#30123"
+msgid "ISO 639-1 code (e.g., en, es); leave blank for default."
+msgstr "ISO 639-1 code (e.g., en, es); leave blank for default."
+
+msgctxt "#30124"
+msgid "Preferred language"
+msgstr "Preferred language"
+
+msgctxt "#30125"
+msgid "Content language preference; leave blank to use system default."
+msgstr "Content language preference; leave blank to use system default."
+
+# ============================================================================
+# 30200-30299: Authentication
+# ============================================================================
+
+msgctxt "#30200"
 msgid "Authentication"
-msgstr ""
+msgstr "Authentication"
 
-msgctxt "#32011"
-msgid "Username"
-msgstr "Username"
+msgctxt "#30201"
+msgid "Authentication settings"
+msgstr "Authentication settings"
 
-msgctxt "#32012"
-msgid "Password"
-msgstr "Password"
+msgctxt "#30204"
+msgid "Enter username"
+msgstr "Enter username"
 
-msgctxt "#32013"
+msgctxt "#30206"
+msgid "Show Angel Studios Session details"
+msgstr "Show Angel Studios Session details"
+
+msgctxt "#30207"
+msgid "Display current login status in a dialog"
+msgstr "Display current login status in a dialog"
+
+# ============================================================================
+# 30300-30399: Folders & Content Types
+# ============================================================================
+
+msgctxt "#30300"
+msgid "Folders"
+msgstr "Folders"
+
+msgctxt "#30301"
+msgid "Choose which folders appear on the home screen"
+msgstr "Choose which folders appear on the home screen"
+
+msgctxt "#30311"
+msgid "Show Movies on the main menu"
+msgstr "Show Movies on the main menu"
+
+msgctxt "#30312"
+msgid "Series"
+msgstr "Series"
+
+msgctxt "#30313"
+msgid "Show Series on the main menu"
+msgstr "Show Series on the main menu"
+
+msgctxt "#30314"
+msgid "Dry Bar Comedy Specials"
+msgstr "Dry Bar Comedy Specials"
+
+msgctxt "#30315"
+msgid "Show Specials on the main menu"
+msgstr "Show Specials on the main menu"
+
+msgctxt "#30316"
+msgid "Podcasts"
+msgstr "Podcasts"
+
+msgctxt "#30317"
+msgid "Show Podcasts on the main menu"
+msgstr "Show Podcasts on the main menu"
+
+msgctxt "#30318"
+msgid "Livestreams"
+msgstr "Livestreams"
+
+msgctxt "#30319"
+msgid "Show Livestreams on the main menu"
+msgstr "Show Livestreams on the main menu"
+
+msgctxt "#30320"
+msgid "Continue Watching"
+msgstr "Continue Watching"
+
+msgctxt "#30321"
+msgid "Show Continue Watching on the main menu"
+msgstr "Show Continue Watching on the main menu"
+
+msgctxt "#30322"
+msgid "Top Picks For You"
+msgstr "Top Picks For You"
+
+msgctxt "#30323"
+msgid "Show Top Picks on the main menu"
+msgstr "Show Top Picks on the main menu"
+
+msgctxt "#30324"
+msgid "Other Content"
+msgstr "Other Content"
+
+msgctxt "#30325"
+msgid "Show Other Content on the main menu"
+msgstr "Show Other Content on the main menu"
+
+# ============================================================================
+# 30400-30499: Advanced & Debug
+# ============================================================================
+
+msgctxt "#30401"
+msgid "Playback and diagnostic options"
+msgstr "Playback and diagnostic options"
+
+msgctxt "#30402"
 msgid "Debug mode"
 msgstr "Debug mode"
+
+msgctxt "#30403"
+msgid "Enables verbose addon logging to the Kodi log."
+msgstr "Enables verbose addon logging to the Kodi log."
+
+msgctxt "#30404"
+msgid "Off"
+msgstr "Off"
+
+msgctxt "#30405"
+msgid "Debug"
+msgstr "Debug"
+
+msgctxt "#30406"
+msgid "Trace"
+msgstr "Trace"
+
+msgctxt "#30407"
+msgid "Disable cache"
+msgstr "Disable cache"
+
+msgctxt "#30408"
+msgid "Disables data caching for troubleshooting purposes."
+msgstr "Disables data caching for troubleshooting purposes."
+
+msgctxt "#30409"
+msgid "Cache expiration (hours)"
+msgstr "Cache expiration (hours)"
+
+msgctxt "#30410"
+msgid "Set cache lifetime in hours (default 12)."
+msgstr "Set cache lifetime in hours (default 12)."
+
+# ============================================================================
+# 30500-30599: Maintenance & Troubleshooting
+# ============================================================================
+
+msgctxt "#30501"
+msgid "Cache and session management"
+msgstr "Cache and session management"
+
+msgctxt "#30502"
+msgid "Troubleshooting"
+msgstr "Troubleshooting"
+
+msgctxt "#30503"
+msgid "Troubleshooting settings"
+msgstr "Troubleshooting settings"
+
+msgctxt "#30510"
+msgid "Clear cache now"
+msgstr "Clear cache now"
+
+msgctxt "#30511"
+msgid "Clears all cached Angel Studios data immediately."
+msgstr "Clears all cached Angel Studios data immediately."
+
+msgctxt "#30512"
+msgid "Force logout"
+msgstr "Force logout"
+
+msgctxt "#30513"
+msgid "Clears authentication/session cookies to require re-login."
+msgstr "Clears authentication/session cookies to require re-login."
+
+msgctxt "#30514"
+msgid "Clear debug data"
+msgstr "Clear debug data"
+
+msgctxt "#30515"
+msgid "Removes all debug data and logs."
+msgstr "Removes all debug data and logs."
+
+# ============================================================================
+# 30600-30699: Future Use
+# ============================================================================
+
+msgctxt "#30600"
+msgid "History"
+msgstr "History"
+
+msgctxt "#30601"
+msgid "Coming soon"
+msgstr "Coming soon"
