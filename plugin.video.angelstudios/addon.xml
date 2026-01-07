@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<addon id="plugin.video.angelstudios" version="0.3.1" name="Angel Studios">
+<addon id="plugin.video.angelstudios" version="0.4.0" name="Angel Studios">
   <provider-name>Brian Reavey, Peter Reavey</provider-name>
   <requires>
     <import addon="xbmc.python" version="3.0.1"/>
@@ -21,6 +21,6 @@
       <icon>resources/images/icons/Angel_Studios_Logo.png</icon>
       <fanart>resources/images/fanart/Angel_Studios_Fanart.webp</fanart>
     </assets>
-    <news>0.3.1 - Fix unplayable ListItems.  Slight refactor of item creation for consistency.</news>
+    <news>0.4.0 - Major refactor, menu building, debug and trace settings, etc.</news>
   </extension>
 </addon>
