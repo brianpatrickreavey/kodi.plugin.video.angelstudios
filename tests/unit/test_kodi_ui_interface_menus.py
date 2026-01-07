@@ -2,9 +2,14 @@
 Unit tests for menus from Kodi UI Interface class.
 """
 
+import os
+import tempfile
+
 import pytest
 import unittest
 from unittest.mock import MagicMock, patch
+
+from kodi_ui_interface import KodiUIInterface
 
 import copy
 
@@ -37,6 +42,9 @@ class TestMainMenu:
         ui, logger_mock, angel_interface_mock = ui_interface
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
+        # Ensure menu rebuild uses current settings
+        ui.addon.getSettingBool.return_value = True
+
         ui.main_menu()
 
         # Assert addDirectoryItem was called for each menu item
@@ -65,6 +73,284 @@ class TestMainMenu:
             assert list_item_call[1]["label"] == item["label"]
 
         mock_end_dir.assert_called_once_with(1)
+
+    def test_watchlist_menu_placeholder(self, ui_interface):
+        ui, logger_mock, angel_interface_mock = ui_interface
+
+        with patch.object(ui, "show_error") as mock_show_error:
+            ui.watchlist_menu()
+
+        mock_show_error.assert_called_once_with("Watchlist is not available yet.")
+        logger_mock.info.assert_any_call("Watchlist menu requested, but not yet implemented.")
+
+    def test_continue_watching_menu_placeholder(self, ui_interface):
+        ui, logger_mock, angel_interface_mock = ui_interface
+
+        with patch.object(ui, "show_error") as mock_show_error:
+            ui.continue_watching_menu()
+
+        mock_show_error.assert_called_once_with("Continue Watching is not available yet.")
+        logger_mock.info.assert_any_call("Continue watching menu requested, but not yet implemented.")
+
+    def test_top_picks_menu_placeholder(self, ui_interface):
+        ui, logger_mock, angel_interface_mock = ui_interface
+
+        with patch.object(ui, "show_error") as mock_show_error:
+            ui.top_picks_menu()
+
+        mock_show_error.assert_called_once_with("Top Picks is not available yet.")
+        logger_mock.info.assert_any_call("Top picks menu requested, but not yet implemented.")
+
+    def test_other_content_menu_placeholder(self, ui_interface):
+        ui, logger_mock, angel_interface_mock = ui_interface
+
+        with patch.object(ui, "show_error") as mock_show_error:
+            ui.other_content_menu()
+
+        mock_show_error.assert_called_once_with("Other Content is not available yet.")
+        logger_mock.info.assert_any_call("Other content menu requested, but not yet implemented.")
+
+    def test_main_menu_settings_error_defaults_enabled(self, mock_xbmc):
+        """If settings read fails, menu defaults stay enabled."""
+        import xbmcaddon
+
+        addon = xbmcaddon.Addon.return_value
+        original_side_effect = addon.getSettingBool.side_effect
+        addon.getSettingBool.side_effect = Exception("settings failure")
+
+        ui = KodiUIInterface(
+            handle=1,
+            url="plugin://plugin.video.angelstudios/",
+            logger=MagicMock(),
+            angel_interface=MagicMock(),
+        )
+
+        mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
+
+        ui.main_menu()
+
+        addon.getSettingBool.side_effect = original_side_effect
+
+        # Fallback to defaults shows only enabled defaults plus Settings
+        assert len(ui.menu_items) == 4
+        mock_add_item.assert_called()
+        assert mock_add_item.call_count == len(ui.menu_items)
+        mock_end_dir.assert_called_once_with(1)
+
+    def test_main_menu_non_bool_setting_falls_back_to_default(self, mock_xbmc):
+        """Non-boolean setting values fall back to defaults."""
+        import xbmcaddon
+
+        addon = xbmcaddon.Addon.return_value
+        original_side_effect = addon.getSettingBool.side_effect
+
+        def fake_get_setting_bool(key):
+            if key == "show_podcasts":
+                return "yes"  # force non-bool path
+            return original_side_effect(key)
+
+        addon.getSettingBool.side_effect = fake_get_setting_bool
+
+        ui = KodiUIInterface(
+            handle=1,
+            url="plugin://plugin.video.angelstudios/",
+            logger=MagicMock(),
+            angel_interface=MagicMock(),
+        )
+
+        # Rebuild menu and ensure non-bool falls back to default (podcasts stays hidden)
+        ui.main_menu()
+
+        addon.getSettingBool.side_effect = original_side_effect
+
+        labels = [item["label"] for item in ui.menu_items]
+        assert "Podcasts" not in labels
+        assert labels.count("Movies") == 1
+        assert labels.count("Series") == 1
+        assert labels.count("Dry Bar Comedy Specials") == 1
+        assert labels.count("Settings") == 1
+
+    def test_main_menu_respects_setting_toggle_off(self, mock_xbmc):
+        """Menu rebuild should hide items when settings are false."""
+        import xbmcaddon
+
+        addon = xbmcaddon.Addon.return_value
+        original_side_effect = addon.getSettingBool.side_effect
+        addon.getSettingBool.side_effect = (
+            lambda key: False if key == "show_series" else True
+        )
+
+        ui = KodiUIInterface(
+            handle=1,
+            url="plugin://plugin.video.angelstudios/",
+            logger=MagicMock(),
+            angel_interface=MagicMock(),
+        )
+
+        # Rebuild menu using current settings
+        ui.main_menu()
+
+        addon.getSettingBool.side_effect = original_side_effect
+
+        labels = [item["label"] for item in ui.menu_items]
+        assert "Series" not in labels
+        assert "Movies" in labels
+        assert "Dry Bar Comedy Specials" in labels
+        assert "Settings" in labels
+
+    def test_cache_ttl_uses_setting_int(self):
+        import xbmcaddon
+
+        addon = xbmcaddon.Addon.return_value
+        addon.getSettingInt.return_value = 5
+
+        ui = KodiUIInterface(
+            handle=1,
+            url="plugin://plugin.video.angelstudios/",
+            logger=MagicMock(),
+            angel_interface=MagicMock(),
+        )
+
+        ttl = ui._cache_ttl()
+        assert ttl == timedelta(hours=5)
+
+        addon.getSettingInt.return_value = 12
+
+    @pytest.mark.parametrize("hours", [1, 12, 168])
+    def test_cache_ttl_respects_slider_range(self, hours):
+        import xbmcaddon
+
+        addon = xbmcaddon.Addon.return_value
+        addon.getSettingInt.return_value = hours
+
+        ui = KodiUIInterface(
+            handle=1,
+            url="plugin://plugin.video.angelstudios/",
+            logger=MagicMock(),
+            angel_interface=MagicMock(),
+        )
+
+        ttl = ui._cache_ttl()
+        assert ttl == timedelta(hours=hours)
+
+        addon.getSettingInt.return_value = 12
+
+    def test_cache_ttl_falsy_defaults_to_12(self):
+        import xbmcaddon
+
+        addon = xbmcaddon.Addon.return_value
+        addon.getSettingInt.return_value = 0
+
+        ui = KodiUIInterface(
+            handle=1,
+            url="plugin://plugin.video.angelstudios/",
+            logger=MagicMock(),
+            angel_interface=MagicMock(),
+        )
+
+        ttl = ui._cache_ttl()
+        assert ttl == timedelta(hours=12)
+
+        addon.getSettingInt.return_value = 12
+
+    def test_cache_ttl_falls_back_on_exception(self):
+        import xbmcaddon
+
+        addon = xbmcaddon.Addon.return_value
+        addon.getSettingInt.side_effect = Exception("fail int")
+
+        ui = KodiUIInterface(
+            handle=1,
+            url="plugin://plugin.video.angelstudios/",
+            logger=MagicMock(),
+            angel_interface=MagicMock(),
+        )
+
+        ttl = ui._cache_ttl()
+        assert ttl == timedelta(hours=12)
+
+        addon.getSettingInt.side_effect = None
+        addon.getSettingInt.return_value = 12
+
+    def test_cache_ttl_getsetting_fallback_exception(self):
+        import xbmcaddon
+
+        addon = xbmcaddon.Addon.return_value
+        addon.getSettingInt = None  # force non-callable path
+        addon.getSetting.side_effect = Exception("boom")
+
+        ui = KodiUIInterface(
+            handle=1,
+            url="plugin://plugin.video.angelstudios/",
+            logger=MagicMock(),
+            angel_interface=MagicMock(),
+        )
+
+        ttl = ui._cache_ttl()
+        assert ttl == timedelta(hours=12)
+
+        addon.getSetting = MagicMock(return_value="12")
+        addon.getSettingInt = MagicMock(return_value=12)
+
+    def test_cache_disabled_bypasses_get_set(self, ui_interface):
+        import xbmcaddon
+        from unittest.mock import MagicMock
+
+        ui, logger_mock, angel_interface_mock = ui_interface
+
+        # Fresh addon scoped to this test to avoid leaking disable_cache to other tests
+        fresh_addon = MagicMock()
+        fresh_addon.getSettingBool.side_effect = lambda key: True if key == "disable_cache" else False
+        fresh_addon.getSettingString.return_value = "off"
+        fresh_addon.getSettingInt.return_value = 12
+
+        ui.addon = fresh_addon
+        ui.cache.get.reset_mock()
+        ui.cache.set.reset_mock()
+        angel_interface_mock.get_projects.return_value = []
+
+        with (
+            patch("xbmcaddon.Addon", return_value=fresh_addon),
+            patch.object(ui, "show_error"),
+        ):
+            ui.projects_menu(content_type="movies")
+
+        ui.cache.get.assert_not_called()
+        ui.cache.set.assert_not_called()
+
+    def test_trace_writer_redacts_and_stores(self):
+        import xbmcaddon
+
+        addon = xbmcaddon.Addon.return_value
+        addon.getSettingString.return_value = "trace"
+
+        ui = KodiUIInterface(
+            handle=1,
+            url="plugin://plugin.video.angelstudios/",
+            logger=MagicMock(),
+            angel_interface=MagicMock(),
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ui.trace_dir = tmpdir
+            tracer = ui.get_trace_callback()
+            payload = {
+                "operation": "op",
+                "request": {"headers": {"Authorization": "secret", "X": "ok"}, "body": {"password": "pw"}},
+                "response": {"token": "abc", "value": 1},
+            }
+            tracer(payload)
+
+            files = os.listdir(tmpdir)
+            assert len(files) == 1
+            with open(os.path.join(tmpdir, files[0]), "r", encoding="utf-8") as fp:
+                content = fp.read()
+                assert "secret" not in content
+                assert "pw" not in content
+                assert "abc" not in content
+                assert "<redacted>" in content
+
+        addon.getSettingString.return_value = "off"
 
 
 def projects_menu_logic_helper(
@@ -95,7 +381,7 @@ def projects_menu_logic_helper(
         )
         cache_key = f"projects_{content_type}"
         ui.cache.set.assert_called_once_with(
-            cache_key, projects_data, expiration=timedelta(hours=4)
+            cache_key, projects_data, expiration=timedelta(hours=12)
         )
 
     # Directory item assertions
@@ -232,7 +518,7 @@ def seasons_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, pr
             )
             cache_key = f"project_{project_data['slug']}"
             ui.cache.set.assert_any_call(
-                cache_key, project_data, expiration=timedelta(hours=4)
+                cache_key, project_data, expiration=timedelta(hours=12)
             )
 
         # Ensure cache was checked
@@ -396,7 +682,7 @@ def episodes_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, p
             ui.cache.set.assert_not_called()
         else:
             angel_interface_mock.get_project.assert_called_once_with(project_data["slug"])
-            ui.cache.set.assert_called_once_with(f"project_{project_data['slug']}", project_data, expiration=timedelta(hours=4))
+            ui.cache.set.assert_called_once_with(f"project_{project_data['slug']}", project_data, expiration=timedelta(hours=12))
 
         # Content and sorting assertions
         mock_set_content.assert_called_once_with(1, "tvshows")

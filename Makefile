@@ -6,6 +6,9 @@ lint:
 unittest:
 	pytest tests/unit/
 
+unittest-with-coverage:
+	.venv/bin/python -m pytest --cov=plugin.video.angelstudios --cov-report=term-missing tests/unit
+
 coverage:
 	pytest --cov=plugin.video.angelstudios tests/unit/
 

@@ -19,6 +19,12 @@ def _make_jwt(exp_ts: int) -> str:
 	return f"{header.decode()}.{payload.decode()}.signature"
 
 
+def _make_jwt_with_claims(payload: dict) -> str:
+	header = base64.urlsafe_b64encode(json.dumps({"alg": "HS256"}).encode()).rstrip(b"=")
+	payload_b64 = base64.urlsafe_b64encode(json.dumps(payload).encode()).rstrip(b"=")
+	return f"{header.decode()}.{payload_b64.decode()}.signature"
+
+
 class DummyCookies:
 	"""Lightweight cookie stand-in to avoid requests' real cookie jar."""
 	def __init__(self, mapping=None, iterable=None):
@@ -27,6 +33,9 @@ class DummyCookies:
 
 	def get(self, key, default=None):
 		return self._mapping.get(key, default)
+
+	def clear(self):
+		self._mapping.clear()
 
 	def update(self, other):
 		self._mapping.update(getattr(other, "_mapping", {}))
@@ -71,8 +80,10 @@ class TestAngelStudioSession:
 		"""Return early when an in-memory session is already valid."""
 		inst = AngelStudioSession(logger=logger)
 		inst.session = session_mock
-		with patch.object(inst, "_validate_session", return_value=True) as mock_val, \
-			 patch("angel_authentication.requests.Session") as mock_session_ctor:
+		with (
+			patch.object(inst, "_validate_session", return_value=True) as mock_val,
+			patch("angel_authentication.requests.Session") as mock_session_ctor,
+		):
 			result = inst.authenticate()
 			assert result is True
 			mock_val.assert_called_once()
@@ -83,10 +94,12 @@ class TestAngelStudioSession:
 		inst = AngelStudioSession(username="u", password="p", session_file="/tmp/sess", logger=logger)
 		inst.session = MagicMock()
 		inst.session_valid = True
-		with patch.object(inst, "_AngelStudioSession__clear_session_cache") as mock_clear, \
-			 patch("angel_authentication.requests.Session") as session_ctor, \
-			 patch.object(inst, "_AngelStudioSession__load_session_cookies", return_value=True) as mock_load, \
-			 patch.object(inst, "_validate_session", return_value=True) as mock_validate:
+		with (
+			patch.object(inst, "_AngelStudioSession__clear_session_cache") as mock_clear,
+			patch("angel_authentication.requests.Session") as session_ctor,
+			patch.object(inst, "_AngelStudioSession__load_session_cookies", return_value=True) as mock_load,
+			patch.object(inst, "_validate_session", return_value=True) as mock_validate,
+		):
 			sess = MagicMock()
 			sess.cookies = DummyCookies()
 			sess.headers = {}
@@ -99,9 +112,11 @@ class TestAngelStudioSession:
 	def test_authenticate_loaded_cookies_invalid_starts_new_flow(self, logger):
 		"""Invalid cached cookies should fall through to full login."""
 		inst = AngelStudioSession(username="u", password="p", session_file="/tmp/sess", logger=logger)
-		with patch("angel_authentication.requests.Session") as session_ctor, \
-			 patch.object(inst, "_AngelStudioSession__load_session_cookies", return_value=True) as mock_load, \
-			 patch.object(inst, "_validate_session", return_value=False) as mock_validate:
+		with (
+			patch("angel_authentication.requests.Session") as session_ctor,
+			patch.object(inst, "_AngelStudioSession__load_session_cookies", return_value=True) as mock_load,
+			patch.object(inst, "_validate_session", return_value=False) as mock_validate,
+		):
 			sess = MagicMock()
 			sess.cookies = DummyCookies()
 			sess.headers = {}
@@ -115,9 +130,11 @@ class TestAngelStudioSession:
 
 	def test_authenticate_uses_loaded_valid_cookies(self, logger):
 		inst = AngelStudioSession(logger=logger, session_file="/tmp/sess")
-		with patch("angel_authentication.requests.Session") as session_ctor, \
-			 patch.object(inst, "_AngelStudioSession__load_session_cookies", return_value=True) as mock_load, \
-			 patch.object(inst, "_validate_session", return_value=True) as mock_validate:
+		with (
+			patch("angel_authentication.requests.Session") as session_ctor,
+			patch.object(inst, "_AngelStudioSession__load_session_cookies", return_value=True) as mock_load,
+			patch.object(inst, "_validate_session", return_value=True) as mock_validate,
+		):
 			sess = MagicMock()
 			session_ctor.return_value = sess
 			result = inst.authenticate()
@@ -147,9 +164,11 @@ class TestAngelStudioSession:
 		sess.get.side_effect = [login_page, email_page, redirect_response]
 		sess.post.return_value = password_response
 
-		with patch("angel_authentication.requests.Session", return_value=sess), \
-			 patch.object(inst, "_AngelStudioSession__save_session_cookies") as mock_save, \
-			 patch("angel_authentication.BeautifulSoup") as mock_bs:
+		with (
+			patch("angel_authentication.requests.Session", return_value=sess),
+			patch.object(inst, "_AngelStudioSession__save_session_cookies") as mock_save,
+			patch("angel_authentication.BeautifulSoup") as mock_bs,
+		):
 
 			soup_login = MagicMock()
 			soup_login.find_all.return_value = []
@@ -185,9 +204,11 @@ class TestAngelStudioSession:
 		sess.get.side_effect = [login_page, email_page]
 		sess.post.return_value = password_response
 
-		with patch("angel_authentication.requests.Session", return_value=sess), \
-			 patch.object(inst, "_AngelStudioSession__save_session_cookies") as mock_save, \
-			 patch("angel_authentication.BeautifulSoup") as mock_bs:
+		with (
+			patch("angel_authentication.requests.Session", return_value=sess),
+			patch.object(inst, "_AngelStudioSession__save_session_cookies") as mock_save,
+			patch("angel_authentication.BeautifulSoup") as mock_bs,
+		):
 			login_inputs = [FakeInput({'id': 'state', 'name': 'state', 'value': 'state_from_input'})]
 			email_inputs = [
 				FakeInput({'id': 'state', 'name': 'state', 'value': 'state_two'}),
@@ -224,8 +245,10 @@ class TestAngelStudioSession:
 		sess = MagicMock()
 		sess.cookies = DummyCookies()
 		sess.get.side_effect = [login_page, bad_email]
-		with patch("angel_authentication.requests.Session", return_value=sess), \
-			 patch("angel_authentication.BeautifulSoup") as mock_bs:
+		with (
+			patch("angel_authentication.requests.Session", return_value=sess),
+			patch("angel_authentication.BeautifulSoup") as mock_bs,
+		):
 			mock_bs.return_value.find_all.return_value = []
 			with pytest.raises(Exception, match="Failed to fetch the post-email page"):
 				inst.authenticate()
@@ -241,8 +264,10 @@ class TestAngelStudioSession:
 		sess.cookies = DummyCookies()
 		sess.get.side_effect = [login_page, email_page, redirect_response]
 		sess.post.return_value = password_response
-		with patch("angel_authentication.requests.Session", return_value=sess), \
-			 patch("angel_authentication.BeautifulSoup") as mock_bs:
+		with (
+			patch("angel_authentication.requests.Session", return_value=sess),
+			patch("angel_authentication.BeautifulSoup") as mock_bs,
+		):
 			mock_bs.return_value.find_all.return_value = []
 			with pytest.raises(Exception, match="Login failed after redirect"):
 				inst.authenticate()
@@ -257,8 +282,10 @@ class TestAngelStudioSession:
 		sess.cookies = DummyCookies()
 		sess.get.side_effect = [login_page, email_page]
 		sess.post.return_value = password_response
-		with patch("angel_authentication.requests.Session", return_value=sess), \
-			 patch("angel_authentication.BeautifulSoup") as mock_bs:
+		with (
+			patch("angel_authentication.requests.Session", return_value=sess),
+			patch("angel_authentication.BeautifulSoup") as mock_bs,
+		):
 			soup_login = MagicMock()
 			soup_login.find_all.return_value = []
 			soup_email = MagicMock()
@@ -279,8 +306,10 @@ class TestAngelStudioSession:
 		sess.cookies = DummyCookies()
 		sess.get.side_effect = [login_page, email_page]
 		sess.post.return_value = password_response
-		with patch("angel_authentication.requests.Session", return_value=sess), \
-			 patch("angel_authentication.BeautifulSoup") as mock_bs:
+		with (
+			patch("angel_authentication.requests.Session", return_value=sess),
+			patch("angel_authentication.BeautifulSoup") as mock_bs,
+		):
 			soup_login = MagicMock()
 			soup_login.find_all.return_value = []
 			soup_email = MagicMock()
@@ -314,6 +343,91 @@ class TestAngelStudioSession:
 		inst.session = MagicMock()
 		inst.session.cookies = DummyCookies(mapping={'angel_jwt': token})
 		assert inst._validate_session() is True
+
+	def test_get_session_details_no_session(self, logger):
+		"""Without a session or jwt, return defaults."""
+		inst = AngelStudioSession(username="user@example.com", logger=logger)
+		inst.session = None
+		details = inst.get_session_details()
+		assert details['login_email'] == "user@example.com"
+		assert details['jwt_present'] is False
+		assert details['cookie_names'] == []
+
+	def test_get_session_details_malformed_jwt(self, logger):
+		"""Malformed jwt is handled gracefully and still marks presence."""
+		inst = AngelStudioSession(username="user@example.com", logger=logger)
+		sess = MagicMock()
+		sess.cookies = DummyCookies(mapping={'angel_jwt': 'badtoken'})
+		inst.session = sess
+		details = inst.get_session_details()
+		assert details['jwt_present'] is True
+		assert details['login_email'] == "user@example.com"
+
+	def test_get_session_details_with_claims_and_auth_header(self, logger):
+		"""Claims populate email/account and compute expirations with auth header set."""
+		now = datetime.now(timezone.utc)
+		future = int((now + timedelta(hours=1)).timestamp())
+		iat = int(now.timestamp())
+		token = _make_jwt_with_claims({
+			"exp": future,
+			"iat": iat,
+			"email": "jwt@example.com",
+			"sub": "account-123",
+		})
+		cookie_obj = SimpleNamespace(name='angel_jwt', value=token)
+		sess = MagicMock()
+		sess.cookies = DummyCookies(mapping={'angel_jwt': token}, iterable=[cookie_obj])
+		sess.headers = {'Authorization': 'Bearer x'}
+
+		inst = AngelStudioSession(username="fallback@example.com", logger=logger)
+		inst.session = sess
+
+		details = inst.get_session_details()
+
+		assert details['jwt_present'] is True
+		assert details['login_email'] == "jwt@example.com"
+		assert details['account_id'] == "account-123"
+		assert details['authenticated'] is True
+		assert details['expires_in_seconds'] is not None
+		assert 'angel_jwt' in details['cookie_names']
+		assert details['issued_at_local']
+		assert details['expires_at_local']
+
+	def test_logout_handles_cookie_and_header_errors(self, logger):
+		"""logout swallows cookie/header clearing errors and still returns."""
+		inst = AngelStudioSession(logger=logger)
+
+		class BadCookies:
+			def clear(self):
+				raise RuntimeError("cookie boom")
+
+		class BadHeaders(dict):
+			def pop(self, *args, **kwargs):  # type: ignore[override]
+				raise RuntimeError("header boom")
+
+		sess = MagicMock()
+		sess.cookies = BadCookies()
+		sess.headers = BadHeaders()
+		inst.session = sess
+		inst.session_file = None
+
+		result = inst.logout()
+		assert result is True
+		assert inst.session is None
+
+	def test_get_session_details_outer_exception(self, logger):
+		"""Outer try/except safely swallows unexpected errors."""
+		inst = AngelStudioSession(logger=logger)
+
+		class BadSession:
+			@property
+			def cookies(self):
+				raise RuntimeError("boom")
+
+		inst.session = BadSession()
+
+		details = inst.get_session_details()
+		assert details['jwt_present'] is False
 
 	def test_validate_session_expired(self, logger):
 		"""Expired JWT marks session invalid."""
@@ -357,8 +471,10 @@ class TestAngelStudioSession:
 		sess.headers = {}
 		inst = AngelStudioSession(session_file="/tmp/sess", logger=logger)
 		inst.session = sess
-		with patch("builtins.open", mock_open(read_data=pickle.dumps(cookies_obj))), \
-			 patch("pickle.load", return_value=cookies_obj):
+		with (
+			patch("builtins.open", mock_open(read_data=pickle.dumps(cookies_obj))),
+			patch("pickle.load", return_value=cookies_obj),
+		):
 			assert inst._AngelStudioSession__load_session_cookies() is True
 			assert sess.headers.get('Authorization') == 'Bearer tok'
 
@@ -378,8 +494,10 @@ class TestAngelStudioSession:
 		sess.headers = {}
 		inst = AngelStudioSession(session_file="/tmp/sess", logger=logger)
 		inst.session = sess
-		with patch("builtins.open", mock_open(read_data=pickle.dumps(cookies_obj))), \
-			 patch("pickle.load", return_value=cookies_obj):
+		with (
+			patch("builtins.open", mock_open(read_data=pickle.dumps(cookies_obj))),
+			patch("pickle.load", return_value=cookies_obj),
+		):
 			assert inst._AngelStudioSession__load_session_cookies() is True
 			assert sess.headers.get("Authorization") is None
 
@@ -394,8 +512,10 @@ class TestAngelStudioSession:
 		sess.cookies = IterErrorCookies(mapping={}, iterable=[])
 		inst = AngelStudioSession(session_file="/tmp/sess", logger=logger)
 		inst.session = sess
-		with patch("builtins.open", mock_open(read_data=pickle.dumps(cookies_obj))), \
-			 patch("pickle.load", return_value=cookies_obj):
+		with (
+			patch("builtins.open", mock_open(read_data=pickle.dumps(cookies_obj))),
+			patch("pickle.load", return_value=cookies_obj),
+		):
 			assert inst._AngelStudioSession__load_session_cookies() is False
 
 	def test_save_session_cookies(self, logger):
@@ -403,8 +523,10 @@ class TestAngelStudioSession:
 		inst = AngelStudioSession(session_file="/tmp/sess", logger=logger)
 		inst.session = MagicMock()
 		inst.session.cookies = DummyCookies()
-		with patch("builtins.open", mock_open()) as m_open, \
-			 patch("pickle.dump") as mock_dump:
+		with (
+			patch("builtins.open", mock_open()) as m_open,
+			patch("pickle.dump") as mock_dump,
+		):
 			inst._AngelStudioSession__save_session_cookies()
 			m_open.assert_called_once_with("/tmp/sess", 'wb')
 			mock_dump.assert_called_once_with(inst.session.cookies, m_open())
@@ -412,14 +534,61 @@ class TestAngelStudioSession:
 	def test_clear_session_cache_success(self, logger):
 		"""Remove cached cookie file when present."""
 		inst = AngelStudioSession(session_file="/tmp/sess", logger=logger)
-		with patch("os.path.exists", return_value=True), \
-			 patch("os.remove") as mock_remove:
+		with (
+			patch("os.path.exists", return_value=True),
+			patch("os.remove") as mock_remove,
+		):
 			assert inst._AngelStudioSession__clear_session_cache() is True
 			mock_remove.assert_called_once_with("/tmp/sess")
 
 	def test_clear_session_cache_failure(self, logger):
 		"""Return False and log when cache removal fails."""
 		inst = AngelStudioSession(session_file="/tmp/sess", logger=logger)
-		with patch("os.path.exists", return_value=True), \
-			 patch("os.remove", side_effect=Exception("boom")):
+		with (
+			patch("os.path.exists", return_value=True),
+			patch("os.remove", side_effect=Exception("boom")),
+		):
 			assert inst._AngelStudioSession__clear_session_cache() is False
+
+	def test_logout_clears_session_and_cache(self, logger, tmp_path):
+		"""logout clears cookies, auth header, session file, and marks session invalid."""
+		session_file = tmp_path / "sess"
+		session_file.write_text("data")
+		inst = AngelStudioSession(session_file=str(session_file), logger=logger)
+		sess = MagicMock()
+		sess.cookies = DummyCookies(mapping={'a': 'b'})
+		sess.headers = {'Authorization': 'Bearer tok'}
+		inst.session = sess
+		inst.session_valid = True
+
+		with (
+			patch("os.path.exists", return_value=True),
+			patch("os.remove") as mock_remove,
+		):
+			assert inst.logout() is True
+
+		mock_remove.assert_called_once_with(str(session_file))
+		assert inst.session is None
+		assert inst.session_valid is False
+		assert sess.headers.get('Authorization') is None
+		assert sess.cookies.get_dict() == {}
+
+	def test_logout_returns_false_when_cache_delete_fails(self, logger):
+		"""logout still clears in-memory state even if file removal fails."""
+		inst = AngelStudioSession(session_file="/tmp/sess", logger=logger)
+		sess = MagicMock()
+		sess.cookies = DummyCookies(mapping={'a': 'b'})
+		sess.headers = {'Authorization': 'Bearer tok'}
+		inst.session = sess
+		inst.session_valid = True
+
+		with (
+			patch("os.path.exists", return_value=True),
+			patch("os.remove", side_effect=Exception("boom")),
+		):
+			assert inst.logout() is False
+
+		assert inst.session is None
+		assert inst.session_valid is False
+		assert sess.headers.get('Authorization') is None
+		assert sess.cookies.get_dict() == {}

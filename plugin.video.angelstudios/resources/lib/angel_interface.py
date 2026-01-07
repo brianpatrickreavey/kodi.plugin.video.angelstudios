@@ -26,7 +26,7 @@ class AngelStudiosInterface:
     - GraphQL queries are used to fetch project data, seasons, episodes, and more.
     - helpers translate native graphql queries into useable data
     """
-    def __init__(self, username=None, password=None, session_file=None, logger=None, query_path=None):
+    def __init__(self, username=None, password=None, session_file=None, logger=None, query_path=None, tracer=None):
         # Use the provided logger, or default to the module logger
         if logger is not None:
             self.log = logger
@@ -38,6 +38,9 @@ class AngelStudiosInterface:
             self.log.info("STDOUT logger initialized")
         self.log.debug(f"{self.log=}")
 
+        # Set the tracer function provided by the calling function
+        self.tracer = tracer
+
         # Use provided session file or get authenticated session
         self.angel_studios_session = angel_authentication.AngelStudioSession(
             username=username,
@@ -48,7 +51,7 @@ class AngelStudiosInterface:
         self.angel_studios_session.authenticate()
         self.session = self.angel_studios_session.get_session()
 
-        # Test is session is authenticated and valid:
+        # Test if session is authenticated and valid:
         # Log authentication status more meaningfully
         auth_header = self.session.headers.get('Authorization')
         cookie_count = len(self.session.cookies) if self.session.cookies else 0
@@ -89,6 +92,31 @@ class AngelStudiosInterface:
             self.log.error(f"Error loading fragment '{fragment_name}' from '{fragment_path}': {e}")
             return ""
 
+    def _trace_request(self, operation, query_dict, status=None, response_data=None, error=None):
+        """Helper to trace GraphQL requests without breaking main flow."""
+        if not callable(self.tracer):
+            return
+        try:
+            safe_headers = {k: v for k, v in self.session.headers.items()
+                           if k.lower() not in ('authorization', 'cookie')}
+            trace_payload = {
+                'operation': operation,
+                'url': angel_graphql_url,
+                'status': status,
+                'request': {
+                    'headers': safe_headers,
+                    'body': query_dict,
+                },
+            }
+            if response_data is not None:
+                trace_payload['response'] = response_data
+            if error is not None:
+                trace_payload['error'] = error
+            self.tracer(trace_payload)
+        except Exception:
+            # Tracing must never break main flow
+            pass
+
     def _graphql_query(self, operation: str, variables=None) -> dict:
         """Generalized GraphQL query executor with automatic fragment loading and caching."""
         variables = variables or {}
@@ -118,13 +146,23 @@ class AngelStudiosInterface:
                 self.log.error(f"GraphQL errors: {result['errors']}")
                 self.log.error(f"session headers: {self.session.headers}")
                 self.angel_studios_session.authenticate(force_reauthentication=True)
-                return {}
-            return result.get('data', {})
+                data = {}
+            else:
+                data = result.get('data', {})
+
+            self._trace_request(operation, query_dict, status=response.status_code, response_data=data)
+            return data
         except requests.RequestException as e:
             self.log.error(f"GraphQL request failed: {e}")
+            self._trace_request(
+                operation, query_dict,
+                status=getattr(e.response, 'status_code', None),
+                error=str(e)
+            )
             return {}
         except Exception as e:
             self.log.error(f"Unexpected error during GraphQL query: {e}")
+            self._trace_request(operation, query_dict, error=str(e))
             return {}
 
     def get_projects(self, project_type=None):
@@ -200,3 +238,13 @@ class AngelStudiosInterface:
                 raise Exception("Session re-authentication failed")
         else:
             self.log.info("Session is valid")
+
+    def force_logout(self):
+        """Force a local logout; future enhancement may call remote logout API."""
+        try:
+            result = self.angel_studios_session.logout()
+            self.session = None
+            return result
+        except Exception as e:
+            self.log.error(f"Logout failed: {e}")
+            return False

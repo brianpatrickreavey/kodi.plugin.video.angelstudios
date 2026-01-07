@@ -16,8 +16,10 @@ class TestAngelStudiosInterface:
     @pytest.fixture
     def angel_interface(self):
         """Fixture for a mocked AngelStudiosInterface instance."""
-        with patch('angel_interface.angel_authentication.AngelStudioSession') as mock_session_class, \
-             patch('angel_interface.requests.Session') as mock_session:
+        with (
+            patch('angel_interface.angel_authentication.AngelStudioSession') as mock_session_class,
+            patch('angel_interface.requests.Session') as mock_session,
+        ):
             mock_session_instance = MagicMock()
             mock_session_class.return_value.authenticate.return_value = None
             mock_session_class.return_value.get_session.return_value = mock_session_instance
@@ -36,8 +38,10 @@ class TestAngelStudiosInterface:
     def test_init_with_and_without_auth(self, auth_header, expected_log):
         """Test __init__ wiring with and without an auth header."""
         logger = MagicMock()
-        with patch('angel_interface.angel_authentication.AngelStudioSession') as mock_session_class, \
-             patch('angel_interface.requests.Session'):
+        with (
+            patch('angel_interface.angel_authentication.AngelStudioSession') as mock_session_class,
+            patch('angel_interface.requests.Session'),
+        ):
             mock_session_instance = MagicMock()
             mock_session_instance.headers.get.return_value = auth_header
             mock_session_instance.cookies = []
@@ -56,8 +60,10 @@ class TestAngelStudiosInterface:
 
     def test_init_without_logger(self):
         """Test __init__ without logger (uses default)."""
-        with patch('angel_interface.angel_authentication.AngelStudioSession'), \
-             patch('angel_interface.requests.Session'):
+        with (
+            patch('angel_interface.angel_authentication.AngelStudioSession'),
+            patch('angel_interface.requests.Session'),
+        ):
             interface = AngelStudiosInterface()
             # Verify default logger is set and no custom log
             assert interface.log is not None
@@ -191,8 +197,10 @@ class TestAngelStudiosInterface:
 
     def test_graphql_query_with_errors(self, angel_interface):
         """Test _graphql_query handles GraphQL errors."""
-        with patch.object(angel_interface.session, 'post') as mock_post, \
-            patch.object(angel_interface.angel_studios_session, 'authenticate') as mock_authenticate:
+        with (
+            patch.object(angel_interface.session, 'post') as mock_post,
+            patch.object(angel_interface.angel_studios_session, 'authenticate') as mock_authenticate,
+        ):
             mock_response = MagicMock()
             mock_response.json.return_value = {'errors': ['GraphQL error occurred']}
             mock_post.return_value = mock_response
@@ -244,6 +252,92 @@ class TestAngelStudiosInterface:
             mock_post.assert_called_once()
             mock_authenticate.assert_not_called()
             angel_interface.log.error.assert_called_once_with('GraphQL request failed: boom')
+
+
+    def test_graphql_query_tracer_filters_headers(self, angel_interface):
+        """Tracer receives redacted headers and response data."""
+        angel_interface.tracer = MagicMock()
+        angel_interface.session.headers = {'Authorization': 'secret', 'Cookie': 'c', 'X-Test': 'ok'}
+        response = MagicMock()
+        response.json.return_value = {'data': {'ok': True}}
+        response.status_code = 200
+
+        with patch.object(angel_interface.session, 'post', return_value=response):
+            result = angel_interface._graphql_query('op')
+
+        assert result == {'ok': True}
+        angel_interface.tracer.assert_called_once()
+        trace_payload = angel_interface.tracer.call_args[0][0]
+        assert trace_payload['request']['headers'] == {'X-Test': 'ok'}
+        assert trace_payload['response'] == {'ok': True}
+
+
+    def test_graphql_query_tracer_exception_swallowed(self, angel_interface):
+        """Exceptions from tracer do not break flow."""
+        angel_interface.tracer = MagicMock(side_effect=RuntimeError("boom"))
+        response = MagicMock()
+        response.json.return_value = {'data': {'ok': True}}
+        response.status_code = 200
+
+        with patch.object(angel_interface.session, 'post', return_value=response):
+            result = angel_interface._graphql_query('op')
+
+        assert result == {'ok': True}
+        # No exception propagates
+
+
+    def test_graphql_query_request_exception_tracer(self, angel_interface):
+        """Tracer invoked on RequestException with sanitized headers."""
+        angel_interface.tracer = MagicMock()
+        angel_interface.session.headers = {'Authorization': 'secret', 'Cookie': 'c', 'X-Test': 'ok'}
+        exc = requests.RequestException('boom')
+        exc.response = MagicMock(status_code=503)
+
+        with patch.object(angel_interface.session, 'post', side_effect=exc):
+            result = angel_interface._graphql_query('op')
+
+        assert result == {}
+        angel_interface.tracer.assert_called_once()
+        payload = angel_interface.tracer.call_args[0][0]
+        assert payload['status'] == 503
+        assert payload['request']['headers'] == {'X-Test': 'ok'}
+
+
+    def test_graphql_query_unexpected_exception_tracer(self, angel_interface):
+        """Tracer invoked on generic exceptions."""
+        angel_interface.tracer = MagicMock()
+        angel_interface.session.headers = {'Authorization': 'secret', 'Cookie': 'c', 'X-Test': 'ok'}
+        response = MagicMock()
+        response.json.side_effect = ValueError("bad json")
+
+        with patch.object(angel_interface.session, 'post', return_value=response):
+            result = angel_interface._graphql_query('op')
+
+        assert result == {}
+        angel_interface.tracer.assert_called_once()
+        payload = angel_interface.tracer.call_args[0][0]
+        assert payload['request']['headers'] == {'X-Test': 'ok'}
+
+
+    def test_graphql_query_request_exception_tracer_raises(self, angel_interface):
+        """Tracer exceptions on RequestException are swallowed."""
+        angel_interface.tracer = MagicMock(side_effect=RuntimeError("boom"))
+        angel_interface.session.headers = {'Authorization': 'secret'}
+        exc = requests.RequestException('fail')
+
+        with patch.object(angel_interface.session, 'post', side_effect=exc):
+            assert angel_interface._graphql_query('op') == {}
+
+
+    def test_graphql_query_unexpected_exception_tracer_raises(self, angel_interface):
+        """Tracer exceptions on generic exceptions are swallowed."""
+        angel_interface.tracer = MagicMock(side_effect=RuntimeError("boom"))
+        angel_interface.session.headers = {'Authorization': 'secret'}
+        response = MagicMock()
+        response.json.side_effect = ValueError("bad json")
+
+        with patch.object(angel_interface.session, 'post', return_value=response):
+            assert angel_interface._graphql_query('op') == {}
 
     @pytest.mark.parametrize("project_type", [None, 'series', 'movie'])
     def test_get_projects(self, angel_interface, project_type):
@@ -347,8 +441,10 @@ class TestAngelStudiosInterface:
 
     def test_session_check_invalid(self, angel_interface):
         """Test session_check when session is invalid and re-auth succeeds."""
-        with patch.object(angel_interface.angel_studios_session, '_validate_session', return_value=False) as mock_validate, \
-            patch.object(angel_interface.angel_studios_session, 'authenticate') as mock_auth:
+        with (
+            patch.object(angel_interface.angel_studios_session, '_validate_session', return_value=False) as mock_validate,
+            patch.object(angel_interface.angel_studios_session, 'authenticate') as mock_auth,
+        ):
             mock_auth.return_value = None
             angel_interface.angel_studios_session.session_valid = True
             angel_interface.session_check()
@@ -359,8 +455,10 @@ class TestAngelStudiosInterface:
 
     def test_session_check_reauth_failure(self, angel_interface):
         """Test session_check when re-auth fails."""
-        with patch.object(angel_interface.angel_studios_session, '_validate_session', return_value=False) as mock_validate, \
-            patch.object(angel_interface.angel_studios_session, 'authenticate') as mock_auth:
+        with (
+            patch.object(angel_interface.angel_studios_session, '_validate_session', return_value=False) as mock_validate,
+            patch.object(angel_interface.angel_studios_session, 'authenticate') as mock_auth,
+        ):
             mock_auth.return_value = None
             angel_interface.angel_studios_session.session_valid = False
 
@@ -370,3 +468,29 @@ class TestAngelStudiosInterface:
             mock_validate.assert_called_once()
             mock_auth.assert_called_once_with(force_reauthentication=True)
             angel_interface.log.error.assert_called_once_with("Session re-authentication failed")
+
+    def test_force_logout_exception(self):
+        """force_logout returns False on exception and logs error."""
+        iface = object.__new__(AngelStudiosInterface)
+        iface.log = MagicMock()
+        iface.angel_studios_session = MagicMock()
+        iface.angel_studios_session.logout.side_effect = RuntimeError("boom")
+        iface.session = MagicMock()
+
+        result = iface.force_logout()
+
+        assert result is False
+        iface.log.error.assert_called_once()
+
+    def test_force_logout_success(self):
+        """force_logout clears session on success."""
+        iface = object.__new__(AngelStudiosInterface)
+        iface.log = MagicMock()
+        iface.angel_studios_session = MagicMock()
+        iface.angel_studios_session.logout.return_value = True
+        iface.session = MagicMock()
+
+        result = iface.force_logout()
+
+        assert result is True
+        assert iface.session is None

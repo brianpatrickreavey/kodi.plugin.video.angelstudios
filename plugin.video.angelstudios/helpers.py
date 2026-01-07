@@ -9,8 +9,13 @@ import inspect
 
 class KodiLogger:
     """Simple logger class to log messages to Kodi log"""
+    def __init__(self, debug_promotion=False):
+        self.debug_promotion = debug_promotion
+
     def debug(self, message):
-        self.xbmclog(message, xbmc.LOGDEBUG)
+        promoted_message = f"(debug) {message}" if self.debug_promotion else message
+        level = xbmc.LOGINFO if self.debug_promotion else xbmc.LOGDEBUG
+        self.xbmclog(promoted_message, level)
 
     def info(self, message):
         self.xbmclog(message, xbmc.LOGINFO)
@@ -26,22 +31,37 @@ class KodiLogger:
 
     def xbmclog(self, message, level):
         """Log a message to Kodi's log with the specified level"""
-        stack = inspect.stack()
-        for i in stack:
-            xbmc.log(
-                f"Function: {i.function}, Class: {i.frame.f_locals.get('self', None).__class__.__name__ if i.frame.f_locals.get('self', None) else None}",
-                xbmc.LOGDEBUG)
+        stack = inspect.stack(context=0)
+        handler = "Unknown Handler"
 
-        if len(stack) >= 3:
-            class_name = stack[2].frame.f_locals.get('self', None).__class__.__name__ if stack[2].frame.f_locals.get('self', None) else None
-            function_name = stack[2].function
-        else:
-            class_name = stack[len(stack)-1].frame.f_locals.get('self', None).__class__.__name__ if stack[len(stack)-1].frame.f_locals.get('self', None) else None
-            function_name = stack[len(stack)-1].function
+        for frame_info in stack[1:]:  # skip xbmclog itself
+            module = inspect.getmodule(frame_info.frame)
+            module_name = module.__name__ if module else None
 
-        handler = f"{class_name}.{function_name}" if class_name and function_name else "Unknown Handler"
-        xbmc.log(f"Handler: {handler} (stack_len:{len(stack)})", xbmc.LOGDEBUG)
-        xbmc.log(f"Angel Studios: {handler}: {message}", level)
+            # Skip frames from this helpers module to find the caller
+            if module_name and module_name.startswith(__name__):
+                continue
+
+            self_obj = frame_info.frame.f_locals.get('self')
+            if not self_obj:
+                continue
+
+            class_name = self_obj.__class__.__name__
+            function_name = frame_info.function
+
+            parts = []
+            if module_name:
+                parts.append(module_name)
+            if class_name:
+                parts.append(class_name)
+            if function_name:
+                parts.append(function_name)
+
+            if parts:
+                handler = ".".join(parts)
+            break
+
+        xbmc.log(f"Angel Studios: Handler: {handler}: {message}", level)
 
 
 def get_session_file():

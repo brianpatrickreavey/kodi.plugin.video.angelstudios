@@ -46,6 +46,22 @@ class TestKodiLogger:
 			for (msg, level), call in zip(calls, mock_log.call_args_list):
 				assert call.args == (msg, level)
 
+	def test_debug_promotion_routes_to_info_with_prefix(self, monkeypatch):
+		"""Debug promotion sends debug messages at INFO with prefix."""
+		self._set_levels()
+		xbmc = sys.modules["xbmc"]
+		xbmc.log = MagicMock()
+		logger = helpers.KodiLogger(debug_promotion=True)
+
+		frame = SimpleNamespace(f_locals={"self": object()})
+		stack = [SimpleNamespace(function="outer", frame=frame), SimpleNamespace(function="inner", frame=frame)]
+		monkeypatch.setattr(helpers.inspect, "stack", MagicMock(return_value=stack))
+
+		logger.debug("msg")
+
+		assert xbmc.log.call_args[0][1] == xbmc.LOGINFO
+		assert "(debug) msg" in xbmc.log.call_args[0][0]
+
 	def test_xbmclog_short_stack_uses_fallback_handler(self, monkeypatch):
 		"""When stack lacks self, handler defaults to Unknown Handler."""
 		self._set_levels()
@@ -134,7 +150,10 @@ class TestSessionHelpers:
 		monkeypatch.setattr(helpers, "get_session_file", MagicMock(return_value="/tmp/session.pkl"))
 		xbmcvfs = sys.modules["xbmcvfs"]
 		xbmcvfs.exists.return_value = True
-		with patch("builtins.open", mock_open(read_data=b"data")) as m_open, patch("pickle.load", return_value={"k": "v"}) as p_load:
+		with (
+			patch("builtins.open", mock_open(read_data=b"data")) as m_open,
+			patch("pickle.load", return_value={"k": "v"}) as p_load,
+		):
 			assert helpers.get_session_data() == {"k": "v"}
 			m_open.assert_called_once_with("/tmp/session.pkl", "rb")
 			p_load.assert_called_once()
@@ -144,7 +163,10 @@ class TestSessionHelpers:
 		monkeypatch.setattr(helpers, "get_session_file", MagicMock(return_value="/tmp/session.pkl"))
 		xbmc = sys.modules["xbmc"]
 		xbmc.log = MagicMock()
-		with patch("builtins.open", mock_open()) as m_open, patch("pickle.dump") as p_dump:
+		with (
+			patch("builtins.open", mock_open()) as m_open,
+			patch("pickle.dump") as p_dump,
+		):
 			helpers.save_session_data({"k": "v"})
 			m_open.assert_called_once_with("/tmp/session.pkl", "wb")
 			p_dump.assert_called_once()

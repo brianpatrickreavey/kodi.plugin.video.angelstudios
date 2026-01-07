@@ -36,11 +36,24 @@ This is a Kodi addon (`plugin.video.angelstudios`) for streaming Angel Studios c
 - **Debugging**: Use Kodi's log viewer for addon logs. Mock external calls in tests to isolate issues.
 - **Build/Deploy**: No custom build; install as Kodi addon. Use `addon.xml` for metadata.
 
+### Code Style
+- For multiple `unittest.mock.patch` context managers, prefer parenthesized `with` blocks instead of line continuations. Example:
+  ```python
+  with (
+      patch('xbmcaddon.Addon', return_value=addon),
+      patch('xbmcgui.ListItem', return_value=list_item),
+  ):
+      ...
+  ```
+- Prefer addon detection with `xbmc.getCondVisibility('System.HasAddon(<addon_id>)')` over try/except import patterns when checking for optional plugins.
+
 ### Project Conventions
 - **Imports**: Use relative imports for lib modules (e.g., `from .unittest_data import MOCK_PROJECT_DATA`).
 - **Mocking**: Patch Kodi modules at `xbmcplugin.*` or `xbmcgui.*`. Use `MagicMock` for sessions/auth.
 - **Parametrization**: Test multiple scenarios (e.g., cache hit/miss) with `@pytest.mark.parametrize`.
 - **File Structure**: Tests mirror lib structure (`test_kodi_ui_interface.py` for `kodi_ui_interface.py`). Fixtures in `conftest.py` shared across test files.
+- **Settings schema**: `resources/settings.xml` uses the version="1" format; all implementation details
+are available here: https://kodi.wiki/view/Add-on_settings_conversion
 - **Examples**:
   - UI tests: `with patch('xbmcplugin.setResolvedUrl') as mock_resolve: ui.play_video(...)`
   - API tests: Mock `session.post` for GraphQL; assert `return_value == {}` on errors.

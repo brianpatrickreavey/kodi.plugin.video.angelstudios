@@ -94,6 +94,11 @@
                     <default>false</default>
                     <control type="toggle" />
                 </setting>
+                <setting id="show_watchlist" type="boolean" label="30326" help="30327">
+                    <level>0</level>
+                    <default>false</default>
+                    <control type="toggle" />
+                </setting>
             </group>
         </category>
 
@@ -129,7 +134,7 @@
                         <maximum>168</maximum>
                         <step>1</step>
                     </constraints>
-                    <control type="spinner" format="integer" />
+                    <control type="slider" format="integer" />
                 </setting>
             </group>
         </category>

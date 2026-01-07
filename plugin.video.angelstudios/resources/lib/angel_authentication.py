@@ -8,7 +8,7 @@ import urllib.parse
 import base64
 import json
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 class AngelStudioSession:
     """Class to handle Angel Studios authentication and session management"""
@@ -238,6 +238,78 @@ class AngelStudioSession:
             return exp_timestamp
         return None
 
+    def get_session_details(self):
+        """Return session diagnostics for UI display without exposing token contents."""
+        details = {
+            'login_email': self.username or 'Unknown',
+            'account_id': None,
+            'authenticated': False,
+            'expires_at_utc': None,
+            'expires_at_local': None,
+            'expires_in_seconds': None,
+            'expires_in_human': None,
+            'issued_at_utc': None,
+            'issued_at_local': None,
+            'jwt_present': False,
+            'cookie_names': [],
+            'session_file': self.session_file,
+        }
+
+        try:
+            jwt_token = None
+            if self.session and self.session.cookies:
+                details['cookie_names'] = [c.name for c in self.session.cookies]
+                jwt_token = self.session.cookies.get('angel_jwt')
+
+            if not jwt_token:
+                return details
+
+            details['jwt_present'] = True
+
+            try:
+                header, payload, signature = jwt_token.split('.')
+                payload_decoded = base64.urlsafe_b64decode(payload + '==')
+                claims = json.loads(payload_decoded)
+            except Exception:
+                return details
+
+            exp_timestamp = claims.get('exp')
+            iat_timestamp = claims.get('iat')
+            email_claim = claims.get('email')
+            sub_claim = claims.get('sub')
+            if email_claim:
+                details['login_email'] = email_claim
+            if sub_claim:
+                details['account_id'] = sub_claim
+
+            now_utc = datetime.now(timezone.utc)
+            now_local = now_utc.astimezone()
+            if exp_timestamp:
+                exp_dt_utc = datetime.fromtimestamp(exp_timestamp, tz=timezone.utc)
+                exp_dt_local = exp_dt_utc.astimezone()
+                remaining = exp_dt_utc - now_utc
+                remaining = remaining if remaining > timedelta(0) else timedelta(0)
+                details['expires_at_utc'] = exp_dt_utc.strftime('%Y-%m-%d %H:%M:%S %Z')
+                details['expires_at_local'] = exp_dt_local.strftime('%Y-%m-%d %H:%M:%S %Z')
+                details['expires_in_seconds'] = int(remaining.total_seconds())
+                details['expires_in_human'] = str(remaining)
+                details['authenticated'] = remaining > timedelta(0)
+
+            if iat_timestamp:
+                iat_dt_utc = datetime.fromtimestamp(iat_timestamp, tz=timezone.utc)
+                iat_dt_local = iat_dt_utc.astimezone()
+                details['issued_at_utc'] = iat_dt_utc.strftime('%Y-%m-%d %H:%M:%S %Z')
+                details['issued_at_local'] = iat_dt_local.strftime('%Y-%m-%d %H:%M:%S %Z')
+
+            if self.session and self.session.headers.get('Authorization'):
+                details['authenticated'] = details['authenticated'] or True
+
+        except Exception:
+            # Intentionally swallow errors to avoid breaking the UI dialog
+            pass
+
+        return details
+
     def __load_session_cookies(self):
         if self.session_file:
             try:
@@ -280,3 +352,28 @@ class AngelStudioSession:
         except Exception as e:
             self.log.error(f"Error clearing session cache: {e}")
         return False
+
+    def logout(self):
+        """Clear local session state; TODO: call remote logout endpoint when available."""
+        self.log.info("Logging out: clearing local session and cached cookies")
+
+        if self.session:
+            try:
+                self.session.cookies.clear()
+            except Exception as e:
+                self.log.warning(f"Failed to clear session cookies: {e}")
+            try:
+                self.session.headers.pop('Authorization', None)
+            except Exception as e:
+                self.log.warning(f"Failed to clear Authorization header: {e}")
+
+        file_cleared = True
+        if self.session_file:
+            file_cleared = self.__clear_session_cache()
+            if not file_cleared:
+                self.log.warning("Session cache file could not be cleared during logout")
+
+        self.session = None
+        self.session_valid = False
+
+        return file_cleared

@@ -16,18 +16,16 @@
 Angel Studios Kodi addon - Clean, modular implementation
 """
 
-import os
-import sys
 import json
+import os
+import pickle
+import sys
 from urllib.parse import parse_qsl, urlencode
 
 import requests
-import pickle
 
 # Add resources/lib to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'resources/lib'))
-
-from helpers import KodiLogger, get_session_file, create_plugin_url
 
 import xbmc  # type: ignore
 import xbmcaddon  # type: ignore
@@ -36,7 +34,7 @@ import xbmcgui  # type: ignore
 import xbmcvfs  # type: ignore
 
 from angel_interface import AngelStudiosInterface
-from helpers import KodiLogger, get_session_file, create_plugin_url
+from helpers import KodiLogger, create_plugin_url, get_session_file
 from kodi_ui_interface import KodiUIInterface
 
 # Plugin constants
@@ -44,7 +42,10 @@ URL = sys.argv[0]
 HANDLE = int(sys.argv[1])
 ADDON = xbmcaddon.Addon()
 
-logger = KodiLogger()  # Create an instance of the logger class
+# Instantiate the logger in debug-promotion mode if debug_mode is either 'debug' or 'trace'
+debug_mode = (ADDON.getSettingString('debug_mode') or 'off').lower()
+debug_promotion = debug_mode in {'debug', 'trace'}
+logger = KodiLogger(debug_promotion=debug_promotion)
 
 ui_interface = KodiUIInterface(HANDLE, URL, logger=logger, angel_interface=None)
 
@@ -67,7 +68,7 @@ def router(paramstring):
     """
     # Parse URL parameters
     params = dict(parse_qsl(paramstring))
-    xbmc.log(f"Router called with params: {params}", xbmc.LOGINFO)
+    logger.info(f"Router called with params: {params}")
 
     try:
         # Route to appropriate function
@@ -93,6 +94,18 @@ def router(paramstring):
             elif params['action'] == 'livestream_menu':
                 # Show Livestreams
                 ui_interface.projects_menu(content_type='livestreams')
+            elif params['action'] == 'watchlist_menu':
+                # Show Watchlist (placeholder)
+                ui_interface.watchlist_menu()
+            elif params['action'] == 'continue_watching_menu':
+                # Show Continue Watching (placeholder)
+                ui_interface.continue_watching_menu()
+            elif params['action'] == 'top_picks_menu':
+                # Show Top Picks (placeholder)
+                ui_interface.top_picks_menu()
+            elif params['action'] == 'other_content_menu':
+                # Show Other Content (placeholder)
+                ui_interface.other_content_menu()
             elif params['action'] == 'all_content_menu':
                 # Show all content (except podcasts & livestreams)
                 #all_content_menu()
@@ -110,19 +123,50 @@ def router(paramstring):
                 # Show info message for unavailable episodes
                 message = params.get('message', 'This content is not available.')
                 ui_interface.show_error(message)
+            elif params['action'] == 'settings':
+                # Open addon settings dialog
+                ADDON.openSettings()
+            elif params['action'] == 'clear_cache':
+                logger.info("Settings: clear_cache button pressed")
+                success = ui_interface.clear_cache()
+                if success:
+                    ui_interface.show_notification("Cache cleared.")
+                else:
+                    ui_interface.show_notification("Cache clear failed; please try again.")
+            elif params['action'] == 'force_logout':
+                logger.info("Settings: force_logout button pressed")
+                if not ui_interface.angel_interface:
+                    raise ValueError("Angel interface not initialized")
+
+                success = ui_interface.angel_interface.force_logout()
+                if success:
+                    ui_interface.show_notification("Logged out locally.")
+                else:
+                    ui_interface.show_notification("Logout failed; please try again.")
+            elif params['action'] == 'clear_debug_data':
+                logger.info("Settings: clear_debug_data button pressed")
+                success = ui_interface.clear_debug_data()
+                if success:
+                    ui_interface.show_notification("Debug data cleared.")
+                else:
+                    ui_interface.show_notification("Debug data clear failed; please try again.")
+            elif params['action'] == 'show_information':
+                ui_interface.show_auth_details_dialog()
             else:
                 # Unknown action
                 raise ValueError(f'Invalid action: {params.get("action", "unknown")}')
 
     except KeyError as e:
-        xbmc.log(f"Missing required parameter: {e}", xbmc.LOGERROR)
+        logger.error(f"Missing required parameter: {e}")
         ui_interface.show_error(f"Missing parameter: {str(e)}")
     except Exception as e:
-        xbmc.log(f"Router error: {e}", xbmc.LOGERROR)
+        logger.error(f"Router error: {e}")
         ui_interface.show_error(f"Navigation error: {str(e)}")
 
 if __name__ == '__main__':
     try:
+        logger.info(f"Addon invoked with argv: {sys.argv}")
+
         if not USERNAME or not PASSWORD:
             # Show error if credentials are not set
             xbmcgui.Dialog().ok(
@@ -146,10 +190,11 @@ if __name__ == '__main__':
                 password=PASSWORD,
                 session_file=get_session_file(),  # Use session file for persistent authentication
                 logger=logger,
-                query_path=query_path
+                query_path=query_path,
+                tracer=ui_interface.get_trace_callback(),
             )
             # Initialize UI helper
-            xbmc.log(f"Setting Angel Interface for Kodi UI {asi}", xbmc.LOGINFO)
+            logger.info(f"Setting Angel Interface for Kodi UI {asi}")
             ui_interface.setAngelInterface(asi)
 
             # Call the router with parameters from the command line

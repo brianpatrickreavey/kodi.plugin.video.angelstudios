@@ -3,6 +3,11 @@ Angel Studios KODI Addon
 
 # Overview
 
+## Playback behavior (current)
+- ISA enabled: we pass the master HLS URL and set ISA properties only. `stream_selection_type` is set per addon quality setting (auto→adaptive, fixed heights→fixed-res with chooser caps incl. secure, manual→ask-quality). No manifest prefetch or local filtering.
+- ISA unavailable/disabled: we set the master HLS URL as-is for native playback; no prefetch, no variant selection, no manual prompt. If no URL, we log a warning.
+- Rationale: keep ISA in control of stream selection while avoiding local manifest handling; keep non-ISA simple and resilient.
+
 # Development and build environment
 Please see BUILD.md for development and build guidelines.
 
