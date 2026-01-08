@@ -26,7 +26,7 @@ class AngelStudiosInterface:
     - GraphQL queries are used to fetch project data, seasons, episodes, and more.
     - helpers translate native graphql queries into useable data
     """
-    def __init__(self, username=None, password=None, session_file=None, logger=None, query_path=None, tracer=None):
+    def __init__(self, username=None, password=None, session_file='', logger=None, query_path=None, tracer=None):
         # Use the provided logger, or default to the module logger
         if logger is not None:
             self.log = logger
@@ -49,20 +49,25 @@ class AngelStudiosInterface:
             logger=self.log
         )
         self.angel_studios_session.authenticate()
+
         self.session = self.angel_studios_session.get_session()
 
         # Test if session is authenticated and valid:
         # Log authentication status more meaningfully
-        auth_header = self.session.headers.get('Authorization')
-        cookie_count = len(self.session.cookies) if self.session.cookies else 0
-        if auth_header:
-            self.log.info(f"Authenticated Session: JWT token present, {cookie_count} cookies")
-        else:
-            self.log.info(f"Session initialized: No JWT token, {cookie_count} cookies")
+        if self.session:
+            auth_header = self.session.headers.get('Authorization')
+            cookie_count = len(self.session.cookies) if self.session.cookies else 0
+            if auth_header:
+                self.log.info(f"Authenticated Session: JWT token present, {cookie_count} cookies")
+            else:
+                self.log.info(f"Session initialized: No JWT token, {cookie_count} cookies")
 
-        self.query_path = query_path or "resources/lib/angel_graphql"
-        self._query_cache = {}
-        self._fragment_cache = {}
+            self.query_path = query_path or "resources/lib/angel_graphql"
+            self._query_cache = {}
+            self._fragment_cache = {}
+        else:
+            self.log.error("Failed to initialize session: No session available")
+            raise Exception("Failed to initialize session: No session available")
 
     def _load_query(self, operation: str) -> str:
         """Load and cache a GraphQL query file by operation name."""
@@ -243,7 +248,7 @@ class AngelStudiosInterface:
         """Force a local logout; future enhancement may call remote logout API."""
         try:
             result = self.angel_studios_session.logout()
-            self.session = None
+            self.session = self.angel_studios_session.get_session()
             return result
         except Exception as e:
             self.log.error(f"Logout failed: {e}")

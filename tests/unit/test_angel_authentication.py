@@ -9,6 +9,8 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
+import requests
+from bs4 import Tag
 
 from angel_authentication import AngelStudioSession
 
@@ -47,13 +49,15 @@ class DummyCookies:
 		return self._mapping
 
 
-class FakeInput:
-	"""Minimal BeautifulSoup input element stub."""
+class FakeInput(Tag):
+	"""Minimal BeautifulSoup input element stub that passes isinstance(Tag) check."""
 	def __init__(self, mapping):
+		# Initialize Tag with minimal required args (name, can_be_empty_element)
+		super().__init__(name='input')
 		self.mapping = mapping
 
-	def get(self, key):
-		return self.mapping.get(key)
+	def get(self, key, default=None):
+		return self.mapping.get(key, default)
 
 
 class TestAngelStudioSession:
@@ -104,10 +108,48 @@ class TestAngelStudioSession:
 			sess.cookies = DummyCookies()
 			sess.headers = {}
 			session_ctor.return_value = sess
+			# Force path: clears cache, validates (returns True via mock), returns early
 			assert inst.authenticate(force_reauthentication=True) is True
 			mock_clear.assert_called_once()
-			mock_load.assert_called_once()
+			# Force path does NOT load cookies; it clears them and validates fresh session
+			mock_load.assert_not_called()
+			# Validate is called once after clearing cache
 			mock_validate.assert_called_once()
+
+	def test_authenticate_handles_session_close_errors(self, logger):
+		"""authenticate() swallows session.close() exceptions and continues."""
+		inst = AngelStudioSession(username="u", password="p", session_file="/tmp/sess", logger=logger)
+
+		# Create a mock session that raises on close()
+		bad_session = MagicMock()
+		bad_session.close.side_effect = RuntimeError("close boom")
+		inst.session = bad_session
+		inst.session_valid = True
+
+		with (
+			patch.object(inst, "_AngelStudioSession__clear_session_cache") as mock_clear,
+			patch("angel_authentication.requests.Session") as session_ctor,
+			patch.object(inst, "_validate_session", side_effect=[False, False]) as mock_validate,
+		):
+			# Fresh session also raises on close to cover line 71-72
+			fresh_session = MagicMock()
+			fresh_session.close.side_effect = RuntimeError("close boom 2")
+			fresh_session.cookies = DummyCookies()
+			fresh_session.headers = {}
+			bad_login = MagicMock(status_code=500, reason="bad", headers={}, content=b"")
+			fresh_session.get.return_value = bad_login
+			session_ctor.return_value = fresh_session
+
+			# Force reauth path: both close() calls raise but are caught
+			with pytest.raises(Exception, match="Failed to fetch the login page"):
+				inst.authenticate(force_reauthentication=True)
+
+			# Verify both close attempts were made and exceptions swallowed
+			bad_session.close.assert_called_once()
+			fresh_session.close.assert_called_once()
+			mock_clear.assert_called_once()
+			# Fresh session was created despite close() errors
+			assert session_ctor.called
 
 	def test_authenticate_loaded_cookies_invalid_starts_new_flow(self, logger):
 		"""Invalid cached cookies should fall through to full login."""
@@ -126,24 +168,27 @@ class TestAngelStudioSession:
 			with pytest.raises(Exception, match="Failed to fetch the login page"):
 				inst.authenticate()
 			mock_load.assert_called_once()
-			mock_validate.assert_called_once()
+			# _validate_session called twice: once initially, once after loading cookies
+			assert mock_validate.call_count == 2
 
 	def test_authenticate_uses_loaded_valid_cookies(self, logger):
+		"""Validate returns True after loading cookies from file."""
 		inst = AngelStudioSession(logger=logger, session_file="/tmp/sess")
 		with (
 			patch("angel_authentication.requests.Session") as session_ctor,
 			patch.object(inst, "_AngelStudioSession__load_session_cookies", return_value=True) as mock_load,
-			patch.object(inst, "_validate_session", return_value=True) as mock_validate,
+			patch.object(inst, "_validate_session", side_effect=[False, True]) as mock_validate,
 		):
 			sess = MagicMock()
 			session_ctor.return_value = sess
 			result = inst.authenticate()
 			assert result is True
 			mock_load.assert_called_once()
-			mock_validate.assert_called_once()
+			# _validate_session called twice: once initially (False), once after loading cookies (True)
+			assert mock_validate.call_count == 2
 			sess.get.assert_not_called()
 
-	def test_authenticate_full_login_flow_success(self, logger):
+	def test_authenticate_succeeds_after_full_login_flow(self, logger):
 		"""Happy-path login through email, password, redirect, and JWT capture."""
 		inst = AngelStudioSession(username="u", password="p", session_file="/tmp/sess", logger=logger)
 
@@ -320,6 +365,114 @@ class TestAngelStudioSession:
 			with pytest.raises(Exception, match="Login failed"):
 				inst.authenticate()
 
+	def test_authenticate_redirect_missing_location_header(self, logger):
+		"""Redirect without Location header raises exception."""
+		inst = AngelStudioSession(username="u", password="p", session_file="/tmp/sess", logger=logger)
+
+		login_page = MagicMock(status_code=200, content=b"<html></html>")
+		email_page = MagicMock(status_code=200, content=b"<html></html>")
+		# Password response is redirect but missing Location header
+		password_response = MagicMock(status_code=302, headers={}, content=b"")
+
+		sess = MagicMock()
+		sess.cookies = DummyCookies(mapping={'angelSession': 'state_cookie'})
+		sess.headers = {}
+		sess.get.side_effect = [login_page, email_page]
+		sess.post.return_value = password_response
+
+		with (
+			patch("angel_authentication.requests.Session", return_value=sess),
+			patch("angel_authentication.BeautifulSoup") as mock_bs,
+		):
+			soup_login = MagicMock()
+			soup_login.find_all.return_value = []
+			soup_email = MagicMock()
+			soup_email.find_all.return_value = [
+				FakeInput({'id': 'state', 'name': 'state', 'value': 'state2'}),
+				FakeInput({'name': '_csrf_token', 'value': 'csrf'}),
+			]
+			mock_bs.side_effect = [soup_login, soup_email]
+
+			with pytest.raises(Exception, match="Login redirect missing Location header"):
+				inst.authenticate()
+
+	def test_authenticate_handles_non_tag_elements_in_html_parsing(self, logger):
+		"""HTML parsing skips non-Tag elements returned by BeautifulSoup."""
+		inst = AngelStudioSession(username="u", password="p", session_file="/tmp/sess", logger=logger)
+
+		login_page = MagicMock(status_code=200, content=b"<html></html>")
+		email_page = MagicMock(status_code=200, content=b"<html></html>")
+		password_response = MagicMock(status_code=200, content=b"<html></html>")
+
+		sess = MagicMock()
+		sess.cookies = DummyCookies(mapping={'angelSession': 'state_cookie'})
+		sess.headers = {}
+		sess.get.side_effect = [login_page, email_page]
+		sess.post.return_value = password_response
+
+		with (
+			patch("angel_authentication.requests.Session", return_value=sess),
+			patch.object(inst, "_AngelStudioSession__save_session_cookies"),
+			patch("angel_authentication.BeautifulSoup") as mock_bs,
+		):
+			# Mix Tag elements with non-Tag elements (e.g., strings, comments)
+			non_tag_element = "some text node"  # Not a Tag
+			login_inputs = [
+				non_tag_element,  # Should be skipped (line 117: continue)
+				FakeInput({'id': 'state', 'name': 'state', 'value': 'state1'}),
+			]
+			email_inputs = [
+				non_tag_element,  # Should be skipped
+				FakeInput({'id': 'state', 'name': 'state', 'value': 'state2'}),
+				FakeInput({'name': '_csrf_token', 'value': 'csrf'}),
+			]
+
+			soup_login = MagicMock()
+			soup_login.find_all.return_value = login_inputs
+			soup_email = MagicMock()
+			soup_email.find_all.return_value = email_inputs
+			soup_password = MagicMock()
+			soup_password.find.return_value = None
+			mock_bs.side_effect = [soup_login, soup_email, soup_password]
+
+			result = inst.authenticate()
+			assert result is True
+
+	def test_validate_session_jwt_expiration_parse_failure(self, logger):
+		"""_validate_session returns False when JWT expiration can't be parsed."""
+		inst = AngelStudioSession(logger=logger)
+
+		# Mock session with JWT cookie
+		sess = MagicMock()
+		sess.cookies.get.return_value = "valid.jwt.token"
+		inst.session = sess
+
+		# Mock __get_jwt_expiration_timestamp to return None (parse failure)
+		with patch.object(inst, "_AngelStudioSession__get_jwt_expiration_timestamp", return_value=None):
+			result = inst._validate_session()
+			assert result is False
+
+	def test_logout_handles_session_close_error(self, logger):
+		"""logout swallows session.close() exception and continues."""
+		inst = AngelStudioSession(session_file="/tmp/sess", logger=logger)
+
+		sess = MagicMock()
+		sess.cookies = DummyCookies(mapping={'a': 'b'})
+		sess.headers = {'Authorization': 'Bearer tok'}
+		sess.close.side_effect = RuntimeError("close boom")
+		inst.session = sess
+		inst.session_valid = True
+
+		with (
+			patch("os.path.exists", return_value=True),
+			patch("os.remove") as mock_remove,
+		):
+			result = inst.logout()
+
+		assert result is True
+		sess.close.assert_called_once()
+		mock_remove.assert_called_once()
+
 	def test_get_session_calls_authenticate_when_missing(self, logger):
 		"""get_session triggers authenticate when no session exists."""
 		inst = AngelStudioSession(logger=logger)
@@ -413,7 +566,9 @@ class TestAngelStudioSession:
 
 		result = inst.logout()
 		assert result is True
-		assert inst.session is None
+		assert inst.session is not None
+		assert inst.session is not sess
+		assert isinstance(inst.session, requests.Session)
 
 	def test_get_session_details_outer_exception(self, logger):
 		"""Outer try/except safely swallows unexpected errors."""
@@ -568,7 +723,9 @@ class TestAngelStudioSession:
 			assert inst.logout() is True
 
 		mock_remove.assert_called_once_with(str(session_file))
-		assert inst.session is None
+		assert inst.session is not None
+		assert inst.session is not sess
+		assert isinstance(inst.session, requests.Session)
 		assert inst.session_valid is False
 		assert sess.headers.get('Authorization') is None
 		assert sess.cookies.get_dict() == {}
@@ -588,7 +745,9 @@ class TestAngelStudioSession:
 		):
 			assert inst.logout() is False
 
-		assert inst.session is None
+		assert inst.session is not None
+		assert inst.session is not sess
+		assert isinstance(inst.session, requests.Session)
 		assert inst.session_valid is False
 		assert sess.headers.get('Authorization') is None
 		assert sess.cookies.get_dict() == {}

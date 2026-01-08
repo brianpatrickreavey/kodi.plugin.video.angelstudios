@@ -380,15 +380,11 @@ class KodiUIInterface:
         self.log.info("Other content menu requested, but not yet implemented.")
         self.show_error("Other Content is not available yet.")
 
-    def projects_menu(self, content_type=None):
+    def projects_menu(self, content_type=''):
         """Display a menu of projects based on content type, with persistent caching."""
         try:
             self.log.info("Fetching projects from AngelStudiosInterface...")
-            angel_menu_content_mapper = {
-                'movies': 'movie',
-                'series': 'series',
-                'specials': 'special'
-            }
+
             cache_key = f"projects_{content_type or 'all'}"
             cache_enabled = self._cache_enabled()
             projects = None
@@ -611,6 +607,9 @@ class KodiUIInterface:
             raise ValueError("Provide only stream_url or episode_data, not both")
         if not stream_url and not episode_data:
             raise ValueError("Must provide either stream_url or episode_data to play video")
+
+        list_item = xbmcgui.ListItem(offscreen=True)
+
         try:
             if episode_data:
                 # Enhanced playback with metadata
@@ -621,7 +620,7 @@ class KodiUIInterface:
                 list_item = self._create_list_item_from_episode(
                     episode=episode,
                     project=project,
-                    content_type=None,
+                    content_type='',
                     is_playback=True
                 )
 
@@ -791,7 +790,7 @@ class KodiUIInterface:
             self.log.info(f"Using cached project data for: {project_slug}")
         return project
 
-    def _create_list_item_from_episode(self, episode, project=None, content_type=None, stream_url=None, is_playback=False):
+    def _create_list_item_from_episode(self, episode, project=None, content_type='', stream_url=None, is_playback=False):
         """
         Unified helper to create a ListItem from an episode dict.
         - episode: Raw episode dict.
@@ -916,7 +915,7 @@ class KodiUIInterface:
         except Exception:
             quality_value = 'auto'
 
-        quality_value = (quality_value or 'auto').lower()
+        quality_value = (quality_value or 'auto').lower() if isinstance(quality_value, str) else 'auto'
         mapping = {
             '1080p': {'mode': 'fixed', 'target_height': 1080},
             '720p': {'mode': 'fixed', 'target_height': 720},

@@ -1,0 +1,13 @@
+{
+  "include": ["plugin.video.angelstudios"],
+  "exclude": [
+    "archive",
+    "htmlcov",
+    "__pycache__",
+    "**/__pycache__",
+    "tools"
+  ],
+  "extraPaths": ["plugin.video.angelstudios/resources/lib"],
+  "reportMissingImports": true,
+  "reportMissingTypeStubs": false
+}

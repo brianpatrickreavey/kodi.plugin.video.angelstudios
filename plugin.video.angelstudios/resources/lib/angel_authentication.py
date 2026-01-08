@@ -3,7 +3,7 @@ import os
 import pickle
 import sys
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 import urllib.parse
 import base64
 import json
@@ -12,11 +12,11 @@ from datetime import datetime, timezone, timedelta
 
 class AngelStudioSession:
     """Class to handle Angel Studios authentication and session management"""
-    def __init__(self, username=None, password=None, session_file=None, logger=None):
+    def __init__(self, username=None, password=None, session_file='', logger=None):
         self.username = username
         self.password = password
         self.session_file = session_file
-        self.session = None
+        self.session = requests.Session()
         self.session_valid = False
         self.web_url = "https://www.angel.com"
         self.auth_url = "https://auth.angel.com"
@@ -47,21 +47,29 @@ class AngelStudioSession:
               - validate_session
         """
         self.log.info("Getting authenticated session for Angel.com")
-
         if force_reauthentication:
             self.log.info("Forcing re-authentication and clearing session cache")
             self.__clear_session_cache()
-            self.session = None
+            try:
+                self.session.close()
+            except Exception:
+                # Best-effort close; session should always be replaced below
+                pass
+            self.session = requests.Session()
             self.session_valid = False
 
-        if self.session:
-            self.session_valid = self._validate_session()
+        # Validate current session, if any
+        self.session_valid = self._validate_session()
 
-        if self.session and self.session_valid:
+        if self.session_valid:
             self.log.info("Session is already authenticated and valid.")
             return True
 
         self.log.info("No valid session found, starting authentication flow.")
+        try:
+            self.session.close()
+        except Exception:
+            pass
         self.session = requests.Session()
 
         # Try to load existing session cookies
@@ -105,6 +113,8 @@ class AngelStudioSession:
 
         state = self.session.cookies.get('angelSession', 'asdfasdf')
         for element in soup.find_all('input'):
+            if not isinstance(element, Tag):
+                continue
             self.log.info(f"Found input element: {element}")
             if element.get('id') == 'state' and element.get('name') == 'state':
                 state = element.get('value')
@@ -126,6 +136,8 @@ class AngelStudioSession:
         state2 = None
         csrf_token = None
         for input_element in soup.find_all('input'):
+            if not isinstance(input_element, Tag):
+                continue
             if input_element.get('id') == 'state' and input_element.get('name') == 'state':
                 state2 = input_element.get('value')
             elif input_element.get('name') == '_csrf_token':
@@ -144,6 +156,9 @@ class AngelStudioSession:
         password_response = self.session.post(password_uri, data=password_payload, allow_redirects=False)
         if password_response.status_code in (302, 303):
             redirect_url = password_response.headers.get('Location')
+            if not redirect_url:
+                self.log.error("Redirect response missing Location header")
+                raise Exception("Login redirect missing Location header")
             self.log.info(f"Following redirect to: {redirect_url}")
             # Follow the redirect - required to complete the login process
             redirect_response = self.session.get(redirect_url, allow_redirects=True)
@@ -174,10 +189,10 @@ class AngelStudioSession:
         # Step 7: Set JWT token in session headers
         """Extract JWT token from cookies and set up Authorization header for GraphQL requests"""
         # Look for the JWT token in cookies
-        jwt_token = None
+        jwt_token = ''
         for cookie in self.session.cookies:
             if cookie.name == 'angel_jwt':
-                jwt_token = cookie.value
+                jwt_token = str(cookie.value)
                 self.log.debug(f"Found JWT token in cookies: {jwt_token[:10]}...")  # Log first 10 chars for brevity
                 break
 
@@ -196,21 +211,13 @@ class AngelStudioSession:
 
         return True
 
-    def get_session(self):
-        """
-        Get an authenticated session for making requests to the Angel.com API.
-
-        Returns:
-            requests.Session: Authenticated session object
-        """
-        if not self.session:
-            if not self.authenticate():
-                raise Exception("Failed to authenticate and create a valid session")
-        return self.session
-
     def _validate_session(self):
         """Check if the current session is valid"""
-        token_exp_timestamp = self.__get_jwt_expiration_timestamp(self.session.cookies.get('angel_jwt'))
+        jwt_token = self.session.cookies.get('angel_jwt')
+        if not jwt_token:
+            self.log.warning("No JWT token present in session cookies.")
+            return False
+        token_exp_timestamp = self.__get_jwt_expiration_timestamp(jwt_token)
         if token_exp_timestamp:
             now_timestamp = int(datetime.now(timezone.utc).timestamp())
             now_datetime = datetime.fromtimestamp(now_timestamp, tz=timezone.utc)
@@ -237,6 +244,20 @@ class AngelStudioSession:
         if exp_timestamp:
             return exp_timestamp
         return None
+
+
+    def get_session(self) -> requests.Session:
+        """
+        Get an authenticated session for making requests to the Angel.com API.
+
+        Returns:
+            requests.Session: Authenticated session object
+        """
+        if not self.session_valid:
+            if not self.authenticate():
+                raise Exception("Failed to authenticate and create a valid session")
+
+        return self.session
 
     def get_session_details(self):
         """Return session diagnostics for UI display without exposing token contents."""
@@ -318,10 +339,10 @@ class AngelStudioSession:
             except FileNotFoundError:
                 return False
             try:
-                jwt_token = None
+                jwt_token = ''
                 for cookie in self.session.cookies:
                     if cookie.name == 'angel_jwt':
-                        jwt_token = cookie.value
+                        jwt_token = str(cookie.value)
                         self.log.info(f"Loaded JWT token from cookies: {jwt_token[:10]}...")
                         break
 
@@ -366,6 +387,10 @@ class AngelStudioSession:
                 self.session.headers.pop('Authorization', None)
             except Exception as e:
                 self.log.warning(f"Failed to clear Authorization header: {e}")
+            try:
+                self.session.close()
+            except Exception as e:
+                self.log.warning(f"Failed to close session during logout: {e}")
 
         file_cleared = True
         if self.session_file:
@@ -373,7 +398,8 @@ class AngelStudioSession:
             if not file_cleared:
                 self.log.warning("Session cache file could not be cleared during logout")
 
-        self.session = None
+        # Replace with a fresh session to maintain the invariant of a non-None Session object
+        self.session = requests.Session()
         self.session_valid = False
 
         return file_cleared

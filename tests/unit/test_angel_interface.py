@@ -51,7 +51,7 @@ class TestAngelStudiosInterface:
 
             interface = AngelStudiosInterface(logger=logger)
 
-            mock_session_class.assert_called_once_with(username=None, password=None, session_file=None, logger=logger)
+            mock_session_class.assert_called_once_with(username=None, password=None, session_file='', logger=logger)
             mock_session_class.return_value.authenticate.assert_called_once()
             mock_session_class.return_value.get_session.assert_called_once()
             assert interface.log is logger
@@ -68,6 +68,19 @@ class TestAngelStudiosInterface:
             # Verify default logger is set and no custom log
             assert interface.log is not None
             # Note: Default logger setup doesn't log "Custom logger initialized"
+
+    def test_init_fails_when_session_is_none(self):
+        """Test __init__ raises exception when get_session() returns None."""
+        with (
+            patch('angel_interface.angel_authentication.AngelStudioSession') as mock_session_class,
+        ):
+            mock_session_instance = mock_session_class.return_value
+            mock_session_instance.authenticate.return_value = True
+            # get_session returns None (should never happen, but defensive check)
+            mock_session_instance.get_session.return_value = None
+
+            with pytest.raises(Exception, match="Failed to initialize session: No session available"):
+                AngelStudiosInterface()
 
     def test_load_query_success(self, angel_interface):
         """Test _load_query loads and caches a query successfully."""
@@ -484,13 +497,17 @@ class TestAngelStudiosInterface:
 
     def test_force_logout_success(self):
         """force_logout clears session on success."""
-        iface = object.__new__(AngelStudiosInterface)
-        iface.log = MagicMock()
-        iface.angel_studios_session = MagicMock()
-        iface.angel_studios_session.logout.return_value = True
-        iface.session = MagicMock()
+        asi = object.__new__(AngelStudiosInterface)
+        asi.log = MagicMock()
+        asi.angel_studios_session = MagicMock()
+        asi.angel_studios_session.logout.return_value = True
+        fresh_session = MagicMock()
+        asi.angel_studios_session.get_session.return_value = fresh_session
+        old_session = MagicMock()
+        asi.session = old_session
 
-        result = iface.force_logout()
+        result = asi.force_logout()
 
         assert result is True
-        assert iface.session is None
+        assert asi.session is fresh_session
+        assert asi.session is not old_session
