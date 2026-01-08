@@ -777,3 +777,50 @@ class TestEpisodesMenu:
             angel_interface_mock.get_project.assert_called_once_with("test-project")
             mock_show_error.assert_called_once_with("Error fetching season 1: Test exception")
             assert result is None
+
+    def test_episodes_menu_handles_unavailable_episodes(self, ui_interface, mock_xbmc, mock_cache):
+        """Episodes with source: None (unavailable) should be rendered but marked unavailable."""
+        import copy
+
+        ui, logger_mock, angel_interface_mock = ui_interface
+        mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
+
+        # Prepare project with a season where episodes include both available and unavailable
+        project_data = copy.deepcopy(MOCK_PROJECT_DATA["single_season_project"])
+        season = project_data["seasons"][0]
+        available_episode = copy.deepcopy(season["episodes"][0])
+        unavailable_episode = copy.deepcopy(season["episodes"][0])
+        unavailable_episode["guid"] = "unavailable-guid"
+        unavailable_episode["source"] = None  # Unavailable episode
+
+        season["episodes"] = [unavailable_episode, available_episode]
+
+        ui.cache.get.return_value = project_data
+        angel_interface_mock.get_project.return_value = project_data
+
+        with (
+            patch.object(ui, "_create_list_item_from_episode") as mock_create_item,
+            patch("xbmcplugin.setContent") as mock_set_content,
+            patch("xbmcplugin.addSortMethod") as mock_add_sort,
+            patch("xbmcplugin.SORT_METHOD_EPISODE") as mock_episode_sort,
+            patch("xbmcplugin.SORT_METHOD_VIDEO_SORT_TITLE") as mock_title_sort,
+            patch("xbmcplugin.SORT_METHOD_LABEL") as mock_label_sort,
+        ):
+            ui.episodes_menu(content_type="series", project_slug=project_data["slug"], season_id=season["id"])
+
+            # Both episodes should be added (unavailable and available)
+            assert mock_add_item.call_count == 2
+
+            # Check first call (unavailable episode)
+            first_call_args = mock_add_item.call_args_list[0][0]
+            assert "unavailable-guid" in first_call_args[1]
+            assert first_call_args[3] is False  # Non-playable
+
+            # Check second call (available episode)
+            second_call_args = mock_add_item.call_args_list[1][0]
+            assert available_episode["guid"] in second_call_args[1]
+            assert second_call_args[3] is False  # Still non-playable in menu
+
+            # Sorting still applied safely
+            mock_add_sort.assert_any_call(1, mock_label_sort)
+            mock_end_dir.assert_called_once_with(1)

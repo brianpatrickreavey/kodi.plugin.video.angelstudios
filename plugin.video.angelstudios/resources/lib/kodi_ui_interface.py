@@ -527,7 +527,8 @@ class KodiUIInterface:
             self.log.info(f"Setting content type for Kodi: {content_type} ({kodi_content_type})")
             xbmcplugin.setContent(self.handle, kodi_content_type)
 
-            for episode in season.get('episodes', []):
+            episodes_list = season.get('episodes', [])
+            for idx, episode in enumerate(episodes_list):
                 episode_available = bool(episode.get('source'))
                 list_item = self._create_list_item_from_episode(
                     episode,
@@ -817,7 +818,7 @@ class KodiUIInterface:
             quality_pref = self._get_quality_pref()
             quality_mode = quality_pref['mode']
             target_height = quality_pref['target_height']
-            manifest_url = episode.get('source', {}).get('url', stream_url)
+            manifest_url = (episode.get('source') or {}).get('url', stream_url)
             selected_url = manifest_url
 
             list_item.setIsFolder(False)
@@ -893,7 +894,8 @@ class KodiUIInterface:
 
         # Set media type and additional metadata
         info_tag = list_item.getVideoInfoTag()
-        info_tag.setDuration(episode.get('source', {}).get('duration', 0))
+        if episode_available:
+            info_tag.setDuration(episode.get('source').get('duration', 0))
         if is_playback:
             info_tag.setMediaType('video')
             # Additional playback metadata from project
