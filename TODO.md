@@ -10,26 +10,6 @@ an actual episode, a dialog pops up asking to resume or not.
 # Plugin Configuration Options Features
 
 ## Playback
-### Audio Settings
-* default language (fall back to en if language unavailable)
-
-### Video / Streams
-* Toggle InputStream Adaptive (HLS on/off)
-* Optional fixed-quality fallback selector (when not using ISA)
-
-## Troubleshooting
-### Angel Debug Logging
-Since KODI's normal Debug logging is extremely verbose, it would be helpful
-to be able to enable debug logging only for the Angel Studios Plugin.
-
-### Cache Settings
-Create a subset of confriguration options that control our cache settings.
-
-* Cache timeout (default 24 hours, unless URLs are signed and may need
-  more frequent refreshing)
-* Cache clearing - clear out all the Angel Studios specific caches
-* Cache disabling - disable all caching (should include a warning)
-- Document known instability with VAAPI: on some systems VAAPI + ISA HLS can stall/segfault when stopping playback; disabling VAAPI resolved crashes and restored subtitle/audio switching.
 
 ### Test Hygiene
 - Consider switching test fixtures to use a fresh `xbmcaddon.Addon` mock per test to avoid state leakage when toggling cache settings.

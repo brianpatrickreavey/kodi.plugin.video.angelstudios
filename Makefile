@@ -1,7 +1,8 @@
 # Makefile for common development tasks
 
 lint:
-	flake8 plugin.video.angelstudios/ --max-line-length=120 --extend-ignore=E501,W503
+	flake8 plugin.video.angelstudios/ --max-line-length=120
+	black plugin.video.angelstudios/ --line-length 120
 
 unittest:
 	pytest tests/unit/

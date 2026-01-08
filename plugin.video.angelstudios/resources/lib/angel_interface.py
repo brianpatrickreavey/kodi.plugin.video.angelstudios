@@ -1,11 +1,11 @@
-''' angel_studios_interface.py
+"""angel_studios_interface.py
 This module provides an interface for interacting with the Angel Studios website,
 specifically for making HTML and GraphQL queries.
 The aim is for this module to be KODI agnostic, meaning it should not depend on KODI-specific libraries.
 It should be usable in any Python environment, including unit tests.
 This module is designed to be used by the KODI UI Interface, which will handle KODI-specific operations.
 It provides methods for authentication, making GraphQL queries, and retrieving project data.
-'''
+"""
 
 import logging
 import os
@@ -26,7 +26,16 @@ class AngelStudiosInterface:
     - GraphQL queries are used to fetch project data, seasons, episodes, and more.
     - helpers translate native graphql queries into useable data
     """
-    def __init__(self, username=None, password=None, session_file='', logger=None, query_path=None, tracer=None):
+
+    def __init__(
+        self,
+        username=None,
+        password=None,
+        session_file="",
+        logger=None,
+        query_path=None,
+        tracer=None,
+    ):
         # Use the provided logger, or default to the module logger
         if logger is not None:
             self.log = logger
@@ -46,7 +55,7 @@ class AngelStudiosInterface:
             username=username,
             password=password,
             session_file=session_file,
-            logger=self.log
+            logger=self.log,
         )
         self.angel_studios_session.authenticate()
 
@@ -55,7 +64,7 @@ class AngelStudiosInterface:
         # Test if session is authenticated and valid:
         # Log authentication status more meaningfully
         if self.session:
-            auth_header = self.session.headers.get('Authorization')
+            auth_header = self.session.headers.get("Authorization")
             cookie_count = len(self.session.cookies) if self.session.cookies else 0
             if auth_header:
                 self.log.info(f"Authenticated Session: JWT token present, {cookie_count} cookies")
@@ -73,9 +82,9 @@ class AngelStudiosInterface:
         """Load and cache a GraphQL query file by operation name."""
         if operation in self._query_cache:
             return self._query_cache[operation]
-        query_file = os.path.join(self.query_path, f'query_{operation}.graphql')
+        query_file = os.path.join(self.query_path, f"query_{operation}.graphql")
         try:
-            with open(query_file, 'r') as f:
+            with open(query_file, "r") as f:
                 query = f.read()
                 self._query_cache[operation] = query
                 return query
@@ -87,9 +96,9 @@ class AngelStudiosInterface:
         """Load and cache a GraphQL fragment file by fragment name."""
         if fragment_name in self._fragment_cache:
             return self._fragment_cache[fragment_name]
-        fragment_path = os.path.join(self.query_path, f'fragment_{fragment_name}.graphql')
+        fragment_path = os.path.join(self.query_path, f"fragment_{fragment_name}.graphql")
         try:
-            with open(fragment_path, 'r') as f:
+            with open(fragment_path, "r") as f:
                 fragment = f.read()
                 self._fragment_cache[fragment_name] = fragment
                 return fragment
@@ -102,21 +111,22 @@ class AngelStudiosInterface:
         if not callable(self.tracer):
             return
         try:
-            safe_headers = {k: v for k, v in self.session.headers.items()
-                           if k.lower() not in ('authorization', 'cookie')}
+            safe_headers = {
+                k: v for k, v in self.session.headers.items() if k.lower() not in ("authorization", "cookie")
+            }
             trace_payload = {
-                'operation': operation,
-                'url': angel_graphql_url,
-                'status': status,
-                'request': {
-                    'headers': safe_headers,
-                    'body': query_dict,
+                "operation": operation,
+                "url": angel_graphql_url,
+                "status": status,
+                "request": {
+                    "headers": safe_headers,
+                    "body": query_dict,
                 },
             }
             if response_data is not None:
-                trace_payload['response'] = response_data
+                trace_payload["response"] = response_data
             if error is not None:
-                trace_payload['error'] = error
+                trace_payload["error"] = error
             self.tracer(trace_payload)
         except Exception:
             # Tracing must never break main flow
@@ -131,38 +141,39 @@ class AngelStudiosInterface:
         # This regex captures fragment names after '...'
         # It excludes 'on' keyword to avoid matching inline fragments
         # Example: "... FragmentName" will match "FragmentName"
-        fragment_names = set(re.findall(r'\.\.\.\s*(?!on\b)([A-Za-z0-9_]+)', query))
+        fragment_names = set(re.findall(r"\.\.\.\s*(?!on\b)([A-Za-z0-9_]+)", query))
 
         # Load and append each fragment only once (cached)
         for fragment in fragment_names:
-            query += '\n' + self._load_fragment(fragment)
+            query += "\n" + self._load_fragment(fragment)
 
         query_dict = {
             "operationName": operation,
             "query": query,
-            "variables": variables
+            "variables": variables,
         }
         self.log.debug(f"Executing GraphQL query: {operation}")
         try:
             response = self.session.post(angel_graphql_url, json=query_dict)
             response.raise_for_status()
             result = response.json()
-            if 'errors' in result:
+            if "errors" in result:
                 self.log.error(f"GraphQL errors: {result['errors']}")
                 self.log.error(f"session headers: {self.session.headers}")
                 self.angel_studios_session.authenticate(force_reauthentication=True)
                 data = {}
             else:
-                data = result.get('data', {})
+                data = result.get("data", {})
 
             self._trace_request(operation, query_dict, status=response.status_code, response_data=data)
             return data
         except requests.RequestException as e:
             self.log.error(f"GraphQL request failed: {e}")
             self._trace_request(
-                operation, query_dict,
-                status=getattr(e.response, 'status_code', None),
-                error=str(e)
+                operation,
+                query_dict,
+                status=getattr(e.response, "status_code", None),
+                error=str(e),
             )
             return {}
         except Exception as e:
@@ -174,13 +185,10 @@ class AngelStudiosInterface:
         """Get all projects available in the catalog of the matching content type"""
         try:
             self.log.info("Fetching projects using GraphQL...")
-            result = self._graphql_query(
-                "getProjectsForMenu",
-                variables={}
-            )
+            result = self._graphql_query("getProjectsForMenu", variables={})
             projects = []
-            for project in result.get('projects', []):
-                if project_type and project.get('projectType') != project_type:
+            for project in result.get("projects", []):
+                if project_type and project.get("projectType") != project_type:
                     continue
                 projects.append(project)
             return projects
@@ -202,10 +210,10 @@ class AngelStudiosInterface:
                 variables={
                     "slug": project_slug,
                     "includePrerelease": True,
-                    "includeSeasons": True
-                }
+                    "includeSeasons": True,
+                },
             )
-            project = result.get('project', {})
+            project = result.get("project", {})
             if not project:
                 self.log.warning(f"No project found for slug: {project_slug}")
                 return None
@@ -224,8 +232,8 @@ class AngelStudiosInterface:
                     "projectSlug": project_slug or "",
                     "includePrerelease": True,
                     "authenticated": True,
-                    "reactionsRollupInterval": 4000
-                }
+                    "reactionsRollupInterval": 4000,
+                },
             )
             return result
         except Exception as e:

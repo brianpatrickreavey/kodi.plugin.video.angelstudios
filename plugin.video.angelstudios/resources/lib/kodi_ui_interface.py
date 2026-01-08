@@ -7,7 +7,7 @@ import json
 import os
 import time
 from datetime import timedelta
-from urllib.parse import urlencode, urljoin
+from urllib.parse import urlencode
 
 import xbmc  # type: ignore
 import xbmcaddon  # type: ignore
@@ -17,30 +17,31 @@ import xbmcvfs  # type: ignore
 
 from simplecache import SimpleCache  # type: ignore
 
-REDACTED = '<redacted>'
+REDACTED = "<redacted>"
 
 angel_menu_content_mapper = {
-    'movies': 'movie',
-    'series': 'series',
-    'specials': 'special'
+    "movies": "movie",
+    "series": "series",
+    "specials": "special",
 }
 
 # Map Angel Studios content types to Kodi content types
 kodi_content_mapper = {
-    'movies': 'movies',
-    'series': 'tvshows',
-    'special': 'videos',    # Specials are treated as generic videos
-    'podcast': 'videos',    # Podcasts are also generic videos
-    'livestream': 'videos'  # Livestreams are generic videos
+    "movies": "movies",
+    "series": "tvshows",
+    "special": "videos",  # Specials are treated as generic videos
+    "podcast": "videos",  # Podcasts are also generic videos
+    "livestream": "videos",  # Livestreams are generic videos
 }
+
 
 class KodiUIInterface:
     """Helper class for Kodi UI operations"""
 
     def __init__(self, handle, url, logger, angel_interface):
-        '''
+        """
         Initialize the Kodi UI interface.
-        '''
+        """
         self.handle = handle
         self.kodi_url = url
         self.log = logger
@@ -48,11 +49,11 @@ class KodiUIInterface:
         self.cache = SimpleCache()  # Initialize cache
 
         self.addon = xbmcaddon.Addon()
-        addon_path = xbmcvfs.translatePath(self.addon.getAddonInfo('path'))
-        self.default_icon = os.path.join(addon_path, 'resources', 'images', 'icons', 'Angel_Studios_Logo.png')
-        self.default_settings_icon = 'DefaultAddonService.png'
-        profile_path = xbmcvfs.translatePath(self.addon.getAddonInfo('profile'))
-        self.trace_dir = os.path.join(profile_path, 'temp')
+        addon_path = xbmcvfs.translatePath(self.addon.getAddonInfo("path"))
+        self.default_icon = os.path.join(addon_path, "resources", "images", "icons", "Angel_Studios_Logo.png")
+        self.default_settings_icon = "DefaultAddonService.png"
+        profile_path = xbmcvfs.translatePath(self.addon.getAddonInfo("profile"))
+        self.trace_dir = os.path.join(profile_path, "temp")
 
         # Log initialization
         self.log.info("KodiUIInterface initialized")
@@ -60,81 +61,81 @@ class KodiUIInterface:
 
         # Default state for menu toggles
         self.default_menu_enabled = {
-            'show_movies': True,
-            'show_series': True,
-            'show_specials': True,
-            'show_podcasts': False,
-            'show_livestreams': False,
-            'show_continue_watching': False,
-            'show_top_picks': False,
-            'show_other_content': False,
+            "show_movies": True,
+            "show_series": True,
+            "show_specials": True,
+            "show_podcasts": False,
+            "show_livestreams": False,
+            "show_continue_watching": False,
+            "show_top_picks": False,
+            "show_other_content": False,
         }
 
         # Static menu definitions (settings are applied when rendering)
         self.menu_defs = {
-            'show_movies': {
-                'label': 'Movies',
-                'content_type': 'movie',
-                'action': 'movies_menu',
-                'description': 'Browse standalone movies and films',
-                'icon': 'DefaultMovies.png',
+            "show_movies": {
+                "label": "Movies",
+                "content_type": "movie",
+                "action": "movies_menu",
+                "description": "Browse standalone movies and films",
+                "icon": "DefaultMovies.png",
             },
-            'show_series': {
-                'label': 'Series',
-                'content_type': 'tvshow',
-                'action': 'series_menu',
-                'description': 'Browse series with multiple episodes',
-                'icon': 'DefaultTVShows.png',
+            "show_series": {
+                "label": "Series",
+                "content_type": "tvshow",
+                "action": "series_menu",
+                "description": "Browse series with multiple episodes",
+                "icon": "DefaultTVShows.png",
             },
             # Kodi uses 'specials' for Dry Bar Comedy Specials
             # If this changes in the future, update accordingly
-            'show_specials': {
-                'label': 'Dry Bar Comedy Specials',
-                'content_type': 'video',
-                'action': 'specials_menu',
-                'description': 'Browse Dry Bar Comedy Specials',
-                'icon': 'DefaultAddonLyrics.png',  # Microphone icon, best we could do
+            "show_specials": {
+                "label": "Dry Bar Comedy Specials",
+                "content_type": "video",
+                "action": "specials_menu",
+                "description": "Browse Dry Bar Comedy Specials",
+                "icon": "DefaultAddonLyrics.png",  # Microphone icon, best we could do
             },
-            'show_podcasts': {
-                'label': 'Podcasts',
-                'content_type': 'video',
-                'action': 'podcast_menu',
-                'description': 'Browse Podcast content',
-                'icon': 'DefaultMusicSources.png',
+            "show_podcasts": {
+                "label": "Podcasts",
+                "content_type": "video",
+                "action": "podcast_menu",
+                "description": "Browse Podcast content",
+                "icon": "DefaultMusicSources.png",
             },
-            'show_livestreams': {
-                'label': 'Livestreams',
-                'content_type': 'video',
-                'action': 'livestream_menu',
-                'description': 'Browse Livestream content',
-                'icon': 'DefaultPVRGuide.png',
+            "show_livestreams": {
+                "label": "Livestreams",
+                "content_type": "video",
+                "action": "livestream_menu",
+                "description": "Browse Livestream content",
+                "icon": "DefaultPVRGuide.png",
             },
-            'show_continue_watching': {
-                'label': 'Continue Watching',
-                'content_type': 'video',
-                'action': 'continue_watching_menu',
-                'description': 'Continue watching your in-progress content',
-                'icon': 'DefaultInProgressShows.png',
+            "show_continue_watching": {
+                "label": "Continue Watching",
+                "content_type": "video",
+                "action": "continue_watching_menu",
+                "description": "Continue watching your in-progress content",
+                "icon": "DefaultInProgressShows.png",
             },
-            'show_watchlist': {
-                'label': 'Watchlist',
-                'content_type': 'video',
-                'action': 'watchlist_menu',
-                'description': 'Browse your saved watchlist items',
-                'icon': 'DefaultVideoPlaylists.png',
+            "show_watchlist": {
+                "label": "Watchlist",
+                "content_type": "video",
+                "action": "watchlist_menu",
+                "description": "Browse your saved watchlist items",
+                "icon": "DefaultVideoPlaylists.png",
             },
-            'show_top_picks': {
-                'label': 'Top Picks For You',
-                'content_type': 'video',
-                'action': 'top_picks_menu',
-                'description': 'Browse top picks for you',
-                'icon': 'DefaultMusicTop100.png',
+            "show_top_picks": {
+                "label": "Top Picks For You",
+                "content_type": "video",
+                "action": "top_picks_menu",
+                "description": "Browse top picks for you",
+                "icon": "DefaultMusicTop100.png",
             },
-            'show_other_content': {
-                'label': 'Other Content',
-                'content_type': 'video',
-                'action': 'other_content_menu',
-                'description': 'Other content types not categorized above',
+            "show_other_content": {
+                "label": "Other Content",
+                "content_type": "video",
+                "action": "other_content_menu",
+                "description": "Other content types not categorized above",
             },
         }
 
@@ -169,17 +170,17 @@ class KodiUIInterface:
             return has_isa
 
     def setAngelInterface(self, angel_interface):
-        '''Set the Angel Studios interface for this UI helper'''
+        """Set the Angel Studios interface for this UI helper"""
         self.angel_interface = angel_interface
 
     def create_plugin_url(self, **kwargs):
         """Create a URL for calling the plugin recursively"""
-        return f'{self.kodi_url}?{urlencode(kwargs)}'
+        return f"{self.kodi_url}?{urlencode(kwargs)}"
 
     def _cache_ttl(self):
         """Return timedelta for current cache expiration setting."""
         try:
-            hours = self.addon.getSettingInt('cache_expiration_hours')
+            hours = self.addon.getSettingInt("cache_expiration_hours")
             if not hours:
                 self.log.warning(f"cache_expiration_hours was falsy ({hours!r}); defaulting to 12")
                 hours = 12
@@ -192,22 +193,22 @@ class KodiUIInterface:
     def _get_debug_mode(self):
         """Return debug mode string in {'off','debug','trace'}"""
         try:
-            value = self.addon.getSettingString('debug_mode')
+            value = self.addon.getSettingString("debug_mode")
         except Exception as exc:
             self.log.warning(f"debug_mode read failed; defaulting to off: {exc}")
-            value = 'off'
+            value = "off"
 
-        value = (value or 'off').lower()
-        return value if value in {'off', 'debug', 'trace'} else 'off'
+        value = (value or "off").lower()
+        return value if value in {"off", "debug", "trace"} else "off"
 
     def _is_debug(self):
         """Return True if debug or trace mode is enabled."""
         mode = self._get_debug_mode()
-        return mode in {'debug', 'trace'}
+        return mode in {"debug", "trace"}
 
     def _is_trace(self):
         """Return True only when trace mode is enabled."""
-        return self._get_debug_mode() == 'trace'
+        return self._get_debug_mode() == "trace"
 
     def _cache_enabled(self):
         """Return True if cache is enabled based on addon settings.
@@ -216,7 +217,7 @@ class KodiUIInterface:
         the setting is missing, unreadable, or a non-bool value.
         """
         try:
-            disabled_val = self.addon.getSettingBool('disable_cache')
+            disabled_val = self.addon.getSettingBool("disable_cache")
             if isinstance(disabled_val, bool):
                 return not disabled_val
 
@@ -241,14 +242,13 @@ class KodiUIInterface:
             self.log.error(f"Failed to ensure trace directory {self.trace_dir}: {exc}")
             return False
 
-
     def _redact_sensitive(self, data):
         """Recursively redact sensitive keys in dicts/lists."""
         if isinstance(data, dict):
             redacted = {}
             for key, val in data.items():
                 key_lower = str(key).lower()
-                if any(secret in key_lower for secret in ('password', 'authorization', 'cookie', 'token')):
+                if any(secret in key_lower for secret in ("password", "authorization", "cookie", "token")):
                     redacted[key] = REDACTED
                 else:
                     redacted[key] = self._redact_sensitive(val)
@@ -291,11 +291,11 @@ class KodiUIInterface:
             return
 
         safe_payload = self._redact_sensitive(payload)
-        ts = time.strftime('%Y%m%dT%H%M%S')
-        fname = f"trace_{ts}_{int(time.time()*1000)%1000}.json"
+        ts = time.strftime("%Y%m%dT%H%M%S")
+        fname = f"trace_{ts}_{int(time.time()*1000) % 1000}.json"
         path = os.path.join(self.trace_dir, fname)
         try:
-            with open(path, 'w', encoding='utf-8') as fp:
+            with open(path, "w", encoding="utf-8") as fp:
                 json.dump(safe_payload, fp, indent=2)
             self._trim_trace_files()
         except Exception as exc:
@@ -324,13 +324,15 @@ class KodiUIInterface:
                 self.menu_items.append(item)
 
         # Settings is always shown
-        self.menu_items.append({
-            'label': 'Settings',
-            'content_type': 'video',
-            'action': 'settings',
-            'description': 'Open addon settings',
-            'icon': self.default_settings_icon
-        })
+        self.menu_items.append(
+            {
+                "label": "Settings",
+                "content_type": "video",
+                "action": "settings",
+                "description": "Open addon settings",
+                "icon": self.default_settings_icon,
+            }
+        )
 
     def main_menu(self):
         """Show the main menu with content type options"""
@@ -341,18 +343,22 @@ class KodiUIInterface:
         # Create directory items for each menu option
         for item in self.menu_items:
             # Create list item
-            list_item = xbmcgui.ListItem(label=item['label'])
+            list_item = xbmcgui.ListItem(label=item["label"])
 
-            if item.get('icon'):
-                list_item.setArt({'icon': item['icon'], 'thumb': item['icon']})
+            if item.get("icon"):
+                list_item.setArt({"icon": item["icon"], "thumb": item["icon"]})
 
             # Set info tags
             info_tag = list_item.getVideoInfoTag()
-            info_tag.setPlot(item['description'])
+            info_tag.setPlot(item["description"])
 
             # Create URL
             self.log.debug(f"Creating URL for action: {item['action']}, content_type: {item['content_type']}")
-            url = self.create_plugin_url(base_url=self.kodi_url, action=item['action'], content_type=item['content_type'])
+            url = self.create_plugin_url(
+                base_url=self.kodi_url,
+                action=item["action"],
+                content_type=item["content_type"],
+            )
 
             # Add to directory
             xbmcplugin.addDirectoryItem(self.handle, url, list_item, True)
@@ -380,7 +386,7 @@ class KodiUIInterface:
         self.log.info("Other content menu requested, but not yet implemented.")
         self.show_error("Other Content is not available yet.")
 
-    def projects_menu(self, content_type=''):
+    def projects_menu(self, content_type=""):
         """Display a menu of projects based on content type, with persistent caching."""
         try:
             self.log.info("Fetching projects from AngelStudiosInterface...")
@@ -402,7 +408,8 @@ class KodiUIInterface:
             else:
                 self.log.info(f"Fetching projects from AngelStudiosInterface for content type: {content_type}")
                 projects = self.angel_interface.get_projects(
-                    project_type=angel_menu_content_mapper.get(content_type, 'videos'))
+                    project_type=angel_menu_content_mapper.get(content_type, "videos")
+                )
                 if cache_enabled:
                     self.cache.set(cache_key, projects, expiration=self._cache_ttl())
             try:
@@ -414,10 +421,14 @@ class KodiUIInterface:
                 self.show_error(f"No projects found for content type: {content_type}")
                 return
 
-            self.log.info(f"Processing {len(projects)} \'{content_type if content_type else 'all content type'}\' projects")
+            self.log.info(
+                f"Processing {len(projects)} '{content_type if content_type else 'all content type'}' projects"
+            )
 
             # Set content type for the plugin
-            kodi_content_type = 'movies' if content_type == 'movies' else 'tvshows' if content_type == 'series' else 'videos'
+            kodi_content_type = (
+                "movies" if content_type == "movies" else "tvshows" if content_type == "series" else "videos"
+            )
             xbmcplugin.setContent(self.handle, kodi_content_type)
             # Create list items for each project
             for project in projects:
@@ -425,17 +436,17 @@ class KodiUIInterface:
                 self.log.debug(f"Project dictionary: {json.dumps(project, indent=2)}")
 
                 # Create list item
-                list_item = xbmcgui.ListItem(label=project['name'])
+                list_item = xbmcgui.ListItem(label=project["name"])
                 info_tag = list_item.getVideoInfoTag()
-                info_tag.setMediaType(kodi_content_mapper.get(project['projectType'], 'video'))
+                info_tag.setMediaType(kodi_content_mapper.get(project["projectType"], "video"))
                 self._process_attributes_to_infotags(list_item, project)
 
                 # Create URL for seasons listing
                 url = self.create_plugin_url(
                     base_url=self.kodi_url,
-                    action='seasons_menu',
+                    action="seasons_menu",
                     content_type=content_type,
-                    project_slug=project['slug']
+                    project_slug=project["slug"],
                 )
 
                 # Add to directory
@@ -463,31 +474,32 @@ class KodiUIInterface:
             self.log.info(f"Processing {len(project.get('seasons', []))} seasons for project: {project_slug}")
 
             # TODO Map this, this is gross.
-            kodi_content_type = 'movies' if content_type == 'movies' else 'tvshows' if content_type == 'series' else 'videos'
+            kodi_content_type = (
+                "movies" if content_type == "movies" else "tvshows" if content_type == "series" else "videos"
+            )
             self.log.info(f"Setting content type for Kodi: {content_type} ({kodi_content_type})")
             xbmcplugin.setContent(self.handle, kodi_content_type)
 
-            if len(project.get('seasons', [])) == 1:
+            if len(project.get("seasons", [])) == 1:
                 self.log.info(f"Single season found: {project['seasons'][0]['name']}")
-                self.episodes_menu(content_type, project['slug'], season_id=project['seasons'][0]['id'])
+                self.episodes_menu(content_type, project["slug"], season_id=project["seasons"][0]["id"])
             else:
-                for season in project.get('seasons', []):
+                for season in project.get("seasons", []):
                     self.log.info(f"Processing season: {season['name']}")
                     self.log.debug(f"Season dictionary: {json.dumps(season, indent=2)}")
                     # Create list item
-                    list_item = xbmcgui.ListItem(label=season['name'])
+                    list_item = xbmcgui.ListItem(label=season["name"])
                     info_tag = list_item.getVideoInfoTag()
-                    info_tag.setMediaType(kodi_content_mapper.get(content_type, 'video'))
+                    info_tag.setMediaType(kodi_content_mapper.get(content_type, "video"))
                     self._process_attributes_to_infotags(list_item, season)
-
 
                     # Create URL for seasons listing
                     url = self.create_plugin_url(
                         base_url=self.kodi_url,
-                        action='episodes_menu',
+                        action="episodes_menu",
                         content_type=content_type,
                         project_slug=project_slug,
-                        season_id=season['id']
+                        season_id=season["id"],
                     )
 
                     xbmcplugin.addDirectoryItem(self.handle, url, list_item, True)
@@ -512,42 +524,48 @@ class KodiUIInterface:
                 self.show_error(f"Project not found: {project_slug}")
                 return
 
-            season = next((s for s in project.get('seasons', []) if s.get('id') == season_id), None)
+            season = next(
+                (s for s in project.get("seasons", []) if s.get("id") == season_id),
+                None,
+            )
             if not season:
                 self.log.error(f"Season not found: {season_id}")
                 self.show_error(f"Season not found: {season_id}")
                 return
 
-            self.log.info(f"Processing {len(season.get('episodes', []))} episodes for project: {project_slug}, season: {season_id}")
-            kodi_content_type = 'movies' if content_type == 'movies' else 'tvshows' if content_type == 'series' else 'videos'
+            episode_count = len(season.get("episodes", []))
+            self.log.info(f"Processing {episode_count} episodes for project: {project_slug}, season: {season_id}")
+            kodi_content_type = (
+                "movies" if content_type == "movies" else "tvshows" if content_type == "series" else "videos"
+            )
             self.log.info(f"Setting content type for Kodi: {content_type} ({kodi_content_type})")
             xbmcplugin.setContent(self.handle, kodi_content_type)
 
-            episodes_list = season.get('episodes', [])
+            episodes_list = season.get("episodes", [])
             for idx, episode in enumerate(episodes_list):
-                episode_available = bool(episode.get('source'))
+                episode_available = bool(episode.get("source"))
                 list_item = self._create_list_item_from_episode(
                     episode,
                     project=None,
                     content_type=content_type,
                     stream_url=None,
-                    is_playback=False
+                    is_playback=False,
                 )
 
                 # Create URL for seasons listing
                 url = self.create_plugin_url(
                     base_url=self.kodi_url,
-                    action='play_episode' if episode_available else 'info',
+                    action="play_episode" if episode_available else "info",
                     content_type=content_type,
                     project_slug=project_slug,
-                    season_id=season['id'],
-                    episode_id=episode['id'],
-                    episode_guid=episode.get('guid', '')
+                    season_id=season["id"],
+                    episode_id=episode["id"],
+                    episode_guid=episode.get("guid", ""),
                 )
 
                 xbmcplugin.addDirectoryItem(self.handle, url, list_item, False)
 
-            if season['episodes'][0].get('seasonNumber', 0) > 0:
+            if season["episodes"][0].get("seasonNumber", 0) > 0:
                 xbmcplugin.addSortMethod(self.handle, xbmcplugin.SORT_METHOD_EPISODE)
             else:
                 xbmcplugin.addSortMethod(self.handle, xbmcplugin.SORT_METHOD_VIDEO_SORT_TITLE)
@@ -589,15 +607,14 @@ class KodiUIInterface:
             return
 
         # Extract stream URL and metadata
-        source = data.get('episode', {}).get('source')
-        if not source or not source.get('url'):
+        source = data.get("episode", {}).get("source")
+        if not source or not source.get("url"):
             self.show_error("No playable stream URL found for this episode")
             self.log.error(f"No stream URL for episode: {episode_guid} in project: {project_slug}")
             print("No stream URL found")
             print(f"Data: {data}")
             return
 
-        stream_url = source['url']
         self.log.info(f"Playing episode: {data['episode']['name']} from project: {project_slug}")
         self.play_video(episode_data=data)
 
@@ -613,25 +630,24 @@ class KodiUIInterface:
         try:
             if episode_data:
                 # Enhanced playback with metadata
-                episode = episode_data.get('episode', {})
-                project = episode_data.get('project', {})
+                episode = episode_data.get("episode", {})
+                project = episode_data.get("project", {})
 
                 # Create ListItem with metadata using helper
                 list_item = self._create_list_item_from_episode(
-                    episode=episode,
-                    project=project,
-                    content_type='',
-                    is_playback=True
+                    episode=episode, project=project, content_type="", is_playback=True
                 )
 
-                self.log.info(f"Playing enhanced video: {episode.get('subtitle', 'Unknown')} from project: {project.get('name', 'Unknown')}")
+                episode_name = episode.get("subtitle", "Unknown")
+                project_name = project.get("name", "Unknown")
+                self.log.info(f"Playing enhanced video: {episode_name} from project: {project_name}")
             elif stream_url:
                 # Basic playback (fallback for play_content)
                 list_item = xbmcgui.ListItem(offscreen=True)
                 list_item.setPath(stream_url)
                 list_item.setIsFolder(False)
-                list_item.setProperty('IsPlayable', 'true')
-                list_item.addStreamInfo('video', {'codec': 'h264'})
+                list_item.setProperty("IsPlayable", "true")
+                list_item.addStreamInfo("video", {"codec": "h264"})
 
                 self.log.info(f"Playing basic video from URL: {stream_url}")
 
@@ -655,7 +671,7 @@ class KodiUIInterface:
 
     def show_auth_details_dialog(self):
         """Show authentication/session details in a dialog."""
-        if not self.angel_interface or not getattr(self.angel_interface, 'angel_studios_session', None):
+        if not self.angel_interface or not getattr(self.angel_interface, "angel_studios_session", None):
             xbmcgui.Dialog().ok("Angel Studios Session Details", "No session available.")
             return
 
@@ -665,20 +681,20 @@ class KodiUIInterface:
             xbmcgui.Dialog().ok("Angel Studios Session Details", "Unable to read session details.")
             return
 
-        login_email = details.get('login_email', 'Unknown')
-        account_id = details.get('account_id', 'Unknown')
+        login_email = details.get("login_email", "Unknown")
+        account_id = details.get("account_id", "Unknown")
         lines = [f"{'Login email:':<18} {login_email}"]
         if account_id:
             lines.append(f"{'Account ID:':<18} {account_id}")
 
         lines.append(f"{'Authenticated:':<18} {details.get('authenticated', False)}")
 
-        expires_at_local = details.get('expires_at_local', 'Unknown')
-        expires_at_utc = details.get('expires_at_utc', 'Unknown')
-        expires_in_td = details.get('expires_in_human', 'Unknown')
-        expires_in_seconds = details.get('expires_in_seconds')
-        issued_at_local = details.get('issued_at_local', 'Unknown')
-        issued_at_utc = details.get('issued_at_utc', 'Unknown')
+        expires_at_local = details.get("expires_at_local", "Unknown")
+        expires_at_utc = details.get("expires_at_utc", "Unknown")
+        expires_in_td = details.get("expires_in_human", "Unknown")
+        expires_in_seconds = details.get("expires_in_seconds")
+        issued_at_local = details.get("issued_at_local", "Unknown")
+        issued_at_utc = details.get("issued_at_utc", "Unknown")
 
         lines.append(f"{'Session Issued:':<18} {issued_at_local} ({issued_at_utc})")
         lines.append(f"{'Session Expires:':<18} {expires_at_local} ({expires_at_utc})")
@@ -701,9 +717,9 @@ class KodiUIInterface:
         else:
             lines.append(f"{'Session Remaining:':<18} {expires_in_td}")
 
-        if details.get('cookie_names'):
+        if details.get("cookie_names"):
             lines.append("Cookies:")
-            for cookie_name in details['cookie_names']:
+            for cookie_name in details["cookie_names"]:
                 lines.append(f"  - {cookie_name}")
 
         xbmcgui.Dialog().textviewer("Angel Studios Session Details", "\n".join(lines), usemono=True)
@@ -790,7 +806,9 @@ class KodiUIInterface:
             self.log.info(f"Using cached project data for: {project_slug}")
         return project
 
-    def _create_list_item_from_episode(self, episode, project=None, content_type='', stream_url=None, is_playback=False):
+    def _create_list_item_from_episode(
+        self, episode, project=None, content_type="", stream_url=None, is_playback=False
+    ):
         """
         Unified helper to create a ListItem from an episode dict.
         - episode: Raw episode dict.
@@ -799,9 +817,11 @@ class KodiUIInterface:
         - stream_url: If provided, enables playback mode.
         - is_playback: True for playback mode (sets offscreen, path, etc.).
         """
-        self.log.info(f"Creating ListItem for episode: {episode.get('name', 'Unknown Episode')}, is_playback={is_playback}")
-        episode_available = bool(episode.get('source'))
-        episode_subtitle = episode.get('subtitle', episode.get('name', 'Unknown Episode'))
+        self.log.info(
+            f"Creating ListItem for episode: {episode.get('name', 'Unknown Episode')}, is_playback={is_playback}"
+        )
+        episode_available = bool(episode.get("source"))
+        episode_subtitle = episode.get("subtitle", episode.get("name", "Unknown Episode"))
 
         # If the episode is not available (no source), indicate that in the subtitle with italics.
         if not episode_available:
@@ -810,58 +830,66 @@ class KodiUIInterface:
         # Both directory items and playback items must be set to IsPlayable true
         # if the episode is available.
         list_item = xbmcgui.ListItem(label=episode_subtitle, offscreen=is_playback)
-        list_item.setProperty('IsPlayable', 'true' if episode_available else 'false')
+        list_item.setProperty("IsPlayable", "true" if episode_available else "false")
 
         # Create ListItem
         if is_playback:
             quality_pref = self._get_quality_pref()
-            quality_mode = quality_pref['mode']
-            target_height = quality_pref['target_height']
-            manifest_url = (episode.get('source') or {}).get('url', stream_url)
-            selected_url = manifest_url
+            quality_mode = quality_pref["mode"]
+            target_height = quality_pref["target_height"]
+            manifest_url = (episode.get("source") or {}).get("url", stream_url)
 
             list_item.setIsFolder(False)
 
             if manifest_url:
                 self.log.info(f"Loading Manifest: {manifest_url}")
 
-            use_isa = xbmcaddon.Addon().getSettingBool('use_isa')
+            use_isa = xbmcaddon.Addon().getSettingBool("use_isa")
             isa_ready = False
             stream_selection_type = None
 
             if use_isa:
-                isa_ready = self._ensure_isa_available('hls')
+                isa_ready = self._ensure_isa_available("hls")
                 if not isa_ready:
-                    isa_ready = xbmc.getCondVisibility('System.HasAddon(inputstream.adaptive)')
+                    isa_ready = xbmc.getCondVisibility("System.HasAddon(inputstream.adaptive)")
                     if isa_ready:
                         self.log.info("ISA detected via System.HasAddon; proceeding without inputstreamhelper")
 
                 if isa_ready:
-                    if quality_mode == 'manual':
-                        stream_selection_type = 'ask-quality'
-                    elif quality_mode == 'fixed':
-                        stream_selection_type = 'fixed-res'
+                    if quality_mode == "manual":
+                        stream_selection_type = "ask-quality"
+                    elif quality_mode == "fixed":
+                        stream_selection_type = "fixed-res"
                     else:
-                        stream_selection_type = 'adaptive'
+                        stream_selection_type = "adaptive"
 
                     if manifest_url:
                         list_item.setPath(manifest_url)
-                    list_item.setProperty('inputstream', 'inputstream.adaptive')
-                    list_item.setProperty('inputstream.adaptive.manifest_type', 'hls')
+                    list_item.setProperty("inputstream", "inputstream.adaptive")
+                    list_item.setProperty("inputstream.adaptive.manifest_type", "hls")
                     if stream_selection_type:
-                        list_item.setProperty('inputstream.adaptive.stream_selection_type', stream_selection_type)
-                    if target_height and quality_mode != 'manual':
+                        list_item.setProperty(
+                            "inputstream.adaptive.stream_selection_type",
+                            stream_selection_type,
+                        )
+                    if target_height and quality_mode != "manual":
                         chooser_map = {
-                            1080: '1080p',
-                            720: '720p',
-                            480: '480p',
-                            360: '360p'
+                            1080: "1080p",
+                            720: "720p",
+                            480: "480p",
+                            360: "360p",
                         }
                         chooser_value = chooser_map.get(target_height)
                         if chooser_value:
-                            list_item.setProperty('inputstream.adaptive.chooser_resolution_max', chooser_value)
-                            list_item.setProperty('inputstream.adaptive.chooser_resolution_secure_max', chooser_value)
-                    list_item.setMimeType('application/vnd.apple.mpegurl')
+                            list_item.setProperty(
+                                "inputstream.adaptive.chooser_resolution_max",
+                                chooser_value,
+                            )
+                            list_item.setProperty(
+                                "inputstream.adaptive.chooser_resolution_secure_max",
+                                chooser_value,
+                            )
+                    list_item.setMimeType("application/vnd.apple.mpegurl")
                     list_item.setContentLookup(False)
                 else:
                     self.log.info("ISA requested but unavailable; falling back to native playback")
@@ -876,15 +904,15 @@ class KodiUIInterface:
 
             # Stream details
             video_stream_detail = xbmc.VideoStreamDetail()
-            video_stream_detail.setCodec('h264')
+            video_stream_detail.setCodec("h264")
             video_stream_detail.setWidth(1920)
             video_stream_detail.setHeight(1080)
             info_tag = list_item.getVideoInfoTag()
             info_tag.addVideoStream(video_stream_detail)
 
             # Resume
-            if episode.get('watch_position'):
-                info_tag.setResumePoint(episode['watch_position'])
+            if episode.get("watch_position"):
+                info_tag.setResumePoint(episode["watch_position"])
         else:
             list_item.setIsFolder(True)
 
@@ -894,14 +922,14 @@ class KodiUIInterface:
         # Set media type and additional metadata
         info_tag = list_item.getVideoInfoTag()
         if episode_available:
-            info_tag.setDuration(episode.get('source').get('duration', 0))
+            info_tag.setDuration(episode.get("source").get("duration", 0))
         if is_playback:
-            info_tag.setMediaType('video')
+            info_tag.setMediaType("video")
             # Additional playback metadata from project
             if project:
-                info_tag.setTvShowTitle(project.get('name'))
+                info_tag.setTvShowTitle(project.get("name"))
         else:
-            info_tag.setMediaType(kodi_content_mapper.get(content_type, 'video'))
+            info_tag.setMediaType(kodi_content_mapper.get(content_type, "video"))
             info_tag.setTitle(episode_subtitle)
 
         return list_item
@@ -910,21 +938,21 @@ class KodiUIInterface:
         """Return dict with 'mode' and 'target_height'. mode in {'auto','fixed','manual'}."""
         try:
             addon = xbmcaddon.Addon()
-            getter = getattr(addon, 'getSettingString', None)
-            quality_value = getter('video_quality') if callable(getter) else addon.getSetting('video_quality')
+            getter = getattr(addon, "getSettingString", None)
+            quality_value = getter("video_quality") if callable(getter) else addon.getSetting("video_quality")
         except Exception:
-            quality_value = 'auto'
+            quality_value = "auto"
 
-        quality_value = (quality_value or 'auto').lower() if isinstance(quality_value, str) else 'auto'
+        quality_value = (quality_value or "auto").lower() if isinstance(quality_value, str) else "auto"
         mapping = {
-            '1080p': {'mode': 'fixed', 'target_height': 1080},
-            '720p': {'mode': 'fixed', 'target_height': 720},
-            '480p': {'mode': 'fixed', 'target_height': 480},
-            '360p': {'mode': 'fixed', 'target_height': 360},
-            'manual': {'mode': 'manual', 'target_height': None},
-            'auto': {'mode': 'auto', 'target_height': None},
+            "1080p": {"mode": "fixed", "target_height": 1080},
+            "720p": {"mode": "fixed", "target_height": 720},
+            "480p": {"mode": "fixed", "target_height": 480},
+            "360p": {"mode": "fixed", "target_height": 360},
+            "manual": {"mode": "manual", "target_height": None},
+            "auto": {"mode": "auto", "target_height": None},
         }
-        return mapping.get(quality_value, {'mode': 'auto', 'target_height': None})
+        return mapping.get(quality_value, {"mode": "auto", "target_height": None})
 
     def _process_attributes_to_infotags(self, list_item, info_dict):
         """
@@ -935,55 +963,58 @@ class KodiUIInterface:
         self.log.debug(f"Attribute dict: {info_dict}")
         info_tag = list_item.getVideoInfoTag()
         mapping = {
-            'media_type': info_tag.setMediaType,
-            'name': info_tag.setTitle,
-            'theaterDescription': info_tag.setPlot,
-            'description': info_tag.setPlot,
-            'year': info_tag.setYear,
-            'genres': info_tag.setGenres,
-            'contentRating': info_tag.setMpaa,
-            'original_title': info_tag.setOriginalTitle,
-            'sort_title': info_tag.setSortTitle,
-            'tagline': info_tag.setTagLine,
-            'duration': info_tag.setDuration,
-            'cast': info_tag.setCast,
-            'episode': info_tag.setEpisode,
-            'episodeNumber': info_tag.setEpisode,
-            'season': info_tag.setSeason,
-            'seasonNumber': info_tag.setSeason,
-            'tvshowtitle': info_tag.setTvShowTitle,
-            'premiered': info_tag.setPremiered,
-            'rating': info_tag.setRating,
-            'votes': info_tag.setVotes,
-            'trailer': info_tag.setTrailer,
-            'playcount': info_tag.setPlaycount,
-            'unique_ids': info_tag.setUniqueIDs,
-            'imdbnumber': info_tag.setIMDBNumber,
-            'dateadded': info_tag.setDateAdded
+            "media_type": info_tag.setMediaType,
+            "name": info_tag.setTitle,
+            "theaterDescription": info_tag.setPlot,
+            "description": info_tag.setPlot,
+            "year": info_tag.setYear,
+            "genres": info_tag.setGenres,
+            "contentRating": info_tag.setMpaa,
+            "original_title": info_tag.setOriginalTitle,
+            "sort_title": info_tag.setSortTitle,
+            "tagline": info_tag.setTagLine,
+            "duration": info_tag.setDuration,
+            "cast": info_tag.setCast,
+            "episode": info_tag.setEpisode,
+            "episodeNumber": info_tag.setEpisode,
+            "season": info_tag.setSeason,
+            "seasonNumber": info_tag.setSeason,
+            "tvshowtitle": info_tag.setTvShowTitle,
+            "premiered": info_tag.setPremiered,
+            "rating": info_tag.setRating,
+            "votes": info_tag.setVotes,
+            "trailer": info_tag.setTrailer,
+            "playcount": info_tag.setPlaycount,
+            "unique_ids": info_tag.setUniqueIDs,
+            "imdbnumber": info_tag.setIMDBNumber,
+            "dateadded": info_tag.setDateAdded,
         }
         art_dict = {}
 
         for key, value in info_dict.items():
-            self.log.debug(f"Processing key: {key} with value: \'{value}\'")
+            self.log.debug(f"Processing key: {key} with value: '{value}'")
             # Handle metadata keys that have setters
-            if key == 'metadata':
+            if key == "metadata":
                 for meta_key, meta_value in value.items():
                     if meta_key in mapping and meta_value:
                         mapping[meta_key](meta_value)
             # Handle artwork
-            elif 'Cloudinary' in key and value:
-                if key in ['discoveryPosterCloudinaryPath', 'posterCloudinaryPath']:
-                    art_dict['poster'] = self.angel_interface.get_cloudinary_url(value)
-                elif key in ['discoveryPosterLandscapeCloudinaryPath', 'posterLandscapeCloudinaryPath']:
-                    art_dict['landscape'] = self.angel_interface.get_cloudinary_url(value)
-                    art_dict['fanart'] = self.angel_interface.get_cloudinary_url(value)
-                elif key == 'logoCloudinaryPath':
-                    art_dict['logo'] = self.angel_interface.get_cloudinary_url(value)
-                    art_dict['clearlogo'] = self.angel_interface.get_cloudinary_url(value)
-                    art_dict['icon'] = self.angel_interface.get_cloudinary_url(value)
+            elif "Cloudinary" in key and value:
+                if key in ["discoveryPosterCloudinaryPath", "posterCloudinaryPath"]:
+                    art_dict["poster"] = self.angel_interface.get_cloudinary_url(value)
+                elif key in [
+                    "discoveryPosterLandscapeCloudinaryPath",
+                    "posterLandscapeCloudinaryPath",
+                ]:
+                    art_dict["landscape"] = self.angel_interface.get_cloudinary_url(value)
+                    art_dict["fanart"] = self.angel_interface.get_cloudinary_url(value)
+                elif key == "logoCloudinaryPath":
+                    art_dict["logo"] = self.angel_interface.get_cloudinary_url(value)
+                    art_dict["clearlogo"] = self.angel_interface.get_cloudinary_url(value)
+                    art_dict["icon"] = self.angel_interface.get_cloudinary_url(value)
                 else:
                     self.log.info(f"Unknown Cloudinary key: {key}, skipping")
-            elif key == 'seasonNumber' and value == 0:
+            elif key == "seasonNumber" and value == 0:
                 self.log.info("Season is 0, skipping season info")
             elif key in mapping:
                 mapping[key](value)

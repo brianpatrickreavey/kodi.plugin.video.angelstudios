@@ -6,6 +6,7 @@ import sys
 from importlib import util
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+from urllib.parse import urlencode
 
 import pytest
 
@@ -43,7 +44,7 @@ class TestMain:
 		main = _fresh_main_module()
 		ui_mock = MagicMock()
 		monkeypatch.setattr(main, "ui_interface", ui_mock)
-		paramstring = main.urlencode({"action": action, **extra})
+		paramstring = urlencode({"action": action, **extra})
 
 		main.router(paramstring)
 
@@ -59,7 +60,7 @@ class TestMain:
 		ui_mock = MagicMock()
 		monkeypatch.setattr(main, "ui_interface", ui_mock)
 
-		main.router(main.urlencode({"action": "info", "message": "hi"}))
+		main.router(urlencode({"action": "info", "message": "hi"}))
 
 		ui_mock.show_error.assert_called_once_with("hi")
 
@@ -69,7 +70,7 @@ class TestMain:
 		ui_mock = MagicMock()
 		monkeypatch.setattr(main, "ui_interface", ui_mock)
 
-		main.router(main.urlencode({"action": "bad"}))
+		main.router(urlencode({"action": "bad"}))
 
 		ui_mock.show_error.assert_called_once()
 		assert "Invalid action" in ui_mock.show_error.call_args[0][0]
@@ -81,7 +82,7 @@ class TestMain:
 		ui_mock.clear_cache.return_value = True
 		monkeypatch.setattr(main, "ui_interface", ui_mock)
 
-		main.router(main.urlencode({"action": "clear_cache"}))
+		main.router(urlencode({"action": "clear_cache"}))
 
 		ui_mock.clear_cache.assert_called_once()
 		ui_mock.show_notification.assert_called_once()
@@ -93,7 +94,7 @@ class TestMain:
 		ui_mock.clear_cache.return_value = False
 		monkeypatch.setattr(main, "ui_interface", ui_mock)
 
-		main.router(main.urlencode({"action": "clear_cache"}))
+		main.router(urlencode({"action": "clear_cache"}))
 
 		ui_mock.show_notification.assert_called_once()
 		assert "failed" in ui_mock.show_notification.call_args[0][0].lower()
@@ -105,7 +106,7 @@ class TestMain:
 		ui_mock.clear_debug_data.return_value = True
 		monkeypatch.setattr(main, "ui_interface", ui_mock)
 
-		main.router(main.urlencode({"action": "clear_debug_data"}))
+		main.router(urlencode({"action": "clear_debug_data"}))
 
 		ui_mock.clear_debug_data.assert_called_once()
 		ui_mock.show_notification.assert_called_once_with("Debug data cleared.")
@@ -117,7 +118,7 @@ class TestMain:
 		ui_mock.clear_debug_data.return_value = False
 		monkeypatch.setattr(main, "ui_interface", ui_mock)
 
-		main.router(main.urlencode({"action": "clear_debug_data"}))
+		main.router(urlencode({"action": "clear_debug_data"}))
 
 		ui_mock.clear_debug_data.assert_called_once()
 		ui_mock.show_notification.assert_called_once_with("Debug data clear failed; please try again.")
@@ -131,7 +132,7 @@ class TestMain:
 		ui_mock.angel_interface = iface
 		monkeypatch.setattr(main, "ui_interface", ui_mock)
 
-		main.router(main.urlencode({"action": "force_logout"}))
+		main.router(urlencode({"action": "force_logout"}))
 
 		iface.force_logout.assert_called_once()
 		ui_mock.show_notification.assert_called_once()
@@ -145,7 +146,7 @@ class TestMain:
 		ui_mock.angel_interface = iface
 		monkeypatch.setattr(main, "ui_interface", ui_mock)
 
-		main.router(main.urlencode({"action": "force_logout"}))
+		main.router(urlencode({"action": "force_logout"}))
 
 		ui_mock.show_notification.assert_called_once()
 		assert "failed" in ui_mock.show_notification.call_args[0][0].lower()
@@ -157,7 +158,7 @@ class TestMain:
 		ui_mock.angel_interface = None
 		monkeypatch.setattr(main, "ui_interface", ui_mock)
 
-		main.router(main.urlencode({"action": "force_logout"}))
+		main.router(urlencode({"action": "force_logout"}))
 
 		ui_mock.show_error.assert_called_once()
 		assert "navigation error" in ui_mock.show_error.call_args[0][0].lower()
@@ -168,7 +169,7 @@ class TestMain:
 		ui_mock = MagicMock()
 		monkeypatch.setattr(main, "ui_interface", ui_mock)
 
-		main.router(main.urlencode({"action": "show_information"}))
+		main.router(urlencode({"action": "show_information"}))
 
 		ui_mock.show_auth_details_dialog.assert_called_once()
 
@@ -180,7 +181,7 @@ class TestMain:
 		addon_mock = MagicMock()
 		monkeypatch.setattr(main, "ADDON", addon_mock)
 
-		main.router(main.urlencode({"action": "settings"}))
+		main.router(urlencode({"action": "settings"}))
 
 		addon_mock.openSettings.assert_called_once()
 
@@ -190,7 +191,7 @@ class TestMain:
 		ui_mock = MagicMock()
 		monkeypatch.setattr(main, "ui_interface", ui_mock)
 
-		main.router(main.urlencode({"action": "seasons_menu", "content_type": "series"}))
+		main.router(urlencode({"action": "seasons_menu", "content_type": "series"}))
 
 		ui_mock.show_error.assert_called_once()
 		assert "project_slug" in ui_mock.show_error.call_args[0][0]
