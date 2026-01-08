@@ -552,6 +552,13 @@ class KodiUIInterface:
                     is_playback=False,
                 )
 
+                # Apply progress bar if watch position data is available
+                if episode.get("watchPosition"):
+                    watch_position = episode["watchPosition"].get("position")
+                    duration = episode.get("source", {}).get("duration") if episode_available else episode.get("duration")
+                    if watch_position is not None and duration is not None:
+                        self._apply_progress_bar(list_item, watch_position, duration)
+
                 # Create URL for seasons listing
                 url = self.create_plugin_url(
                     base_url=self.kodi_url,
@@ -805,6 +812,39 @@ class KodiUIInterface:
         else:
             self.log.info(f"Using cached project data for: {project_slug}")
         return project
+
+    def _apply_progress_bar(self, list_item, watch_position_seconds, duration_seconds):
+        """
+        Apply native Kodi resume point indicator to a ListItem.
+        
+        Args:
+            list_item: xbmcgui.ListItem to apply progress to
+            watch_position_seconds: Current watch position in seconds (float)
+            duration_seconds: Total duration in seconds (float)
+        
+        Returns:
+            None. Modifies list_item in place.
+        """
+        if watch_position_seconds is None or duration_seconds is None or duration_seconds == 0:
+            self.log.debug(
+                f"Skipping progress bar: watch_position={watch_position_seconds}, "
+                f"duration={duration_seconds}"
+            )
+            return
+        
+        try:
+            resume_point = float(watch_position_seconds) / float(duration_seconds)
+            # Clamp to [0.0, 1.0]
+            resume_point = max(0.0, min(1.0, resume_point))
+            
+            info_tag = list_item.getVideoInfoTag()
+            info_tag.setResumePoint(resume_point)
+            self.log.debug(f"Applied progress bar: {watch_position_seconds}s / {duration_seconds}s = {resume_point:.2%}")
+        except Exception as e:
+            self.log.warning(
+                f"Failed to apply progress bar: {e}. "
+                f"watch_position={watch_position_seconds}, duration={duration_seconds}"
+            )
 
     def _create_list_item_from_episode(
         self, episode, project=None, content_type="", stream_url=None, is_playback=False

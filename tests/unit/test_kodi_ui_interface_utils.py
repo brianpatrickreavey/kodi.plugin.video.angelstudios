@@ -14,6 +14,129 @@ def test_set_angel_interface():
     assert ui_interface.angel_interface == angel_interface_mock
 
 class TestUtils:
+    @pytest.mark.parametrize("watch_position,duration,expected_resume", [
+        (0.0, 100.0, 0.0),
+        (50.0, 100.0, 0.5),
+        (100.0, 100.0, 1.0),
+        (25.5, 102.0, 0.25),
+        (1.0, 3600.0, 0.000278),
+    ])
+    def test_apply_progress_bar_valid(self, ui_interface, watch_position, duration, expected_resume):
+        """Test _apply_progress_bar with valid watch position and duration."""
+        ui, _, _ = ui_interface
+        
+        mock_list_item = MagicMock()
+        mock_info_tag = MagicMock()
+        mock_list_item.getVideoInfoTag.return_value = mock_info_tag
+        
+        ui._apply_progress_bar(mock_list_item, watch_position, duration)
+        
+        mock_list_item.getVideoInfoTag.assert_called_once()
+        # Allow small floating point difference
+        actual_resume = mock_info_tag.setResumePoint.call_args[0][0]
+        assert abs(actual_resume - expected_resume) < 0.001
+    
+    @pytest.mark.parametrize("watch_position,duration", [
+        (None, 100.0),
+        (50.0, None),
+        (None, None),
+        (50.0, 0),
+        (50.0, 0.0),
+    ])
+    def test_apply_progress_bar_invalid_input(self, ui_interface, watch_position, duration):
+        """Test _apply_progress_bar gracefully handles invalid input."""
+        ui, _, _ = ui_interface
+        
+        mock_list_item = MagicMock()
+        mock_info_tag = MagicMock()
+        mock_list_item.getVideoInfoTag.return_value = mock_info_tag
+        
+        # Should not raise exception
+        ui._apply_progress_bar(mock_list_item, watch_position, duration)
+        
+        # Should not call setResumePoint for invalid input
+        mock_info_tag.setResumePoint.assert_not_called()
+    
+    def test_apply_progress_bar_clamps_to_range(self, ui_interface):
+        """Test _apply_progress_bar clamps resume point to [0.0, 1.0]."""
+        ui, _, _ = ui_interface
+        
+        mock_list_item = MagicMock()
+        mock_info_tag = MagicMock()
+        mock_list_item.getVideoInfoTag.return_value = mock_info_tag
+        
+        # Test watch position > duration (clamped to 1.0)
+        ui._apply_progress_bar(mock_list_item, 150.0, 100.0)
+        actual_resume = mock_info_tag.setResumePoint.call_args[0][0]
+        assert actual_resume == 1.0
+        
+        # Test negative watch position (clamped to 0.0)
+        mock_info_tag.reset_mock()
+        ui._apply_progress_bar(mock_list_item, -10.0, 100.0)
+        actual_resume = mock_info_tag.setResumePoint.call_args[0][0]
+        assert actual_resume == 0.0
+    
+    def test_apply_progress_bar_handles_type_conversion(self, ui_interface):
+        """Test _apply_progress_bar handles string inputs that can be converted to float."""
+        ui, _, _ = ui_interface
+        
+        mock_list_item = MagicMock()
+        mock_info_tag = MagicMock()
+        mock_list_item.getVideoInfoTag.return_value = mock_info_tag
+        
+        # String inputs that are valid floats
+        ui._apply_progress_bar(mock_list_item, "50.0", "100.0")
+        
+        mock_info_tag.setResumePoint.assert_called_once()
+        actual_resume = mock_info_tag.setResumePoint.call_args[0][0]
+        assert actual_resume == 0.5
+
+    def test_apply_progress_bar_handles_value_error(self, ui_interface):
+        """Test _apply_progress_bar gracefully handles ValueError from invalid string conversion."""
+        ui, logger_mock, _ = ui_interface
+        
+        mock_list_item = MagicMock()
+        mock_info_tag = MagicMock()
+        mock_list_item.getVideoInfoTag.return_value = mock_info_tag
+        
+        # String that cannot be converted to float should raise ValueError
+        ui._apply_progress_bar(mock_list_item, "not-a-number", "100.0")
+        
+        # Should not call setResumePoint on error
+        mock_info_tag.setResumePoint.assert_not_called()
+        # Should log warning
+        logger_mock.warning.assert_called()
+
+    def test_apply_progress_bar_handles_type_error(self, ui_interface):
+        """Test _apply_progress_bar gracefully handles TypeError from incompatible types."""
+        ui, logger_mock, _ = ui_interface
+        
+        mock_list_item = MagicMock()
+        mock_info_tag = MagicMock()
+        mock_list_item.getVideoInfoTag.return_value = mock_info_tag
+        
+        # Object that cannot be converted to float should raise TypeError
+        ui._apply_progress_bar(mock_list_item, {"nested": "dict"}, 100.0)
+        
+        # Should not call setResumePoint on error
+        mock_info_tag.setResumePoint.assert_not_called()
+        # Should log warning
+        logger_mock.warning.assert_called()
+
+    def test_apply_progress_bar_handles_list_item_error(self, ui_interface):
+        """Test _apply_progress_bar gracefully handles exceptions from Kodi ListItem methods."""
+        ui, logger_mock, _ = ui_interface
+        
+        mock_list_item = MagicMock()
+        # Simulate getVideoInfoTag() raising an exception (unexpected Kodi behavior)
+        mock_list_item.getVideoInfoTag.side_effect = RuntimeError("Kodi error")
+        
+        # Should not raise exception, but catch it
+        ui._apply_progress_bar(mock_list_item, 50.0, 100.0)
+        
+        # Should log warning
+        logger_mock.warning.assert_called()
+
     @pytest.mark.parametrize("is_playback", [True, False])
     @pytest.mark.parametrize("episode_available", [True, False])
     def test_create_list_item_from_episode(self, ui_interface, mock_xbmc, is_playback, episode_available):

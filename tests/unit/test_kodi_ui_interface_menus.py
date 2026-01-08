@@ -824,3 +824,40 @@ class TestEpisodesMenu:
             # Sorting still applied safely
             mock_add_sort.assert_any_call(1, mock_label_sort)
             mock_end_dir.assert_called_once_with(1)
+    def test_episodes_menu_applies_progress_bars(self, ui_interface, mock_xbmc, mock_cache):
+        """Test episodes_menu applies progress bars to episodes with watch position."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
+
+        # Create project with episodes that have watch position
+        project_data = copy.deepcopy(MOCK_PROJECT_DATA["multi_season_project"])
+        season = project_data["seasons"][0]
+        
+        # Add watchPosition to episodes
+        for episode in season["episodes"]:
+            episode["watchPosition"] = {"position": 30.0}  # 30 seconds watched
+            episode["source"] = {"url": "http://example.com/video.mp4", "duration": 3600}  # 1 hour
+
+        ui.cache.get.return_value = project_data
+        angel_interface_mock.get_project.return_value = None
+
+        with (
+            patch.object(ui, "_create_list_item_from_episode") as mock_create_item,
+            patch.object(ui, "_apply_progress_bar") as mock_progress_bar,
+            patch("xbmcplugin.setContent"),
+            patch("xbmcplugin.addSortMethod"),
+        ):
+            mock_created_item = MagicMock()
+            mock_create_item.return_value = mock_created_item
+            
+            ui.episodes_menu(content_type="series", project_slug=project_data["slug"], season_id=season["id"])
+
+            # Verify _apply_progress_bar was called for each episode
+            assert mock_progress_bar.call_count == len(season["episodes"])
+            
+            # Verify the calls with correct parameters
+            for i, episode in enumerate(season["episodes"]):
+                call_args = mock_progress_bar.call_args_list[i]
+                assert call_args[0][0] is mock_created_item  # list_item
+                assert call_args[0][1] == 30.0  # watch_position
+                assert call_args[0][2] == 3600  # duration
