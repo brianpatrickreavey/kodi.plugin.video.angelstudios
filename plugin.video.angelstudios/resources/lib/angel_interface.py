@@ -7,6 +7,7 @@ This module is designed to be used by the KODI UI Interface, which will handle K
 It provides methods for authentication, making GraphQL queries, and retrieving project data.
 """
 
+import json
 import logging
 import os
 import re
@@ -49,6 +50,8 @@ class AngelStudiosInterface:
 
         # Set the tracer function provided by the calling function
         self.tracer = tracer
+
+        # No cache in the KODI-agnostic interface; rely on callers to cache
 
         # Use provided session file or get authenticated session
         self.angel_studios_session = angel_authentication.AngelStudioSession(
@@ -153,10 +156,13 @@ class AngelStudiosInterface:
             "variables": variables,
         }
         self.log.debug(f"Executing GraphQL query: {operation}")
+        self.log.debug(f"GraphQL query body:\n{query}")
+        self.log.debug(f"GraphQL variables: {variables}")
         try:
             response = self.session.post(angel_graphql_url, json=query_dict)
             response.raise_for_status()
             result = response.json()
+            self.log.debug(f"GraphQL response data: {json.dumps(result, indent=2)}")
             if "errors" in result:
                 self.log.error(f"GraphQL errors: {result['errors']}")
                 self.log.error(f"session headers: {self.session.headers}")
@@ -169,6 +175,8 @@ class AngelStudiosInterface:
             return data
         except requests.RequestException as e:
             self.log.error(f"GraphQL request failed: {e}")
+            if hasattr(e, "response") and e.response is not None and hasattr(e.response, "text"):
+                self.log.error(f"GraphQL response body: {e.response.text}")
             self._trace_request(
                 operation,
                 query_dict,
@@ -223,6 +231,67 @@ class AngelStudiosInterface:
             self.log.error(f"Error fetching project by slug '{project_slug}': {e}")
             return None
 
+    def get_projects_by_slugs(self, slugs):
+        """Fetch multiple projects by slug (minimal data: just name and id for enrichment)"""
+        if not slugs:
+            return {}
+        
+        try:
+            self.log.info(f"Batch fetching {len(slugs)} projects by slug")
+            
+            # Build dynamic query with aliased queries (sanitizing slug names for GraphQL aliases)
+            query = "query getProjectsForSlugs {\n"
+            for slug in slugs:
+                sanitized_alias = slug.replace('-', '_')
+                query += f'  project_{sanitized_alias}: project(slug: "{slug}") {{\n'
+                query += "    name\n"
+                query += "    id\n"
+                query += "    __typename\n"
+                query += "  }\n"
+            query += "}\n"
+            
+            query_dict = {
+                "operationName": "getProjectsForSlugs",
+                "query": query,
+                "variables": {},
+            }
+            
+            self.log.debug(f"Batch projects query for {len(slugs)} slugs")
+            self.log.debug(f"Batch projects query:\n{query}")
+            
+            try:
+                response = self.session.post(angel_graphql_url, json=query_dict)
+                response.raise_for_status()
+                result = response.json()
+                
+                self.log.debug(f"Batch projects response: {json.dumps(result, indent=2)}")
+                
+                if "errors" in result:
+                    self.log.error(f"GraphQL errors: {result['errors']}")
+                    self.angel_studios_session.authenticate(force_reauthentication=True)
+                    return {}
+                
+                # Map responses back from sanitized aliases to original slugs
+                data = result.get("data", {})
+                remapped_data = {}
+                for slug in slugs:
+                    sanitized_key = f"project_{slug.replace('-', '_')}"
+                    if sanitized_key in data:
+                        remapped_data[slug] = data[sanitized_key]
+                
+                self.log.info(f"Batch query returned {len(remapped_data)} projects")
+                return remapped_data
+                
+            except requests.RequestException as e:
+                self.log.error(f"Batch projects request failed: {e}")
+                if hasattr(e, "response") and e.response is not None and hasattr(e.response, "text"):
+                    self.log.error(f"GraphQL response body: {e.response.text}")
+                return {}
+                
+        except Exception as e:
+            self.log.error(f"Error fetching batch projects: {e}")
+            return {}
+
     def get_episode_data(self, episode_guid, project_slug=None):
         """Get data for a specific episode by its GUID"""
         try:
@@ -239,6 +308,137 @@ class AngelStudiosInterface:
             return result
         except Exception as e:
             self.log.error(f"Error fetching episode data for GUID '{episode_guid}': {e}")
+            return {}
+
+    def get_resume_watching(self, first=None, after=None):
+        """
+        Get resume watching (continue watching) episode guids with cursor-based pagination.
+        Returns minimal data: just guids, positions, and pagination info.
+        Full episode data should be fetched via get_episodes_for_guids().
+        
+        Args:
+            first: Number of items to fetch (default: API default, typically 20-50)
+            after: Cursor for pagination (pass pageInfo.endCursor from previous call)
+        
+        Returns:
+            dict with 'guids' (ordered list of episode guids), 'positions' (dict of guid->position),
+            and 'pageInfo' (pagination state). Returns {} on error.
+        """
+        try:
+            variables = {}
+            if first is not None:
+                variables["first"] = first
+            if after is not None:
+                variables["after"] = after
+            
+            self.log.info(f"Fetching resume watching: first={first}, after={after}")
+            result = self._graphql_query("resumeWatching", variables=variables)
+            
+            if not result or "resumeWatching" not in result:
+                self.log.warning("No resumeWatching data in response")
+                return {}
+            
+            resume_data = result["resumeWatching"]
+            edges = resume_data.get("edges", [])
+            page_info = resume_data.get("pageInfo", {})
+            
+            self.log.info(f"Resume watching: {len(edges)} items, hasNextPage={page_info.get('hasNextPage')}")
+            
+            # Extract guids in order, track positions
+            guids = []
+            positions = {}
+            for edge in edges:
+                node = edge.get("node", {})
+                guid = node.get("watchableGuid")
+                position = node.get("position")
+                
+                if guid:
+                    guids.append(guid)
+                    positions[guid] = position
+            
+            return {
+                "guids": guids,
+                "positions": positions,
+                "pageInfo": page_info,
+            }
+        except Exception as e:
+            self.log.error(f"Error fetching resume watching: {e}")
+            return {}
+
+    def get_episodes_for_guids(self, guids):
+        """
+        Fetch full episode data for a list of guids using batch query.
+        Uses the EpisodeListItem fragment for consistent field selection.
+        
+        Args:
+            guids: List of episode guids to fetch
+        
+        Returns:
+            dict mapping guid keys (episode_<guid>) to episode data dicts
+            Returns {} on error, logs and omits individual failed guids
+        """
+        if not guids:
+            return {}
+        
+        try:
+            self.log.info(f"Fetching {len(guids)} episodes via batch query")
+            
+            # Load the fragment once
+            fragment = self._load_fragment("EpisodeListItem")
+            
+            # Build dynamic query with aliased queries
+            # Use sanitized alias names (replace hyphens with underscores since GraphQL aliases can't have hyphens)
+            query = "query getEpisodesForGuids {\n"
+            for guid in guids:
+                sanitized_alias = guid.replace('-', '_')
+                query += f'  episode_{sanitized_alias}: episode(guid: "{guid}") {{\n'
+                query += "    ...EpisodeListItem\n"
+                query += "  }\n"
+            query += "}\n"
+            query += fragment
+            
+            query_dict = {
+                "operationName": "getEpisodesForGuids",
+                "query": query,
+                "variables": {},
+            }
+            
+            self.log.debug(f"Executing batch episodes query for {len(guids)} guids")
+            self.log.debug(f"Batch GraphQL query:\n{query}")
+            self.log.debug(f"Batch GraphQL variables: {query_dict['variables']}")
+            
+            try:
+                response = self.session.post(angel_graphql_url, json=query_dict)
+                response.raise_for_status()
+                result = response.json()
+                
+                self.log.debug(f"Batch GraphQL response: {json.dumps(result, indent=2)}")
+                
+                if "errors" in result:
+                    self.log.error(f"GraphQL errors: {result['errors']}")
+                    self.angel_studios_session.authenticate(force_reauthentication=True)
+                    return {}
+                
+                # Map responses back from sanitized aliases to original guids
+                data = result.get("data", {})
+                remapped_data = {}
+                for guid in guids:
+                    sanitized_key = f"episode_{guid.replace('-', '_')}"
+                    if sanitized_key in data:
+                        remapped_data[f"episode_{guid}"] = data[sanitized_key]
+                
+                self.log.info(f"Batch query returned {len(remapped_data)} episodes")
+                return remapped_data
+                
+            except requests.RequestException as e:
+                self.log.error(f"Batch episodes request failed: {e}")
+                self.log.debug(f"Response status: {e.response.status_code if hasattr(e, 'response') and e.response else 'N/A'}")
+                if hasattr(e, 'response') and e.response is not None and hasattr(e.response, "text"):
+                    self.log.debug(f"Response body: {e.response.text}")
+                return {}
+                
+        except Exception as e:
+            self.log.error(f"Error fetching batch episodes: {e}")
             return {}
 
     def session_check(self):
@@ -262,3 +462,5 @@ class AngelStudiosInterface:
         except Exception as e:
             self.log.error(f"Logout failed: {e}")
             return False
+
+    # Interface remains KODI-agnostic and does not manage cache internally

@@ -4,6 +4,7 @@ Unit tests for menus from Kodi UI Interface class.
 
 import os
 import tempfile
+import copy
 
 import pytest
 import unittest
@@ -82,15 +83,6 @@ class TestMainMenu:
 
         mock_show_error.assert_called_once_with("Watchlist is not available yet.")
         logger_mock.info.assert_any_call("Watchlist menu requested, but not yet implemented.")
-
-    def test_continue_watching_menu_placeholder(self, ui_interface):
-        ui, logger_mock, angel_interface_mock = ui_interface
-
-        with patch.object(ui, "show_error") as mock_show_error:
-            ui.continue_watching_menu()
-
-        mock_show_error.assert_called_once_with("Continue Watching is not available yet.")
-        logger_mock.info.assert_any_call("Continue watching menu requested, but not yet implemented.")
 
     def test_top_picks_menu_placeholder(self, ui_interface):
         ui, logger_mock, angel_interface_mock = ui_interface
@@ -709,7 +701,7 @@ def episodes_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, p
             # Check _create_list_item_from_episode calls
             mock_create_item.assert_any_call(
                 episode,
-                project=None,
+                project=project_data,
                 content_type="series",
                 stream_url=None,
                 is_playback=False,
@@ -832,7 +824,7 @@ class TestEpisodesMenu:
         # Create project with episodes that have watch position
         project_data = copy.deepcopy(MOCK_PROJECT_DATA["multi_season_project"])
         season = project_data["seasons"][0]
-        
+
         # Add watchPosition to episodes
         for episode in season["episodes"]:
             episode["watchPosition"] = {"position": 30.0}  # 30 seconds watched
@@ -849,15 +841,309 @@ class TestEpisodesMenu:
         ):
             mock_created_item = MagicMock()
             mock_create_item.return_value = mock_created_item
-            
+
             ui.episodes_menu(content_type="series", project_slug=project_data["slug"], season_id=season["id"])
 
             # Verify _apply_progress_bar was called for each episode
             assert mock_progress_bar.call_count == len(season["episodes"])
-            
+
             # Verify the calls with correct parameters
             for i, episode in enumerate(season["episodes"]):
                 call_args = mock_progress_bar.call_args_list[i]
                 assert call_args[0][0] is mock_created_item  # list_item
                 assert call_args[0][1] == 30.0  # watch_position
                 assert call_args[0][2] == 3600  # duration
+
+
+class TestContinueWatchingMenu:
+    def test_continue_watching_menu_success(self, ui_interface, mock_xbmc):
+        """Test continue_watching_menu displays items successfully."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
+
+        resume_data = {
+            'guids': ['resume-guid-1', 'resume-guid-2'],
+            'positions': {'resume-guid-1': 1200, 'resume-guid-2': 600},
+            'pageInfo': {'hasNextPage': True, 'endCursor': 'cursor-2'}
+        }
+
+        episodes_data = {
+            'episode_resume-guid-1': {
+                'guid': 'resume-guid-1',
+                'name': 'Episode 1',
+                'projectSlug': 'project-1',
+                'duration': 3600,
+            },
+            'episode_resume-guid-2': {
+                'guid': 'resume-guid-2',
+                'name': 'Episode 2',
+                'projectSlug': 'project-2',
+                'duration': 2400,
+            }
+        }
+
+        projects_data = {
+            'project-1': {'name': 'Test Show 1', 'id': 'proj-1'},
+            'project-2': {'name': 'Test Show 2', 'id': 'proj-2'},
+        }
+
+        angel_interface_mock.get_resume_watching.return_value = resume_data
+        angel_interface_mock.get_episodes_for_guids.return_value = episodes_data
+        angel_interface_mock.get_projects_by_slugs.return_value = projects_data
+
+        with (
+            patch.object(ui, "_create_list_item_from_episode", return_value=mock_list_item) as mock_create,
+            patch.object(ui, "_apply_progress_bar") as mock_progress,
+        ):
+            ui.continue_watching_menu(after=None)
+
+            # Verify API called correctly
+            angel_interface_mock.get_resume_watching.assert_called_once_with(first=10, after=None)
+            angel_interface_mock.get_episodes_for_guids.assert_called_once_with(['resume-guid-1', 'resume-guid-2'])
+            # Verify projects batch called with both project slugs
+            projects_call = angel_interface_mock.get_projects_by_slugs.call_args[0][0]
+            assert set(projects_call) == {'project-1', 'project-2'}
+
+            # Verify items created (2 episodes + 1 load more)
+            assert mock_add_item.call_count == 3
+
+            # Verify episode list items created
+            assert mock_create.call_count == 2
+            assert mock_progress.call_count == 2
+
+            # Verify "Load More" pagination item added with correct cursor
+            pagination_calls = [call for call in mock_add_item.call_args_list if "after=cursor-2" in str(call)]
+            assert len(pagination_calls) == 1
+
+            mock_end_dir.assert_called_once()
+
+    def test_continue_watching_menu_with_pagination_cursor(self, ui_interface, mock_xbmc):
+        """Test continue_watching_menu with after cursor."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
+
+        resume_data = {
+            'guids': [],
+            'positions': {},
+            'pageInfo': {'hasNextPage': False, 'endCursor': None}
+        }
+        angel_interface_mock.get_resume_watching.return_value = resume_data
+
+        with patch.object(ui, "show_notification") as mock_notify:
+            ui.continue_watching_menu(after="cursor-abc")
+
+            angel_interface_mock.get_resume_watching.assert_called_once_with(first=10, after="cursor-abc")
+            mock_notify.assert_called_once_with("No items in Continue Watching")
+
+    def test_continue_watching_menu_empty_items(self, ui_interface, mock_xbmc):
+        """Test continue_watching_menu with no items."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
+
+        angel_interface_mock.get_resume_watching.return_value = {
+            'guids': [],
+            'positions': {},
+            'pageInfo': {'hasNextPage': False}
+        }
+
+        with patch.object(ui, "show_notification") as mock_notify:
+            ui.continue_watching_menu()
+
+            mock_notify.assert_called_once_with("No items in Continue Watching")
+            mock_add_item.assert_not_called()
+            mock_end_dir.assert_not_called()
+
+    def test_continue_watching_menu_no_pagination(self, ui_interface, mock_xbmc):
+        """Test continue_watching_menu without next page."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
+
+        resume_data = {
+            'guids': ['resume-guid-1'],
+            'positions': {'resume-guid-1': 1200},
+            'pageInfo': {'hasNextPage': False, 'endCursor': None}
+        }
+
+        episodes_data = {
+            'episode_resume-guid-1': {
+                'guid': 'resume-guid-1',
+                'name': 'Episode 1',
+                'projectSlug': 'project-1',
+                'duration': 3600,
+            }
+        }
+
+        projects_data = {
+            'project-1': {'name': 'Test Show 1', 'id': 'proj-1'},
+        }
+
+        angel_interface_mock.get_resume_watching.return_value = resume_data
+        angel_interface_mock.get_episodes_for_guids.return_value = episodes_data
+        angel_interface_mock.get_projects_by_slugs.return_value = projects_data
+
+        with (
+            patch.object(ui, "_create_list_item_from_episode", return_value=mock_list_item),
+            patch.object(ui, "_apply_progress_bar"),
+        ):
+            ui.continue_watching_menu()
+
+            # Only 1 episode item, no "Load More"
+            assert mock_add_item.call_count == 1
+            mock_end_dir.assert_called_once()
+
+    def test_continue_watching_menu_failed_api_call(self, ui_interface, mock_xbmc):
+        """Test continue_watching_menu when API returns empty dict."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
+
+        angel_interface_mock.get_resume_watching.return_value = {}
+
+        with patch.object(ui, "show_error") as mock_error:
+            ui.continue_watching_menu()
+
+            mock_error.assert_called_once_with("Failed to load Continue Watching")
+            mock_add_item.assert_not_called()
+
+    def test_continue_watching_menu_exception(self, ui_interface, mock_xbmc):
+        """Test continue_watching_menu handles exceptions."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
+
+        angel_interface_mock.get_resume_watching.side_effect = Exception("API error")
+
+        with patch.object(ui, "show_error") as mock_error:
+            ui.continue_watching_menu()
+
+            mock_error.assert_called_once()
+            assert "Failed to load Continue Watching" in str(mock_error.call_args)
+
+    def test_continue_watching_menu_applies_progress_bars(self, ui_interface, mock_xbmc):
+        """Test continue_watching_menu applies progress bars correctly."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
+
+        resume_data = {
+            'guids': ['resume-guid-1'],
+            'positions': {'resume-guid-1': 1200},
+            'pageInfo': {'hasNextPage': False}
+        }
+
+        episodes_data = {
+            'episode_resume-guid-1': {
+                'guid': 'resume-guid-1',
+                'name': 'Episode 1',
+                'projectSlug': 'project-1',
+                'duration': 3600,
+            }
+        }
+
+        projects_data = {
+            'project-1': {'name': 'Test Show 1', 'id': 'proj-1'},
+        }
+
+        angel_interface_mock.get_resume_watching.return_value = resume_data
+        angel_interface_mock.get_episodes_for_guids.return_value = episodes_data
+        angel_interface_mock.get_projects_by_slugs.return_value = projects_data
+
+        mock_created_item = MagicMock()
+
+        with (
+            patch.object(ui, "_create_list_item_from_episode", return_value=mock_created_item),
+            patch.object(ui, "_apply_progress_bar") as mock_progress,
+        ):
+            ui.continue_watching_menu()
+
+            # Verify progress bar called with correct values
+            mock_progress.assert_called_once_with(mock_created_item, 1200, 3600)
+
+    def test_continue_watching_menu_skips_progress_when_missing_watchposition(self, ui_interface, mock_xbmc):
+        """Test continue_watching_menu skips progress bar when watchPosition is missing."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
+
+        resume_data = {
+            'guids': ['guid-1'],
+            'positions': {},  # No position for guid-1
+            'pageInfo': {'hasNextPage': False}
+        }
+
+        episodes_data = {
+            'episode_guid-1': {
+                'guid': 'guid-1',
+                'name': 'Episode 1',
+                'projectSlug': 'project-1',
+                'duration': 3600,
+            }
+        }
+
+        projects_data = {
+            'project-1': {'name': 'Test Show', 'id': 'proj-1'},
+        }
+
+        angel_interface_mock.get_resume_watching.return_value = resume_data
+        angel_interface_mock.get_episodes_for_guids.return_value = episodes_data
+        angel_interface_mock.get_projects_by_slugs.return_value = projects_data
+
+        with (
+            patch.object(ui, "_create_list_item_from_episode", return_value=mock_list_item),
+            patch.object(ui, "_apply_progress_bar") as mock_progress,
+        ):
+            ui.continue_watching_menu()
+
+            # Progress bar should not be called since position is missing
+            mock_progress.assert_not_called()
+
+    def test_continue_watching_menu_skips_malformed_items(self, ui_interface, mock_xbmc):
+        """Test continue_watching_menu skips items not returned from batch query."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
+
+        resume_data = {
+            'guids': ['guid-1', 'guid-2', 'guid-3'],
+            'positions': {'guid-1': 100, 'guid-2': 200, 'guid-3': 300},
+            'pageInfo': {'hasNextPage': False}
+        }
+
+        # Only 2 of 3 episodes returned from batch (guid-3 missing)
+        episodes_data = {
+            'episode_guid-1': {'guid': 'guid-1', 'name': 'Episode 1', 'projectSlug': 'project-1'},
+            'episode_guid-2': {'guid': 'guid-2', 'name': 'Episode 2', 'projectSlug': 'project-1'},
+        }
+
+        projects_data = {
+            'project-1': {'name': 'Test Show', 'id': 'proj-1'},
+        }
+
+        angel_interface_mock.get_resume_watching.return_value = resume_data
+        angel_interface_mock.get_episodes_for_guids.return_value = episodes_data
+        angel_interface_mock.get_projects_by_slugs.return_value = projects_data
+
+        with (
+            patch.object(ui, "_create_list_item_from_episode", return_value=mock_list_item) as mock_create,
+            patch.object(ui, "_apply_progress_bar"),
+        ):
+            ui.continue_watching_menu()
+
+            # Only 2 items added (guid-3 skipped because not in batch response)
+            assert mock_add_item.call_count == 2
+            assert mock_create.call_count == 2
+            mock_end_dir.assert_called_once()
+
+    def test_continue_watching_menu_failed_episodes_batch(self, ui_interface, mock_xbmc):
+        """Test continue_watching_menu when batch episodes fetch fails."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
+
+        # Resume watching returns data, but batch episodes returns empty
+        angel_interface_mock.get_resume_watching.return_value = {
+            'guids': ['guid-1', 'guid-2'],
+            'positions': {'guid-1': 0.5, 'guid-2': 0.3},
+            'pageInfo': {'endCursor': None, 'hasNextPage': False}
+        }
+        angel_interface_mock.get_episodes_for_guids.return_value = {}
+
+        with patch.object(ui, "show_error") as mock_error:
+            ui.continue_watching_menu()
+
+            mock_error.assert_called_once_with("Failed to load episode details")
+            mock_add_item.assert_not_called()

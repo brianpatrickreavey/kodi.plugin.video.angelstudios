@@ -152,6 +152,45 @@ MOCK_EPISODE_DATA = {
 
 MOCK_GRAPHQL_RESPONSE = {'data': MOCK_PROJECT_DATA['multi_season_project']}
 
+MOCK_RESUME_WATCHING_RESPONSE = {
+    'resumeWatching': {
+        'edges': [
+            {
+                'cursor': 'cursor-1',
+                'node': {
+                    'watchableGuid': 'resume-guid-1',
+                    'position': 1200,
+                    'updatedAt': '2026-01-08T12:00:00Z',
+                    'content': {
+                        'id': 'ep1',
+                        'name': 'Episode 1',
+                        '__typename': 'ContentEpisode',
+                    },
+                    '__typename': 'WatchPosition',
+                }
+            },
+            {
+                'cursor': 'cursor-2',
+                'node': {
+                    'watchableGuid': 'resume-guid-2',
+                    'position': 600,
+                    'updatedAt': '2026-01-07T12:00:00Z',
+                    'content': {
+                        'id': 'ep2',
+                        'name': 'Episode 2',
+                        '__typename': 'ContentEpisode',
+                    },
+                    '__typename': 'WatchPosition',
+                }
+            }
+        ],
+        'pageInfo': {
+            'hasNextPage': True,
+            'endCursor': 'cursor-2',
+        }
+    }
+}
+
 # Router dispatch cases for main.py tests
 ROUTER_DISPATCH_CASES = [
     ("movies_menu", "projects_menu", {"content_type": "movies"}),

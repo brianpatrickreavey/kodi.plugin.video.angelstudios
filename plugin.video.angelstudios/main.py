@@ -93,8 +93,9 @@ def router(paramstring):
                 # Show Watchlist (placeholder)
                 ui_interface.watchlist_menu()
             elif params["action"] == "continue_watching_menu":
-                # Show Continue Watching (placeholder)
-                ui_interface.continue_watching_menu()
+                # Show Continue Watching with optional pagination cursor
+                after = params.get("after")
+                ui_interface.continue_watching_menu(after=after)
             elif params["action"] == "top_picks_menu":
                 # Show Top Picks (placeholder)
                 ui_interface.top_picks_menu()

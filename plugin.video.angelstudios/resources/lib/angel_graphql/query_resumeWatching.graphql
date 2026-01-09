@@ -1,0 +1,43 @@
+# Resume watching query with cursor-based pagination
+# Returns minimal data: just guids and watch position
+# Full episode data is fetched via batch getEpisodesForGuids query
+
+query resumeWatching($first: Int, $after: String) {
+  resumeWatching(first: $first, after: $after) {
+    edges {
+      node {
+        watchableGuid
+        position
+        updatedAt
+        content {
+          __typename
+          ... on ContentEpisode {
+            id
+            name
+            __typename
+          }
+          ... on ContentSpecial {
+            id
+            name
+            __typename
+          }
+          ... on ContentMovie {
+            id
+            name
+            __typename
+          }
+        }
+        __typename
+      }
+      __typename
+    }
+    pageInfo {
+      hasNextPage
+      hasPreviousPage
+      startCursor
+      endCursor
+      __typename
+    }
+    __typename
+  }
+}

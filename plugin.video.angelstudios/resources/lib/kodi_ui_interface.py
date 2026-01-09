@@ -371,10 +371,118 @@ class KodiUIInterface:
         self.log.info("Watchlist menu requested, but not yet implemented.")
         self.show_error("Watchlist is not available yet.")
 
-    def continue_watching_menu(self):
-        """Placeholder for continue watching until API support is added."""
-        self.log.info("Continue watching menu requested, but not yet implemented.")
-        self.show_error("Continue Watching is not available yet.")
+    def continue_watching_menu(self, after=None):
+        """Display continue watching menu with pagination."""
+        try:
+            self.log.info(f"Fetching continue watching items, after={after}")
+
+            # Step 1: Fetch resume watching guids (lightweight)
+            resume_data = self.angel_interface.get_resume_watching(first=10, after=after)
+
+            if not resume_data:
+                self.show_error("Failed to load Continue Watching")
+                return
+
+            guids = resume_data.get("guids", [])
+            positions = resume_data.get("positions", {})
+            page_info = resume_data.get("pageInfo", {})
+
+            if not guids:
+                self.log.info("No continue watching items found")
+                self.show_notification("No items in Continue Watching")
+                return
+
+            # Step 2: Batch fetch full episode data for all guids
+            self.log.info(f"Batch fetching {len(guids)} episodes")
+            episodes_data = self.angel_interface.get_episodes_for_guids(guids)
+
+            if not episodes_data:
+                self.log.error("Failed to fetch episode data for continue watching")
+                self.show_error("Failed to load episode details")
+                return
+
+            # Step 2b: Fetch unique project names for enrichment
+            unique_slugs = set()
+            for guid in guids:
+                episode_key = f"episode_{guid}"
+                episode = episodes_data.get(episode_key, {})
+                if episode.get("projectSlug"):
+                    unique_slugs.add(episode["projectSlug"])
+
+            project_names = {}
+            if unique_slugs:
+                self.log.info(f"Fetching project names for {len(unique_slugs)} projects")
+                project_names = self.angel_interface.get_projects_by_slugs(list(unique_slugs))
+
+            self.log.info(f"Processing {len(guids)} continue watching items")
+            xbmcplugin.setContent(self.handle, "videos")
+
+            # Step 3: Render menu in guid order, merging watch positions
+            for guid in guids:
+                episode_key = f"episode_{guid}"
+                episode = episodes_data.get(episode_key)
+
+                if not episode:
+                    self.log.warning(f"Episode {guid} not found in batch response, skipping")
+                    continue
+
+                # Enrich with project name if available
+                project_slug = episode.get("projectSlug")
+                project_for_display = None
+                if project_slug and project_slug in project_names:
+                    project_for_display = project_names[project_slug]
+
+                # Enrich with watch position from resume watching response
+                watch_position = positions.get(guid)
+                if watch_position is not None and "watchPosition" not in episode:
+                    episode["watchPosition"] = {"position": watch_position}
+
+                # Create list item using shared helper
+                list_item = self._create_list_item_from_episode(
+                    episode,
+                    project=project_for_display,
+                    content_type="",
+                    stream_url=None,
+                    is_playback=False,
+                )
+
+                # Apply progress bar if available
+                if episode.get("watchPosition"):
+                    watch_position_val = episode["watchPosition"].get("position")
+                    duration = episode.get("duration")
+                    if watch_position_val is not None and duration is not None:
+                        self._apply_progress_bar(list_item, watch_position_val, duration)
+
+                # Create URL for playback
+                project_slug = episode.get("projectSlug", "")
+
+                url = self.create_plugin_url(
+                    base_url=self.kodi_url,
+                    action="play_episode",
+                    content_type="",
+                    project_slug=project_slug,
+                    episode_guid=guid,
+                )
+
+                xbmcplugin.addDirectoryItem(self.handle, url, list_item, False)
+
+            # Add "Load More" if pagination available
+            if page_info.get("hasNextPage"):
+                end_cursor = page_info.get("endCursor")
+                if end_cursor:
+                    list_item = xbmcgui.ListItem(label="[Load More...]")
+                    url = self.create_plugin_url(
+                        base_url=self.kodi_url,
+                        action="continue_watching_menu",
+                        after=end_cursor,
+                    )
+                    xbmcplugin.addDirectoryItem(self.handle, url, list_item, True)
+
+            xbmcplugin.endOfDirectory(self.handle)
+
+        except Exception as e:
+            self.log.error(f"Error in continue_watching_menu: {e}")
+            self.show_error(f"Failed to load Continue Watching: {str(e)}")
 
     def top_picks_menu(self):
         """Placeholder for top picks until API support is added."""
@@ -546,7 +654,7 @@ class KodiUIInterface:
                 episode_available = bool(episode.get("source"))
                 list_item = self._create_list_item_from_episode(
                     episode,
-                    project=None,
+                    project=project,
                     content_type=content_type,
                     stream_url=None,
                     is_playback=False,
@@ -586,44 +694,47 @@ class KodiUIInterface:
             return
 
     def play_episode(self, episode_guid, project_slug):
-        """Play an episode with enhanced metadata, with persistent caching."""
+        """Play an episode using cached project data (no separate API call)."""
         try:
-            cache_key = f"episode_data_{episode_guid}_{project_slug}"
-            data = None
-            if self._cache_enabled():
-                data = self.cache.get(cache_key)
-                if data:
-                    self.log.debug(f"Cache hit for {cache_key}")
-                else:
-                    self.log.debug(f"Cache miss for {cache_key}")
-            else:
-                self.log.debug("Cache disabled; bypassing episode cache")
+            # Fetch project data (uses cache if available)
+            project = self._get_project(project_slug)
+            if not project:
+                self.log.error(f"Project not found: {project_slug}")
+                self.show_error(f"Project not found: {project_slug}")
+                return
 
-            if data is None:
-                data = self.angel_interface.get_episode_data(episode_guid, project_slug)
-                if self._cache_enabled():
-                    self.cache.set(cache_key, data, expiration=self._cache_ttl())
-            if not data:
-                self.log.info(f"No data: {data}")
-                self.log.info(f"Episode not found: {episode_guid}")
+            # Find episode in project seasons
+            episode = None
+            for season in project.get("seasons", []):
+                for ep in season.get("episodes", []):
+                    if ep.get("guid") == episode_guid:
+                        episode = ep
+                        break
+                if episode:
+                    break
+
+            if not episode:
+                self.log.error(f"Episode {episode_guid} not found in project {project_slug}")
                 self.show_error(f"Episode not found: {episode_guid}")
                 return
+
+            # Check for playable source
+            source = episode.get("source")
+            if not source or not source.get("url"):
+                self.show_error("No playable stream URL found for this episode")
+                self.log.error(f"No stream URL for episode: {episode_guid} in project: {project_slug}")
+                return
+
+            episode_name = episode.get("subtitle") or episode.get("name", "Unknown")
+            project_name = project.get("name", "Unknown")
+            self.log.info(f"Playing episode: {episode_name} from project: {project_name}")
+
+            # Play using existing episode data
+            self.play_video(episode_data={"episode": episode, "project": project})
+
         except Exception as e:
             self.log.error(f"Error playing episode {episode_guid}: {e}")
             self.show_error(f"Failed to play episode: {str(e)}")
-            return
-
-        # Extract stream URL and metadata
-        source = data.get("episode", {}).get("source")
-        if not source or not source.get("url"):
-            self.show_error("No playable stream URL found for this episode")
-            self.log.error(f"No stream URL for episode: {episode_guid} in project: {project_slug}")
-            print("No stream URL found")
-            print(f"Data: {data}")
-            return
-
-        self.log.info(f"Playing episode: {data['episode']['name']} from project: {project_slug}")
-        self.play_video(episode_data=data)
 
     def play_video(self, stream_url=None, episode_data=None):
         """Play a video stream with optional enhanced metadata"""
@@ -816,12 +927,12 @@ class KodiUIInterface:
     def _apply_progress_bar(self, list_item, watch_position_seconds, duration_seconds):
         """
         Apply native Kodi resume point indicator to a ListItem.
-        
+
         Args:
             list_item: xbmcgui.ListItem to apply progress to
             watch_position_seconds: Current watch position in seconds (float)
             duration_seconds: Total duration in seconds (float)
-        
+
         Returns:
             None. Modifies list_item in place.
         """
@@ -831,12 +942,12 @@ class KodiUIInterface:
                 f"duration={duration_seconds}"
             )
             return
-        
+
         try:
             resume_point = float(watch_position_seconds) / float(duration_seconds)
             # Clamp to [0.0, 1.0]
             resume_point = max(0.0, min(1.0, resume_point))
-            
+
             info_tag = list_item.getVideoInfoTag()
             info_tag.setResumePoint(resume_point)
             self.log.debug(f"Applied progress bar: {watch_position_seconds}s / {duration_seconds}s = {resume_point:.2%}")
@@ -1056,6 +1167,17 @@ class KodiUIInterface:
                     self.log.info(f"Unknown Cloudinary key: {key}, skipping")
             elif key == "seasonNumber" and value == 0:
                 self.log.info("Season is 0, skipping season info")
+            elif key == "season" and isinstance(value, dict):
+                # Extract seasonNumber from nested season object
+                season_num = value.get("seasonNumber")
+                if season_num is not None:
+                    info_tag.setSeason(season_num)
+            elif key == "source" and isinstance(value, dict):
+                # Skip nested source objects (handled separately in playback)
+                pass  # pragma: no cover - defensive skip of nested source
+            elif key == "watchPosition" and isinstance(value, dict):
+                # Skip nested watchPosition objects (handled separately for progress)
+                pass  # pragma: no cover - defensive skip of nested watchPosition
             elif key in mapping:
                 mapping[key](value)
             else:

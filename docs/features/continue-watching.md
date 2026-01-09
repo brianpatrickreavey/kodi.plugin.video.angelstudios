@@ -35,7 +35,7 @@ Add a new "Continue Watching" menu item that displays in-progress episodes from 
       """Apply native Kodi resume point to a ListItem."""
       if watch_position_seconds is None or duration_seconds is None or duration_seconds == 0:
           return
-      
+
       info_tag = list_item.getVideoInfoTag()
       resume_point = watch_position_seconds / duration_seconds
       info_tag.setResumePoint(resume_point)

@@ -1,0 +1,78 @@
+# Shared fragment for all episode contexts: menus, resume watching, and playback
+# Includes all fields needed for display, progress tracking, and video playback
+
+fragment EpisodeListItem on Episode {
+  # Identity & routing
+  id
+  guid
+  slug
+
+  # Positioning
+  episodeNumber
+  seasonNumber
+  seasonId
+  projectSlug
+
+  # Display
+  name
+  subtitle
+  description
+
+  # Artwork
+  posterCloudinaryPath
+  posterLandscapeCloudinaryPath
+
+  # Dates
+  releaseDate
+  earlyAccessDate
+  publiclyAvailableDate
+  guildAvailableDate
+
+  # Availability
+  unavailableReason
+  currentUserHasEarlyAccess
+  isAngelGuildOnly
+  prereleaseAvailableFor
+
+  # Media (both duration fields for fallback)
+  duration
+  source {
+    url(input: {segmentFormat: TS})
+    duration
+    credits
+    __typename
+  }
+  vmapUrl
+
+  # Progress tracking
+  watchPosition {
+    id
+    position
+    __typename
+  }
+
+  # Navigation
+  upNext {
+    id
+    guid
+    projectSlug
+    seasonNumber
+    episodeNumber
+    subtitle
+    __typename
+  }
+
+  # Playback timing
+  introStartTime
+  introEndTime
+
+  # Season context (for cross-show labels in resume)
+  season {
+    id
+    seasonNumber
+    name
+    __typename
+  }
+
+  __typename
+}

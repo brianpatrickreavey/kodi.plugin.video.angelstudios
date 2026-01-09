@@ -10,7 +10,7 @@ class TestEpisodePlayback:
     @pytest.mark.parametrize("cache_hit", [False, True])
     @pytest.mark.parametrize("project_data", MOCK_PROJECT_DATA.values())
     def test_play_episode(self, ui_interface, mock_xbmc, mock_cache, project_data, cache_hit):
-        """Test play_episode with cache hit/miss."""
+        """Test refactored play_episode using cached project data."""
         ui, logger_mock, angel_interface_mock = ui_interface
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
@@ -18,88 +18,94 @@ class TestEpisodePlayback:
         episode_data = project_data["seasons"][0]["episodes"][0]
         episode_guid = episode_data["guid"]
 
-        # Full data structure as expected by the code
-        full_episode_data = {'episode': episode_data, 'project': project_data}
-
-        # Setup mocks based on cache_hit
-        if cache_hit:
-            ui.cache.get.return_value = full_episode_data
-        else:
-            ui.cache.get.return_value = None
-            angel_interface_mock.get_episode_data.return_value = full_episode_data
-            print(f"Mocked episode data for GUID {episode_guid}: {full_episode_data}")
-            angel_interface_mock.get_project.return_value = project_data
-
-        with patch.object(ui, "play_video") as mock_play_video:
+        # Setup _get_project to return project data
+        with (
+            patch.object(ui, "_get_project", return_value=project_data) as mock_get_project,
+            patch.object(ui, "play_video") as mock_play_video,
+        ):
             ui.play_episode(episode_guid, project_slug)
 
             # Assertions
-            ui.cache.get.assert_called_once_with(f"episode_data_{episode_guid}_{project_slug}")
-            if cache_hit:
-                angel_interface_mock.get_episode_data.assert_not_called()
-                ui.cache.set.assert_not_called()
-            else:
-                angel_interface_mock.get_episode_data.assert_called_once_with(episode_guid, project_slug)
-                ui.cache.set.assert_called_once_with(
-                    f"episode_data_{episode_guid}_{project_slug}",
-                    full_episode_data,
-                    expiration=timedelta(hours=12)
-                )
-            mock_play_video.assert_called_once_with(episode_data=full_episode_data)
+            mock_get_project.assert_called_once_with(project_slug)
+            mock_play_video.assert_called_once_with(episode_data={"episode": episode_data, "project": project_data})
+
+    def test_play_episode_project_not_found(self, ui_interface, mock_xbmc, mock_cache):
+        """Test play_episode when project is not found."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
+
+        with (
+            patch.object(ui, "_get_project", return_value=None),
+            patch.object(ui, "show_error") as mock_show_error,
+        ):
+            ui.play_episode("guid", "project-slug")
+
+            mock_show_error.assert_called_once_with("Project not found: project-slug")
+
+    def test_play_episode_episode_not_found_in_project(self, ui_interface, mock_xbmc, mock_cache):
+        """Test play_episode when episode GUID not found in project."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
+
+        project_data = copy.deepcopy(MOCK_PROJECT_DATA["single_season_project"])
+
+        with (
+            patch.object(ui, "_get_project", return_value=project_data),
+            patch.object(ui, "show_error") as mock_show_error,
+        ):
+            ui.play_episode("nonexistent-guid", project_data["slug"])
+
+            mock_show_error.assert_called_once_with("Episode not found: nonexistent-guid")
 
     def test_play_episode_no_stream(self, ui_interface, mock_xbmc, mock_cache):
         """Test play_episode when episode has no stream."""
         ui, logger_mock, angel_interface_mock = ui_interface
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
-        episode_guid = "test-episode-guid"
-        project_slug = "test-project"
+        # Setup project with episode that has no source
+        project_data = copy.deepcopy(MOCK_PROJECT_DATA["single_season_project"])
+        project_data["seasons"][0]["episodes"][0]["source"] = None
 
-        # Setup mocks: Episode data without stream
-        episode_data_no_stream = copy.deepcopy(MOCK_EPISODE_DATA)
-        episode_data_no_stream['episode']["source"] = None
-        ui.cache.get.return_value = episode_data_no_stream
+        with (
+            patch.object(ui, "_get_project", return_value=project_data),
+            patch.object(ui, "show_error") as mock_show_error,
+        ):
+            episode_guid = project_data["seasons"][0]["episodes"][0]["guid"]
+            ui.play_episode(episode_guid, project_data["slug"])
 
-        with patch.object(ui, "show_error") as mock_show_error:
-            ui.play_episode(episode_guid, project_slug)
+            mock_show_error.assert_called_once_with("No playable stream URL found for this episode")
+
+    def test_play_episode_no_url_in_source(self, ui_interface, mock_xbmc, mock_cache):
+        """Test play_episode when source exists but url is missing."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
+
+        # Setup project with episode that has source but no URL
+        project_data = copy.deepcopy(MOCK_PROJECT_DATA["single_season_project"])
+        project_data["seasons"][0]["episodes"][0]["source"] = {"duration": 3600}
+
+        with (
+            patch.object(ui, "_get_project", return_value=project_data),
+            patch.object(ui, "show_error") as mock_show_error,
+        ):
+            episode_guid = project_data["seasons"][0]["episodes"][0]["guid"]
+            ui.play_episode(episode_guid, project_data["slug"])
 
             # Assertions: Error shown
             mock_show_error.assert_called_once_with("No playable stream URL found for this episode")
 
-    def test_play_episode_no_data(self, ui_interface, mock_xbmc, mock_cache):
-        """Test play_episode when episode data is not found."""
+    def test_play_episode_exception_handling(self, ui_interface, mock_xbmc, mock_cache):
+        """Test play_episode handles exceptions gracefully."""
         ui, logger_mock, angel_interface_mock = ui_interface
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
-        episode_guid = "test-episode-guid"
-        project_slug = "test-project"
+        with (
+            patch.object(ui, "_get_project", side_effect=Exception("Test exception")),
+            patch.object(ui, "show_error") as mock_show_error,
+        ):
+            ui.play_episode("guid", "slug")
 
-        # Setup mocks: No episode data
-        ui.cache.get.return_value = None
-        angel_interface_mock.get_episode_data.return_value = None
-
-        with patch.object(ui, "show_error") as mock_show_error:
-            ui.play_episode(episode_guid, project_slug)
-
-            # Assertions: Error shown
-            mock_show_error.assert_called_once_with("Episode not found: test-episode-guid")
-
-    def test_play_episode_exception(self, ui_interface, mock_xbmc, mock_cache):
-        """Test play_episode handles exceptions."""
-        ui, logger_mock, angel_interface_mock = ui_interface
-        mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
-
-        episode_guid = "test-episode-guid"
-        project_slug = "test-project"
-
-        # Setup mocks: Exception in get_episode_data
-        ui.cache.get.return_value = None
-        angel_interface_mock.get_episode_data.side_effect = Exception("Test exception")
-
-        with patch.object(ui, "show_error") as mock_show_error:
-            ui.play_episode(episode_guid, project_slug)
-
-            # Assertions: Error shown
+            # Verify error handling
             mock_show_error.assert_called_once_with("Failed to play episode: Test exception")
 
 class TestVideoPlayback:

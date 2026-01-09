@@ -1,6 +1,6 @@
 import pytest
 import requests
-from unittest.mock import patch, MagicMock, mock_open
+from unittest.mock import patch, MagicMock, mock_open, PropertyMock
 import os
 import sys
 
@@ -444,6 +444,63 @@ class TestAngelStudiosInterface:
             mock_query.assert_called_once_with("getEpisodeAndUserWatchData", variables={"guid": "ep_guid", "projectSlug": "project_slug", "includePrerelease": True, "authenticated": True, "reactionsRollupInterval": 4000})
             angel_interface.log.error.assert_called_once_with("Error fetching episode data for GUID 'ep_guid': Query failed")
 
+    def test_get_resume_watching_success_with_defaults(self, angel_interface):
+        """Test get_resume_watching with default parameters."""
+        from .unittest_data import MOCK_RESUME_WATCHING_RESPONSE
+        with patch.object(angel_interface, '_graphql_query') as mock_query:
+            mock_query.return_value = MOCK_RESUME_WATCHING_RESPONSE
+            result = angel_interface.get_resume_watching()
+
+            assert 'guids' in result
+            assert 'positions' in result
+            assert 'pageInfo' in result
+            assert len(result['guids']) == 2
+            assert result['guids'][0] == 'resume-guid-1'
+            assert result['positions']['resume-guid-1'] == 1200
+            assert result['pageInfo']['hasNextPage'] is True
+            mock_query.assert_called_once_with("resumeWatching", variables={})
+
+    def test_get_resume_watching_success_with_pagination(self, angel_interface):
+        """Test get_resume_watching with pagination parameters."""
+        from .unittest_data import MOCK_RESUME_WATCHING_RESPONSE
+        with patch.object(angel_interface, '_graphql_query') as mock_query:
+            mock_query.return_value = MOCK_RESUME_WATCHING_RESPONSE
+            result = angel_interface.get_resume_watching(first=10, after='cursor-abc')
+
+            assert 'guids' in result
+            assert len(result['guids']) == 2
+            mock_query.assert_called_once_with("resumeWatching", variables={"first": 10, "after": "cursor-abc"})
+
+    def test_get_resume_watching_empty_response(self, angel_interface):
+        """Test get_resume_watching with no items."""
+        with patch.object(angel_interface, '_graphql_query') as mock_query:
+            mock_query.return_value = {
+                'resumeWatching': {
+                    'edges': [],
+                    'pageInfo': {'hasNextPage': False, 'endCursor': None}
+                }
+            }
+            result = angel_interface.get_resume_watching()
+
+            assert result == {'guids': [], 'positions': {}, 'pageInfo': {'hasNextPage': False, 'endCursor': None}}
+
+    def test_get_resume_watching_no_data(self, angel_interface):
+        """Test get_resume_watching when response missing resumeWatching key."""
+        with patch.object(angel_interface, '_graphql_query') as mock_query:
+            mock_query.return_value = {}
+            result = angel_interface.get_resume_watching()
+
+            assert result == {}
+            angel_interface.log.warning.assert_called_once_with("No resumeWatching data in response")
+
+    def test_get_resume_watching_exception(self, angel_interface):
+        """Test get_resume_watching handles exceptions."""
+        with patch.object(angel_interface, '_graphql_query', side_effect=Exception('Query failed')) as mock_query:
+            result = angel_interface.get_resume_watching(first=20)
+
+            assert result == {}
+            angel_interface.log.error.assert_called_once_with("Error fetching resume watching: Query failed")
+
     def test_session_check_valid(self, angel_interface):
         """Test session_check when session is valid."""
         with patch.object(angel_interface.angel_studios_session, '_validate_session', return_value=True) as mock_validate:
@@ -511,3 +568,282 @@ class TestAngelStudiosInterface:
         assert result is True
         assert asi.session is fresh_session
         assert asi.session is not old_session
+
+    def test_get_episodes_for_guids_empty_list(self, angel_interface):
+        """Test get_episodes_for_guids with empty guid list returns empty dict."""
+        result = angel_interface.get_episodes_for_guids([])
+        assert result == {}
+
+    def test_get_episodes_for_guids_success(self, angel_interface):
+        """Test get_episodes_for_guids successfully batches and remaps episode data."""
+        guids = ['guid-1', 'guid-2', 'guid-3']
+        
+        # Mock response with sanitized keys
+        mock_response = {
+            'data': {
+                'episode_guid_1': {'id': 'ep1', 'title': 'Episode 1', 'slug': 'slug-1'},
+                'episode_guid_2': {'id': 'ep2', 'title': 'Episode 2', 'slug': 'slug-2'},
+                'episode_guid_3': {'id': 'ep3', 'title': 'Episode 3', 'slug': 'slug-3'},
+            }
+        }
+        
+        with (
+            patch.object(angel_interface, '_load_fragment', return_value='...EpisodeListItem fragment'),
+            patch.object(angel_interface.session, 'post') as mock_post,
+        ):
+            mock_response_obj = MagicMock()
+            mock_response_obj.json.return_value = mock_response
+            mock_post.return_value = mock_response_obj
+            
+            result = angel_interface.get_episodes_for_guids(guids)
+            
+            # Verify remapping: sanitized keys (hyphens→underscores) back to episode_guid format
+            assert 'episode_guid-1' in result
+            assert 'episode_guid-2' in result
+            assert 'episode_guid-3' in result
+            assert result['episode_guid-1'] == {'id': 'ep1', 'title': 'Episode 1', 'slug': 'slug-1'}
+            assert result['episode_guid-2'] == {'id': 'ep2', 'title': 'Episode 2', 'slug': 'slug-2'}
+            assert result['episode_guid-3'] == {'id': 'ep3', 'title': 'Episode 3', 'slug': 'slug-3'}
+            
+            # Verify query construction: should contain sanitized aliases with underscores
+            call_args = mock_post.call_args
+            assert call_args is not None
+            query_dict = call_args[1]['json']
+            assert 'getEpisodesForGuids' in query_dict['operationName']
+            assert 'episode_guid_1' in query_dict['query']
+            assert 'episode_guid_2' in query_dict['query']
+            assert 'episode_guid_3' in query_dict['query']
+
+    def test_get_episodes_for_guids_with_hyphens_in_guid(self, angel_interface):
+        """Test get_episodes_for_guids correctly sanitizes guids with hyphens."""
+        guids = ['ep-id-123', 'ep-id-456']
+        
+        mock_response = {
+            'data': {
+                'episode_ep_id_123': {'id': 'ep1', 'title': 'Episode 1'},
+                'episode_ep_id_456': {'id': 'ep2', 'title': 'Episode 2'},
+            }
+        }
+        
+        with (
+            patch.object(angel_interface, '_load_fragment', return_value='...fragment'),
+            patch.object(angel_interface.session, 'post') as mock_post,
+        ):
+            mock_response_obj = MagicMock()
+            mock_response_obj.json.return_value = mock_response
+            mock_post.return_value = mock_response_obj
+            
+            result = angel_interface.get_episodes_for_guids(guids)
+            
+            # Verify remapping preserves original guid format
+            assert 'episode_ep-id-123' in result
+            assert 'episode_ep-id-456' in result
+
+    def test_get_episodes_for_guids_graphql_error(self, angel_interface):
+        """Test get_episodes_for_guids returns empty dict on GraphQL error."""
+        guids = ['guid-1', 'guid-2']
+        
+        mock_response = {'errors': [{'message': 'Invalid query'}]}
+        
+        with (
+            patch.object(angel_interface, '_load_fragment', return_value='...fragment'),
+            patch.object(angel_interface.session, 'post') as mock_post,
+            patch.object(angel_interface.angel_studios_session, 'authenticate') as mock_auth,
+        ):
+            mock_response_obj = MagicMock()
+            mock_response_obj.json.return_value = mock_response
+            mock_post.return_value = mock_response_obj
+            
+            result = angel_interface.get_episodes_for_guids(guids)
+            
+            assert result == {}
+            mock_auth.assert_called_once_with(force_reauthentication=True)
+            angel_interface.log.error.assert_called()
+
+    def test_get_episodes_for_guids_request_exception(self, angel_interface):
+        """Test get_episodes_for_guids returns empty dict on request exception."""
+        guids = ['guid-1', 'guid-2']
+        
+        with (
+            patch.object(angel_interface, '_load_fragment', return_value='...fragment'),
+            patch.object(angel_interface.session, 'post') as mock_post,
+        ):
+            mock_post.side_effect = requests.RequestException("Connection failed")
+            
+            result = angel_interface.get_episodes_for_guids(guids)
+            
+            assert result == {}
+            angel_interface.log.error.assert_called()
+
+    def test_get_episodes_for_guids_unexpected_exception(self, angel_interface):
+        """Test get_episodes_for_guids returns empty dict on unexpected exception."""
+        guids = ['guid-1']
+        
+        with patch.object(angel_interface, '_load_fragment', side_effect=Exception("Unexpected error")):
+            result = angel_interface.get_episodes_for_guids(guids)
+            
+            assert result == {}
+            angel_interface.log.error.assert_called()
+
+    def test_get_projects_by_slugs_empty_list(self, angel_interface):
+        """Test get_projects_by_slugs with empty slug list returns empty dict."""
+        result = angel_interface.get_projects_by_slugs([])
+        assert result == {}
+
+    def test_get_projects_by_slugs_success(self, angel_interface):
+        """Test get_projects_by_slugs successfully batches and remaps project data."""
+        slugs = ['project-1', 'project-2', 'project-3']
+        
+        mock_response = {
+            'data': {
+                'project_project_1': {'id': 'p1', 'name': 'Project 1'},
+                'project_project_2': {'id': 'p2', 'name': 'Project 2'},
+                'project_project_3': {'id': 'p3', 'name': 'Project 3'},
+            }
+        }
+        
+        with patch.object(angel_interface.session, 'post') as mock_post:
+            mock_response_obj = MagicMock()
+            mock_response_obj.json.return_value = mock_response
+            mock_post.return_value = mock_response_obj
+            
+            result = angel_interface.get_projects_by_slugs(slugs)
+            
+            # Verify remapping: sanitized keys back to original slugs
+            assert 'project-1' in result
+            assert 'project-2' in result
+            assert 'project-3' in result
+            assert result['project-1'] == {'id': 'p1', 'name': 'Project 1'}
+            assert result['project-2'] == {'id': 'p2', 'name': 'Project 2'}
+            assert result['project-3'] == {'id': 'p3', 'name': 'Project 3'}
+            
+            # Verify query construction: should contain sanitized aliases with underscores
+            call_args = mock_post.call_args
+            assert call_args is not None
+            query_dict = call_args[1]['json']
+            assert 'getProjectsForSlugs' in query_dict['operationName']
+            assert 'project_project_1' in query_dict['query']
+            assert 'project_project_2' in query_dict['query']
+            assert 'project_project_3' in query_dict['query']
+
+    def test_get_projects_by_slugs_with_hyphens_in_slug(self, angel_interface):
+        """Test get_projects_by_slugs correctly sanitizes slugs with hyphens."""
+        slugs = ['my-project-slug', 'another-project']
+        
+        mock_response = {
+            'data': {
+                'project_my_project_slug': {'id': 'p1', 'name': 'My Project'},
+                'project_another_project': {'id': 'p2', 'name': 'Another Project'},
+            }
+        }
+        
+        with patch.object(angel_interface.session, 'post') as mock_post:
+            mock_response_obj = MagicMock()
+            mock_response_obj.json.return_value = mock_response
+            mock_post.return_value = mock_response_obj
+            
+            result = angel_interface.get_projects_by_slugs(slugs)
+            
+            # Verify remapping preserves original slug format
+            assert 'my-project-slug' in result
+            assert 'another-project' in result
+
+    def test_get_projects_by_slugs_partial_response(self, angel_interface):
+        """Test get_projects_by_slugs handles partial response (missing some projects)."""
+        slugs = ['project-1', 'project-2', 'project-3']
+        
+        # Only 2 out of 3 projects returned
+        mock_response = {
+            'data': {
+                'project_project_1': {'id': 'p1', 'name': 'Project 1'},
+                'project_project_2': {'id': 'p2', 'name': 'Project 2'},
+            }
+        }
+        
+        with patch.object(angel_interface.session, 'post') as mock_post:
+            mock_response_obj = MagicMock()
+            mock_response_obj.json.return_value = mock_response
+            mock_post.return_value = mock_response_obj
+            
+            result = angel_interface.get_projects_by_slugs(slugs)
+            
+            # Should only have the 2 projects that were returned
+            assert len(result) == 2
+            assert 'project-1' in result
+            assert 'project-2' in result
+            assert 'project-3' not in result
+
+    def test_get_projects_by_slugs_graphql_error(self, angel_interface):
+        """Test get_projects_by_slugs returns empty dict on GraphQL error."""
+        slugs = ['project-1', 'project-2']
+        
+        mock_response = {'errors': [{'message': 'Invalid query'}]}
+        
+        with (
+            patch.object(angel_interface.session, 'post') as mock_post,
+            patch.object(angel_interface.angel_studios_session, 'authenticate') as mock_auth,
+        ):
+            mock_response_obj = MagicMock()
+            mock_response_obj.json.return_value = mock_response
+            mock_post.return_value = mock_response_obj
+            
+            result = angel_interface.get_projects_by_slugs(slugs)
+            
+            assert result == {}
+            mock_auth.assert_called_once_with(force_reauthentication=True)
+            angel_interface.log.error.assert_called()
+
+    def test_get_projects_by_slugs_request_exception(self, angel_interface):
+        """Test get_projects_by_slugs returns empty dict on request exception."""
+        slugs = ['project-1', 'project-2']
+        
+        with patch.object(angel_interface.session, 'post') as mock_post:
+            mock_post.side_effect = requests.RequestException("Connection failed")
+            
+            result = angel_interface.get_projects_by_slugs(slugs)
+            
+            assert result == {}
+            angel_interface.log.error.assert_called()
+
+    def test_get_projects_by_slugs_unexpected_exception(self, angel_interface):
+        """Test get_projects_by_slugs returns empty dict on unexpected exception."""
+        slugs = ['project-1']
+        
+        with patch.object(angel_interface.session, 'post', side_effect=Exception("Unexpected error")):
+            result = angel_interface.get_projects_by_slugs(slugs)
+            
+            assert result == {}
+            angel_interface.log.error.assert_called()
+
+    def test_get_episodes_for_guids_request_exception_with_response_text_error(self, angel_interface):
+        """Test get_episodes_for_guids handles exception when logging response body fails."""
+        guids = ['guid-1']
+        
+        # Create mock exception with response that fails when .text is accessed
+        mock_exception = requests.RequestException("Test error")
+        mock_response = MagicMock()
+        mock_response.text = PropertyMock(side_effect=Exception("Cannot read response"))
+        mock_exception.response = mock_response
+        
+        with (
+            patch.object(angel_interface, '_load_fragment', return_value='...fragment'),
+            patch.object(angel_interface.session, 'post', side_effect=mock_exception),
+        ):
+            result = angel_interface.get_episodes_for_guids(guids)
+            
+            assert result == {}
+
+    def test_get_projects_by_slugs_request_exception_with_response_text_error(self, angel_interface):
+        """Test get_projects_by_slugs handles exception when logging response body fails."""
+        slugs = ['project-1']
+        
+        # Create mock exception with response that fails when .text is accessed
+        mock_exception = requests.RequestException("Test error")
+        mock_response = MagicMock()
+        mock_response.text = PropertyMock(side_effect=Exception("Cannot read response"))
+        mock_exception.response = mock_response
+        
+        with patch.object(angel_interface.session, 'post', side_effect=mock_exception):
+            result = angel_interface.get_projects_by_slugs(slugs)
+            
+            assert result == {}

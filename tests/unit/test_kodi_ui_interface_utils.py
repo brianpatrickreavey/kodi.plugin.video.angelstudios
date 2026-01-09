@@ -24,18 +24,18 @@ class TestUtils:
     def test_apply_progress_bar_valid(self, ui_interface, watch_position, duration, expected_resume):
         """Test _apply_progress_bar with valid watch position and duration."""
         ui, _, _ = ui_interface
-        
+
         mock_list_item = MagicMock()
         mock_info_tag = MagicMock()
         mock_list_item.getVideoInfoTag.return_value = mock_info_tag
-        
+
         ui._apply_progress_bar(mock_list_item, watch_position, duration)
-        
+
         mock_list_item.getVideoInfoTag.assert_called_once()
         # Allow small floating point difference
         actual_resume = mock_info_tag.setResumePoint.call_args[0][0]
         assert abs(actual_resume - expected_resume) < 0.001
-    
+
     @pytest.mark.parametrize("watch_position,duration", [
         (None, 100.0),
         (50.0, None),
@@ -46,47 +46,47 @@ class TestUtils:
     def test_apply_progress_bar_invalid_input(self, ui_interface, watch_position, duration):
         """Test _apply_progress_bar gracefully handles invalid input."""
         ui, _, _ = ui_interface
-        
+
         mock_list_item = MagicMock()
         mock_info_tag = MagicMock()
         mock_list_item.getVideoInfoTag.return_value = mock_info_tag
-        
+
         # Should not raise exception
         ui._apply_progress_bar(mock_list_item, watch_position, duration)
-        
+
         # Should not call setResumePoint for invalid input
         mock_info_tag.setResumePoint.assert_not_called()
-    
+
     def test_apply_progress_bar_clamps_to_range(self, ui_interface):
         """Test _apply_progress_bar clamps resume point to [0.0, 1.0]."""
         ui, _, _ = ui_interface
-        
+
         mock_list_item = MagicMock()
         mock_info_tag = MagicMock()
         mock_list_item.getVideoInfoTag.return_value = mock_info_tag
-        
+
         # Test watch position > duration (clamped to 1.0)
         ui._apply_progress_bar(mock_list_item, 150.0, 100.0)
         actual_resume = mock_info_tag.setResumePoint.call_args[0][0]
         assert actual_resume == 1.0
-        
+
         # Test negative watch position (clamped to 0.0)
         mock_info_tag.reset_mock()
         ui._apply_progress_bar(mock_list_item, -10.0, 100.0)
         actual_resume = mock_info_tag.setResumePoint.call_args[0][0]
         assert actual_resume == 0.0
-    
+
     def test_apply_progress_bar_handles_type_conversion(self, ui_interface):
         """Test _apply_progress_bar handles string inputs that can be converted to float."""
         ui, _, _ = ui_interface
-        
+
         mock_list_item = MagicMock()
         mock_info_tag = MagicMock()
         mock_list_item.getVideoInfoTag.return_value = mock_info_tag
-        
+
         # String inputs that are valid floats
         ui._apply_progress_bar(mock_list_item, "50.0", "100.0")
-        
+
         mock_info_tag.setResumePoint.assert_called_once()
         actual_resume = mock_info_tag.setResumePoint.call_args[0][0]
         assert actual_resume == 0.5
@@ -94,14 +94,14 @@ class TestUtils:
     def test_apply_progress_bar_handles_value_error(self, ui_interface):
         """Test _apply_progress_bar gracefully handles ValueError from invalid string conversion."""
         ui, logger_mock, _ = ui_interface
-        
+
         mock_list_item = MagicMock()
         mock_info_tag = MagicMock()
         mock_list_item.getVideoInfoTag.return_value = mock_info_tag
-        
+
         # String that cannot be converted to float should raise ValueError
         ui._apply_progress_bar(mock_list_item, "not-a-number", "100.0")
-        
+
         # Should not call setResumePoint on error
         mock_info_tag.setResumePoint.assert_not_called()
         # Should log warning
@@ -110,14 +110,14 @@ class TestUtils:
     def test_apply_progress_bar_handles_type_error(self, ui_interface):
         """Test _apply_progress_bar gracefully handles TypeError from incompatible types."""
         ui, logger_mock, _ = ui_interface
-        
+
         mock_list_item = MagicMock()
         mock_info_tag = MagicMock()
         mock_list_item.getVideoInfoTag.return_value = mock_info_tag
-        
+
         # Object that cannot be converted to float should raise TypeError
         ui._apply_progress_bar(mock_list_item, {"nested": "dict"}, 100.0)
-        
+
         # Should not call setResumePoint on error
         mock_info_tag.setResumePoint.assert_not_called()
         # Should log warning
@@ -126,14 +126,14 @@ class TestUtils:
     def test_apply_progress_bar_handles_list_item_error(self, ui_interface):
         """Test _apply_progress_bar gracefully handles exceptions from Kodi ListItem methods."""
         ui, logger_mock, _ = ui_interface
-        
+
         mock_list_item = MagicMock()
         # Simulate getVideoInfoTag() raising an exception (unexpected Kodi behavior)
         mock_list_item.getVideoInfoTag.side_effect = RuntimeError("Kodi error")
-        
+
         # Should not raise exception, but catch it
         ui._apply_progress_bar(mock_list_item, 50.0, 100.0)
-        
+
         # Should log warning
         logger_mock.warning.assert_called()
 
@@ -227,6 +227,78 @@ class TestUtils:
 
         logger_mock.info.assert_any_call(f"Processing attributes for list item: {mock_list_item.getLabel.return_value}")
         logger_mock.debug.assert_any_call(f"Attribute dict: {episode}")
+
+    def test_process_attributes_to_infotags_with_nested_season_dict(self, ui_interface, mock_xbmc):
+        """Test _process_attributes_to_infotags extracts seasonNumber from nested season dict."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
+
+        # Episode with nested season dict containing seasonNumber
+        episode = {
+            'name': 'Test Episode',
+            'media_type': 'episode',
+            'season': {'seasonNumber': 2, 'name': 'Season 2'},  # Nested dict with seasonNumber
+        }
+        mock_list_item = MagicMock()
+        mock_info_tag = MagicMock()
+        mock_list_item.getVideoInfoTag.return_value = mock_info_tag
+        mock_list_item.getLabel.return_value = 'Test Episode'
+
+        ui._process_attributes_to_infotags(mock_list_item, episode)
+
+        # Verify title and media_type were set
+        mock_info_tag.setTitle.assert_called_with('Test Episode')
+        mock_info_tag.setMediaType.assert_called_with('episode')
+        # Verify season was extracted and set
+        mock_info_tag.setSeason.assert_called_with(2)
+
+    def test_process_attributes_to_infotags_with_nested_source_dict(self, ui_interface, mock_xbmc):
+        """Test _process_attributes_to_infotags skips nested source dict."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
+
+        # Episode with nested source dict that should be skipped
+        episode = {
+            'name': 'Test Episode',
+            'media_type': 'episode',
+            'source': {'id': 'source-1', 'name': 'Source Name'},  # Nested dict - should be skipped
+        }
+        mock_list_item = MagicMock()
+        mock_info_tag = MagicMock()
+        mock_list_item.getVideoInfoTag.return_value = mock_info_tag
+        mock_list_item.getLabel.return_value = 'Test Episode'
+
+        ui._process_attributes_to_infotags(mock_list_item, episode)
+
+        # Verify title and media_type were set
+        mock_info_tag.setTitle.assert_called_with('Test Episode')
+        mock_info_tag.setMediaType.assert_called_with('episode')
+        # Verify no error logged (source was quietly skipped)
+        logger_mock.info.assert_any_call(f"Processing attributes for list item: Test Episode")
+
+    def test_process_attributes_to_infotags_with_nested_watchposition_dict(self, ui_interface, mock_xbmc):
+        """Test _process_attributes_to_infotags skips nested watchPosition dict."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
+
+        # Episode with nested watchPosition dict that should be skipped
+        episode = {
+            'name': 'Test Episode',
+            'media_type': 'episode',
+            'watchPosition': {'position': 0.5, 'duration': 1.0},  # Nested dict - should be skipped
+        }
+        mock_list_item = MagicMock()
+        mock_info_tag = MagicMock()
+        mock_list_item.getVideoInfoTag.return_value = mock_info_tag
+        mock_list_item.getLabel.return_value = 'Test Episode'
+
+        ui._process_attributes_to_infotags(mock_list_item, episode)
+
+        # Verify title and media_type were set
+        mock_info_tag.setTitle.assert_called_with('Test Episode')
+        mock_info_tag.setMediaType.assert_called_with('episode')
+        # Verify no error logged (watchPosition was quietly skipped)
+        logger_mock.info.assert_any_call(f"Processing attributes for list item: Test Episode")
 
     def test_show_error(self, ui_interface, mock_xbmc):
         """Test show_error displays an error dialog."""
@@ -539,15 +611,18 @@ class TestAdditionalCoverage:
         logger_mock.info.assert_any_call("Projects: <non-serializable type list>")
 
     def test_play_episode_cache_disabled_path(self, ui_interface, monkeypatch):
+        """Test play_episode with cache disabled uses _get_project without caching."""
         ui, logger_mock, angel_interface_mock = ui_interface
         monkeypatch.setattr(ui, '_cache_enabled', lambda: False)
-        angel_interface_mock.get_episode_data.return_value = {
-            'episode': {'source': {'url': 'u'}, 'name': 'n'},
-            'project': {},
-        }
+        
+        from .unittest_data import MOCK_PROJECT_DATA
+        project_data = MOCK_PROJECT_DATA["single_season_project"]
+        
+        with patch.object(ui, '_get_project', return_value=project_data) as mock_get_project:
+            ui.play_episode(project_data["seasons"][0]["episodes"][0]["guid"], project_data["slug"])
+            # Verify _get_project was called (which handles cache internally)
+            mock_get_project.assert_called_once_with(project_data["slug"])
 
-        ui.play_episode('guid', 'slug')
-        logger_mock.debug.assert_any_call("Cache disabled; bypassing episode cache")
 
     def test_clear_debug_data_dir_missing(self, ui_interface, monkeypatch):
         ui, logger_mock, angel_interface_mock = ui_interface

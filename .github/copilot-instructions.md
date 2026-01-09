@@ -6,6 +6,11 @@ This is a Kodi addon (`plugin.video.angelstudios`) for streaming Angel Studios c
 
 ### Workflow Practices
 
+- Unless explicit authorization is given to edit code, all requests are to be
+  treated as read-only conversations about the codebase, plans, and options.
+- Ask for clarification if anything is unclear or multiple approaches are viable.
+- Do not interpret questions as invitations to choose and act; questions are questions, directives are directives.
+- All proposed code changes should be preceeded by a clear plan and rationale.
 - The developer controls the process; defer to their decisions.
 - Always re-read all relevant files before making suggestions or changes.  Do NOT rely on cache or other shortcuts.
 - Never assume how something works—verify by reading files and documentation.
@@ -16,8 +21,6 @@ This is a Kodi addon (`plugin.video.angelstudios`) for streaming Angel Studios c
 - Adhere to best practices; justify any deviations clearly.
 - Use test data and parameterization extensively in tests.
 - Favor verbose, readable code over clever or obscure implementations.
-- Ask for clarification if anything is unclear or multiple approaches are viable.
-- Do not interpret questions as invitations to choose and act; questions are questions, directives are directives.
 
 
 ### Architecture Overview
