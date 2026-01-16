@@ -15,6 +15,7 @@ from kodi_ui_interface import KodiUIInterface
 from .unittest_data import (
     MOCK_PROJECTS_DATA,
     MOCK_PROJECT_DATA,
+    TEST_EXCEPTION_MESSAGE,
 )
 
 parameterized_project_types = pytest.mark.parametrize(
@@ -424,15 +425,15 @@ class TestProjectsMenu:
         """Test projects_menu handles exceptions during project fetching."""
         ui, logger_mock, angel_interface_mock = ui_interface
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
-        angel_interface_mock.get_projects.side_effect = Exception(f"Test exception for {content_type}")
+        angel_interface_mock.get_projects.side_effect = Exception(f"{TEST_EXCEPTION_MESSAGE} for {content_type}")
 
         # Set up exception on get_projects
-        angel_interface_mock.get_projects.side_effect = Exception(f"Test exception for {content_type}")
+        angel_interface_mock.get_projects.side_effect = Exception(f"{TEST_EXCEPTION_MESSAGE} for {content_type}")
         ui.cache.get.return_value = None  # Cache miss
 
         with patch.object(ui, "show_error") as mock_show_error:
             # Expect the exception to be raised
-            with pytest.raises(Exception, match=f"Test exception for {content_type}"):
+            with pytest.raises(Exception, match=f"{TEST_EXCEPTION_MESSAGE} for {content_type}"):
                 ui.projects_menu(content_type=content_type)
 
             # Ensure cache was checked
@@ -443,7 +444,7 @@ class TestProjectsMenu:
 
             # Ensure error was logged and shown
             mock_show_error.assert_called_once_with(
-                f"Failed to load {expected_project_type}: Test exception for {content_type}"
+                f"Failed to load {expected_project_type}: {TEST_EXCEPTION_MESSAGE} for {content_type}"
             )
 
 
@@ -571,7 +572,7 @@ class TestSeasonsMenu:
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
         # Set up exception
-        angel_interface_mock.get_project.side_effect = Exception("Test exception")
+        angel_interface_mock.get_project.side_effect = Exception(TEST_EXCEPTION_MESSAGE)
 
         with (
             patch.object(ui, "show_error") as mock_show_error,
@@ -587,7 +588,7 @@ class TestSeasonsMenu:
             angel_interface_mock.get_project.assert_called_once_with("test-project")
 
             # Ensure error was logged and shown
-            mock_show_error.assert_called_once_with("Error fetching project test-project: Test exception")
+            mock_show_error.assert_called_once_with(f"Error fetching project test-project: {TEST_EXCEPTION_MESSAGE}")
 
             # Ensure the method returns False on exception
             assert result is False
@@ -711,7 +712,7 @@ class TestEpisodesMenu:
         ui, logger_mock, angel_interface_mock = ui_interface
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
-        angel_interface_mock.get_project.side_effect = Exception("Test exception")
+        angel_interface_mock.get_project.side_effect = Exception(TEST_EXCEPTION_MESSAGE)
         ui.cache.get.return_value = None
 
         with patch.object(ui, "show_error") as mock_show_error:
@@ -719,7 +720,7 @@ class TestEpisodesMenu:
 
             ui.cache.get.assert_called_once_with("project_test-project")
             angel_interface_mock.get_project.assert_called_once_with("test-project")
-            mock_show_error.assert_called_once_with("Error fetching season 1: Test exception")
+            mock_show_error.assert_called_once_with(f"Error fetching season 1: {TEST_EXCEPTION_MESSAGE}")
             assert result is None
 
     def test_episodes_menu_handles_unavailable_episodes(self, ui_interface, mock_xbmc, mock_cache):

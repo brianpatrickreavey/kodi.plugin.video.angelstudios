@@ -1,6 +1,6 @@
 from unittest.mock import patch, MagicMock
 import pytest
-from .unittest_data import MOCK_PROJECT_DATA, MOCK_EPISODE_DATA
+from .unittest_data import MOCK_PROJECT_DATA, MOCK_EPISODE_DATA, TEST_EXCEPTION_MESSAGE
 import copy
 
 
@@ -98,13 +98,13 @@ class TestEpisodePlayback:
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
         with (
-            patch.object(ui, "_get_project", side_effect=Exception("Test exception")),
+            patch.object(ui, "_get_project", side_effect=Exception(TEST_EXCEPTION_MESSAGE)),
             patch.object(ui, "show_error") as mock_show_error,
         ):
             ui.play_episode("guid", "slug")
 
             # Verify error handling
-            mock_show_error.assert_called_once_with("Failed to play episode: Test exception")
+            mock_show_error.assert_called_once_with(f"Failed to play episode: {TEST_EXCEPTION_MESSAGE}")
 
 
 class TestVideoPlayback:
@@ -161,13 +161,13 @@ class TestVideoPlayback:
         stream_url = "http://example.com/stream"
 
         with (
-            patch("xbmcplugin.setResolvedUrl", side_effect=Exception("Test exception")),
+            patch("xbmcplugin.setResolvedUrl", side_effect=Exception(TEST_EXCEPTION_MESSAGE)),
             patch.object(ui, "show_error") as mock_show_error,
         ):
             ui.play_video(stream_url=stream_url)
 
             # Assertions: Error shown
-            mock_show_error.assert_called_once_with("Error playing video: Test exception")
+            mock_show_error.assert_called_once_with(f"Error playing video: {TEST_EXCEPTION_MESSAGE}")
 
     def test_play_video_use_isa_properties(self, ui_interface, mock_cache):
         """When use_isa is enabled, playback should set ISA properties on the ListItem."""

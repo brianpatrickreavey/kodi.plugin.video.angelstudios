@@ -1,6 +1,11 @@
 # data.py
 # Reusable test data for unit tests
 
+# Common test constants
+TEST_EXCEPTION_MESSAGE = "Test exception"
+EXAMPLE_URL = "http://example.com/"
+EXAMPLE_VIDEO_URL = "http://example.com/episode1.mp4"
+
 MOCK_PROJECTS_DATA = {
     "movies": [{"slug": "test_movie_project", "name": "Test Movie Name", "projectType": "movie"}],
     "series": [{"slug": "test_series_project", "name": "Test Series Name", "projectType": "series"}],
