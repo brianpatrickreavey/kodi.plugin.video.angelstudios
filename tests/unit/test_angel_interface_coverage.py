@@ -18,7 +18,9 @@ class TestNormalizerCoverage:
         ):
             # Mock requests.Session instance with valid JWT
             mock_requests_instance = MagicMock()
-            mock_jwt_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTksInN1YiI6InRlc3QtdXNlciJ9.test-signature"
+            mock_jwt_token = (
+                "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTksInN1YiI6InRlc3QtdXNlciJ9.test-signature"
+            )
             mock_requests_instance.cookies.get.return_value = mock_jwt_token
             mock_requests_session.return_value = mock_requests_instance
 
@@ -129,7 +131,9 @@ class TestQueryFragmentParsing:
         ):
             # Mock requests.Session with valid JWT
             mock_requests_instance = MagicMock()
-            mock_jwt_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTksInN1YiI6InRlc3QtdXNlciJ9.test-signature"
+            mock_jwt_token = (
+                "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTksInN1YiI6InRlc3QtdXNlciJ9.test-signature"
+            )
             mock_requests_instance.cookies.get.return_value = mock_jwt_token
             mock_requests_session.return_value = mock_requests_instance
 
@@ -188,7 +192,9 @@ class TestUnwrapRelayPagination:
         ):
             # Mock requests.Session with valid JWT
             mock_requests_instance = MagicMock()
-            mock_jwt_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTksInN1YiI6InRlc3QtdXNlciJ9.test-signature"
+            mock_jwt_token = (
+                "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTksInN1YiI6InRlc3QtdXNlciJ9.test-signature"
+            )
             mock_requests_instance.cookies.get.return_value = mock_jwt_token
             mock_requests_session.return_value = mock_requests_instance
 
@@ -243,7 +249,9 @@ class TestNormalizeContentseriesEpisode:
         ):
             # Mock requests.Session with valid JWT
             mock_requests_instance = MagicMock()
-            mock_jwt_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTksInN1YiI6InRlc3QtdXNlciJ9.test-signature"
+            mock_jwt_token = (
+                "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTksInN1YiI6InRlc3QtdXNlciJ9.test-signature"
+            )
             mock_requests_instance.cookies.get.return_value = mock_jwt_token
             mock_requests_session.return_value = mock_requests_instance
 
@@ -297,7 +305,9 @@ class TestMergeEpisodeData:
         ):
             # Mock requests.Session with valid JWT
             mock_requests_instance = MagicMock()
-            mock_jwt_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTksInN1YiI6InRlc3QtdXNlciJ9.test-signature"
+            mock_jwt_token = (
+                "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTksInN1YiI6InRlc3QtdXNlciJ9.test-signature"
+            )
             mock_requests_instance.cookies.get.return_value = mock_jwt_token
             mock_requests_session.return_value = mock_requests_instance
 
@@ -343,7 +353,9 @@ class TestGetProjectContentSeriesMerge:
         ):
             # Mock requests.Session with valid JWT
             mock_requests_instance = MagicMock()
-            mock_jwt_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTksInN1YiI6InRlc3QtdXNlciJ9.test-signature"
+            mock_jwt_token = (
+                "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTksInN1YiI6InRlc3QtdXNlciJ9.test-signature"
+            )
             mock_requests_instance.cookies.get.return_value = mock_jwt_token
             mock_requests_session.return_value = mock_requests_instance
 

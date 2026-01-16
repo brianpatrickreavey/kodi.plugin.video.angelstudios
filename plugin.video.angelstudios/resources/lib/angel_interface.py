@@ -235,10 +235,10 @@ class AngelStudiosInterface:
             if isinstance(title, dict) and title.get("__typename") == "ContentSeries":
                 # Build a map of display episodes by id from relay-style seasons
                 display_map = {}
-                seasons_edges = ((title.get("seasons") or {}).get("edges") or [])
+                seasons_edges = (title.get("seasons") or {}).get("edges") or []
                 for edge in seasons_edges:
                     node = edge.get("node") or {}
-                    ep_edges = ((node.get("episodes") or {}).get("edges") or [])
+                    ep_edges = (node.get("episodes") or {}).get("edges") or []
                     for ep_edge in ep_edges:
                         ep_node = ep_edge.get("node") or {}
                         ep_id = ep_node.get("id")

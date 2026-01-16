@@ -397,7 +397,11 @@ class KodiUIInterface:
                 return
 
             # Fallback: handle legacy shape with 'episodes' list containing embedded project
-            if isinstance(resume_data, dict) and "episodes" in resume_data and isinstance(resume_data["episodes"], list):
+            if (
+                isinstance(resume_data, dict)
+                and "episodes" in resume_data
+                and isinstance(resume_data["episodes"], list)
+            ):
                 xbmcplugin.setContent(self.handle, "videos")
                 for episode in resume_data["episodes"]:
                     project = episode.get("project") if isinstance(episode, dict) else None

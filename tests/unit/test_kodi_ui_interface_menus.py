@@ -274,7 +274,6 @@ class TestMainMenu:
 
     def test_cache_disabled_bypasses_get_set(self, ui_interface):
         import xbmcaddon
-        # MagicMock already imported at module scope
 
         ui, logger_mock, angel_interface_mock = ui_interface
 

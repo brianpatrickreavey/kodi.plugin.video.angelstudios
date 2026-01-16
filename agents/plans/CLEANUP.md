@@ -1,7 +1,7 @@
 # Project Cleanup Plan
 
 **Date:** January 15, 2026
-**Status:** Draft – Awaiting approval
+**Status:** In progress – Phase 0 partially completed
 **Owner:** Architecture & Product
 **Audience:** Developer, Code Reviewer, QA
 
@@ -121,6 +121,17 @@ User Action (Kodi UI)
 
 **Duration:** 1–2 hours
 **Goal:** Remove cruft, establish constants, verify import strategy.
+
+**Current Status:** Partially done
+- ✅ 0.3 TTL constants added in kodi_ui_interface.py (defaults documented)
+- ✅ 0.4 Research docs archived to docs/archive with README
+- 🔶 0.1 Unused imports: pending cleanup (xbmcaddon still present in kodi_ui_interface.py; others need audit)
+- 🔶 0.2 Duplicate MagicMock import in test_kodi_ui_interface_menus.py: pending
+- 🔶 0.5 Relative-import audit: pending
+- 🔶 0.6 Kodi-agnostic check for angel_interface.py / angel_authentication.py: pending
+- 🔶 0.7 Flake8 nits: pending (unused vars, long line, unused imports noted)
+
+**Test/coverage state:** `make unittest-with-coverage` passes (343/343, ~99% coverage). WIP snapshot committed at e556371.
 
 #### 0.1 – Remove Unused Imports
 

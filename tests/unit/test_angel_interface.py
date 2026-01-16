@@ -21,7 +21,9 @@ class TestAngelStudiosInterface:
         ):
             # Mock the requests.Session instance that gets created
             mock_requests_instance = MagicMock()
-            mock_jwt_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTksInN1YiI6InRlc3QtdXNlciJ9.test-signature"
+            mock_jwt_token = (
+                "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTksInN1YiI6InRlc3QtdXNlciJ9.test-signature"
+            )
             mock_requests_instance.cookies.get.return_value = mock_jwt_token
             mock_requests_session.return_value = mock_requests_instance
 
@@ -51,7 +53,9 @@ class TestAngelStudiosInterface:
         ):
             # Mock the requests.Session instance that gets created
             mock_requests_instance = MagicMock()
-            mock_jwt_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTksInN1YiI6InRlc3QtdXNlciJ9.test-signature"
+            mock_jwt_token = (
+                "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTksInN1YiI6InRlc3QtdXNlciJ9.test-signature"
+            )
             mock_requests_instance.cookies.get.return_value = mock_jwt_token
             mock_requests_session.return_value = mock_requests_instance
 
@@ -79,7 +83,9 @@ class TestAngelStudiosInterface:
         ):
             # Mock the requests.Session instance that gets created
             mock_requests_instance = MagicMock()
-            mock_jwt_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTksInN1YiI6InRlc3QtdXNlciJ9.test-signature"
+            mock_jwt_token = (
+                "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTksInN1YiI6InRlc3QtdXNlciJ9.test-signature"
+            )
             mock_requests_instance.cookies.get.return_value = mock_jwt_token
             mock_requests_session.return_value = mock_requests_instance
 
