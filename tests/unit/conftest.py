@@ -88,7 +88,7 @@ from resources.lib.kodi_ui_interface import KodiUIInterface  # noqa: E402
 
 
 @pytest.fixture
-def kodi_addon_mock():
+def mock_kodi_addon():
     """Mock Kodi addon with common settings for unit tests.
 
     Returns a MagicMock with standard settings pre-configured (menus disabled,
@@ -100,7 +100,7 @@ def kodi_addon_mock():
                    methods pre-configured with menu defaults.
 
     Example:
-        kodi_addon_mock.getSettingBool.side_effect = lambda key: True  # Override for test
+        mock_kodi_addon.getSettingBool.side_effect = lambda key: True  # Override for test
     """
     addon = MagicMock()
     addon.getSettingBool.side_effect = lambda key: _MENU_DEFAULTS.get(key, False)
@@ -176,7 +176,7 @@ def mock_simplecache_instance():
 
 
 @pytest.fixture
-def kodi_xbmcplugin_mock():
+def mock_kodi_xbmcplugin():
     """Mock xbmcplugin module methods used for menu rendering.
 
     Patches xbmcplugin.addDirectoryItem, endOfDirectory, setResolvedUrl, and
@@ -187,7 +187,7 @@ def kodi_xbmcplugin_mock():
         dict: Named mocks {'addDirectoryItem', 'endOfDirectory', 'setResolvedUrl', 'setContent'}
 
     Example:
-        kodi_xbmcplugin_mock['addDirectoryItem'].assert_called_once()
+        mock_kodi_xbmcplugin['addDirectoryItem'].assert_called_once()
     """
     with (
         patch("xbmcplugin.addDirectoryItem") as mock_add_item,
@@ -204,7 +204,7 @@ def kodi_xbmcplugin_mock():
 
 
 @pytest.fixture
-def kodi_xbmcgui_mock():
+def mock_kodi_xbmcgui():
     """Mock xbmcgui module (ListItem, Dialog) for UI element testing.
 
     Patches xbmcgui.ListItem and xbmcgui.Dialog. Pre-configures ListItem to
@@ -215,7 +215,7 @@ def kodi_xbmcgui_mock():
         dict: Named mocks {'ListItem', 'Dialog'}
 
     Example:
-        list_item_mock = kodi_xbmcgui_mock['ListItem'].return_value
+        list_item_mock = mock_kodi_xbmcgui['ListItem'].return_value
         list_item_mock.getVideoInfoTag.assert_called()
     """
     with (
@@ -236,7 +236,7 @@ def kodi_xbmcgui_mock():
 
 
 @pytest.fixture
-def ui_interface(kodi_addon_mock, mock_logger, mock_angel_interface, mock_simplecache_instance):
+def ui_interface(mock_kodi_addon, mock_logger, mock_angel_interface, mock_simplecache_instance):
     """Fully configured KodiUIInterface for end-to-end menu testing.
 
     Patches Kodi modules and wires all dependencies (addon, logger, API client,
@@ -245,10 +245,10 @@ def ui_interface(kodi_addon_mock, mock_logger, mock_angel_interface, mock_simple
 
     Useful for testing complete menu flows (fetch → render → cache) without
     mocking individual Kodi methods. For granular testing of specific Kodi calls,
-    use mock_xbmc or kodi_xbmcplugin_mock / kodi_xbmcgui_mock directly.
+    use mock_xbmc or mock_kodi_xbmcplugin / mock_kodi_xbmcgui directly.
 
     Args (injected):
-        kodi_addon_mock: Pre-configured addon mock
+        mock_kodi_addon: Pre-configured addon mock
         mock_logger: Mock logger for capturing logs
         mock_angel_interface: Mock API client
         mock_simplecache_instance: Mock cache instance
@@ -271,7 +271,7 @@ def ui_interface(kodi_addon_mock, mock_logger, mock_angel_interface, mock_simple
     )
 
     # Override with test-scoped addon and cache (fresh per test)
-    ui.addon = kodi_addon_mock
+    ui.addon = mock_kodi_addon
     ui.cache = mock_simplecache_instance
 
     return ui, mock_logger, mock_angel_interface
