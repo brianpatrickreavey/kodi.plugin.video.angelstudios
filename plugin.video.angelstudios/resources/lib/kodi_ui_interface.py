@@ -349,36 +349,40 @@ class KodiUIInterface:
 
             episodes_list = season.get("episodes", [])
             for idx, episode in enumerate(episodes_list):
-                episode_available = bool(episode.get("source"))
-                list_item = self._create_list_item_from_episode(
-                    episode,
-                    project=project,
-                    content_type=content_type,
-                    stream_url=None,
-                    is_playback=False,
-                )
-
-                # Apply progress bar if watch position data is available
-                if episode.get("watchPosition"):
-                    watch_position = episode["watchPosition"].get("position")
-                    duration = (
-                        episode.get("source", {}).get("duration") if episode_available else episode.get("duration")
+                try:
+                    episode_available = bool(episode.get("source"))
+                    list_item = self._create_list_item_from_episode(
+                        episode,
+                        project=project,
+                        content_type=content_type,
+                        stream_url=None,
+                        is_playback=False,
                     )
-                    if watch_position is not None and duration is not None:
-                        self._apply_progress_bar(list_item, watch_position, duration)
 
-                # Create URL for seasons listing
-                url = self.create_plugin_url(
-                    base_url=self.kodi_url,
-                    action="play_episode" if episode_available else "info",
-                    content_type=content_type,
-                    project_slug=project_slug,
-                    season_id=season["id"],
-                    episode_id=episode["id"],
-                    episode_guid=episode.get("guid", ""),
-                )
+                    # Apply progress bar if watch position data is available
+                    if episode.get("watchPosition"):
+                        watch_position = episode["watchPosition"].get("position")
+                        duration = (
+                            episode.get("source", {}).get("duration") if episode_available else episode.get("duration")
+                        )
+                        if watch_position is not None and duration is not None:
+                            self._apply_progress_bar(list_item, watch_position, duration)
 
-                xbmcplugin.addDirectoryItem(self.handle, url, list_item, False)
+                    # Create URL for seasons listing
+                    url = self.create_plugin_url(
+                        base_url=self.kodi_url,
+                        action="play_episode" if episode_available else "info",
+                        content_type=content_type,
+                        project_slug=project_slug,
+                        season_id=season["id"],
+                        episode_id=episode["id"],
+                        episode_guid=episode.get("guid", ""),
+                    )
+
+                    xbmcplugin.addDirectoryItem(self.handle, url, list_item, False)
+                except Exception as e:
+                    self.log.warning(f"Skipping bad episode {idx} ({episode.get('name', 'Unknown')}): {e}")
+                    continue
 
             if season["episodes"][0].get("seasonNumber", 0) > 0:
                 xbmcplugin.addSortMethod(self.handle, xbmcplugin.SORT_METHOD_EPISODE)
@@ -388,7 +392,6 @@ class KodiUIInterface:
             xbmcplugin.endOfDirectory(self.handle)
 
         except Exception as e:
-            # TODO: this needs to handle episodes that are stubs.  Should not fail completely if one episode is bad.
             self.log.error(f"Error fetching season {season_id}: {e}")
             self.show_error(f"Error fetching season {season_id}: {str(e)}")
             return
