@@ -25,6 +25,9 @@ parameterized_project_types = pytest.mark.parametrize(
 
 episodes_menu_cases = [
     (project_key, season["id"]) for project_key, project in MOCK_PROJECT_DATA.items() for season in project["seasons"]
+] + [
+    # All-episodes mode for multi-season projects
+    ("multi_season_project", None),
 ]
 
 
@@ -471,36 +474,49 @@ def seasons_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, pr
 
         seasons_data = project_data["seasons"]
 
-        # If we have multiple seasons, items should be added
+# If we have multiple seasons, items should be added (seasons + All Episodes)
         if len(seasons_data) > 1:
-            assert mock_add_item.call_count == len(seasons_data)
+            assert mock_add_item.call_count == len(seasons_data) + 1
             for i, season in enumerate(seasons_data):
                 call_args = mock_add_item.call_args_list[i]
                 kwargs = call_args[0]  # Positional args
+                assert kwargs[0] == 1  # handle
+                assert "episodes_menu" in kwargs[1]  # url contains action
+                assert str(season["id"]) in kwargs[1]  # url contains season_id
+                assert kwargs[2] is mock_list_item.return_value  # listitem
+                assert kwargs[3] is True  # isFolder
+
+                # Check ListItem creation
+                list_item_call = mock_list_item.call_args_list[i]
+                assert list_item_call[1]["label"] == season["name"]
+
+                # Check _process_attributes_to_infotags was called with season data
+                mock_process_attrs.assert_any_call(mock_list_item.return_value, season)
+
+            # Check "All Episodes" item
+            all_episodes_call = mock_add_item.call_args_list[-1]
+            kwargs = all_episodes_call[0]
             assert kwargs[0] == 1  # handle
             assert "episodes_menu" in kwargs[1]  # url contains action
-            assert str(season["id"]) in kwargs[1]  # url contains season_id
+            assert "season_id=" not in kwargs[1]  # url does not contain season_id
             assert kwargs[2] is mock_list_item.return_value  # listitem
             assert kwargs[3] is True  # isFolder
 
-            # Check ListItem creation
-            list_item_call = mock_list_item.call_args_list[i]
-            assert list_item_call[1]["label"] == season["name"]
+            # Check ListItem creation for "All Episodes"
+            all_episodes_list_item_call = mock_list_item.call_args_list[-1]
+            assert all_episodes_list_item_call[1]["label"] == "[All Episodes]"
 
-            # Check _process_attributes_to_infotags was called with season data
-            mock_process_attrs.assert_any_call(mock_list_item.return_value, season)
             mock_end_dir.assert_called_once_with(1)
         else:
-            # Single season: episodes_menu should be called, no directory items
+            # Single season: episodes_menu should be called with season_id=None, no directory items
             mock_episodes_menu.assert_called_once_with(
                 project_data["projectType"],
                 project_data["slug"],
-                season_id=project_data["seasons"][0]["id"],
             )
             mock_add_item.assert_not_called()
             mock_end_dir.assert_not_called()
             mock_process_attrs.assert_not_called()
-            logger_mock.info.assert_called_with(f"Single season found: {project_data['seasons'][0]['name']}")
+            logger_mock.info.assert_called_with(f"Single season found: {project_data['seasons'][0]['name']}, using all-episodes mode")
 
 
 class TestSeasonsMenu:
@@ -594,9 +610,20 @@ def episodes_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, p
     ui.cache.get.return_value = project_data if cache_hit else None
     angel_interface_mock.get_project.return_value = project_data if not cache_hit else None
 
-    # Find the season for assertions
-    season = next((s for s in project_data["seasons"] if s["id"] == season_id), None)
-    episodes_data = season["episodes"] if season else []
+    # Find the season for assertions or aggregate for all-episodes
+    if season_id is None:
+        # All-episodes mode: aggregate and sort
+        all_episodes = []
+        for s in project_data["seasons"]:
+            for ep in s["episodes"]:
+                all_episodes.append(ep)
+        all_episodes.sort(key=lambda e: (e.get("seasonNumber", 0), e.get("episodeNumber", 0)))
+        episodes_data = all_episodes
+        sort_episodic = True
+    else:
+        season = next((s for s in project_data["seasons"] if s["id"] == season_id), None)
+        episodes_data = season["episodes"] if season else []
+        sort_episodic = episodes_data and episodes_data[0].get("seasonNumber", 0) > 0
 
     with (
         patch.object(ui, "_create_list_item_from_episode") as mock_create_item,
@@ -622,7 +649,7 @@ def episodes_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, p
 
         # Content and sorting assertions
         mock_set_content.assert_called_once_with(1, "tvshows")
-        if episodes_data and episodes_data[0].get("seasonNumber", 0) > 0:
+        if sort_episodic:
             mock_add_sort.assert_any_call(1, mock_episode_sort)
         else:
             mock_add_sort.assert_any_call(1, mock_title_sort)

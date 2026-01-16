@@ -269,16 +269,17 @@ class KodiUIInterface:
                 self.log.error(f"Project not found: {project_slug}")
                 self.show_error(f"Project not found: {project_slug}")
                 return
-            self.log.info(f"Project details: {json.dumps(project, indent=2)}")
+            self.log.debug(f"Project details: {json.dumps(project, indent=2)}")
             self.log.info(f"Processing {len(project.get('seasons', []))} seasons for project: {project_slug}")
 
             kodi_content_type = self._get_kodi_content_type(content_type)
             self.log.info(f"Setting content type for Kodi: {content_type} ({kodi_content_type})")
             xbmcplugin.setContent(self.handle, kodi_content_type)
 
+            # If there is only one season, go straight to episodes menu in all-episodes mode
             if len(project.get("seasons", [])) == 1:
-                self.log.info(f"Single season found: {project['seasons'][0]['name']}")
-                self.episodes_menu(content_type, project["slug"], season_id=project["seasons"][0]["id"])
+                self.log.info(f"Single season found: {project['seasons'][0]['name']}, using all-episodes mode")
+                self.episodes_menu(content_type, project["slug"])
             else:
                 for season in project.get("seasons", []):
                     self.log.info(f"Processing season: {season['name']}")
@@ -288,6 +289,11 @@ class KodiUIInterface:
                     info_tag = list_item.getVideoInfoTag()
                     info_tag.setMediaType(self._get_kodi_content_type(content_type))
                     self._process_attributes_to_infotags(list_item, season)
+                    # Set sort title for proper ordering
+                    season_number = season["episodes"][0].get("seasonNumber", 0) if season.get("episodes") else 0
+                    sort_title = f"Season {season_number:03d}"
+                    info_tag.setSortTitle(sort_title)
+                    self.log.debug(f"Season '{season['name']}' set sort title: '{sort_title}'")
 
                     # Create URL for seasons listing
                     url = self.create_plugin_url(
@@ -300,7 +306,23 @@ class KodiUIInterface:
 
                     xbmcplugin.addDirectoryItem(self.handle, url, list_item, True)
 
-                xbmcplugin.addSortMethod(self.handle, xbmcplugin.SORT_METHOD_LABEL)
+                # Add "All Episodes" item at the bottom
+                list_item = xbmcgui.ListItem(label="[All Episodes]")
+                info_tag = list_item.getVideoInfoTag()
+                info_tag.setMediaType(self._get_kodi_content_type(content_type))
+                info_tag.setPlot("Browse all episodes from all seasons")
+                sort_title = "Season 999"
+                info_tag.setSortTitle(sort_title)
+                self.log.debug(f"'[All Episodes]' set sort title: '{sort_title}'")
+                url = self.create_plugin_url(
+                    base_url=self.kodi_url,
+                    action="episodes_menu",
+                    content_type=content_type,
+                    project_slug=project_slug,
+                )
+                xbmcplugin.addDirectoryItem(self.handle, url, list_item, True)
+
+                xbmcplugin.addSortMethod(self.handle, xbmcplugin.SORT_METHOD_VIDEO_SORT_TITLE)
                 xbmcplugin.endOfDirectory(self.handle)
 
             return True
@@ -320,21 +342,35 @@ class KodiUIInterface:
                 self.show_error(f"Project not found: {project_slug}")
                 return
 
-            # If season_id is None, use first season (all-seasons mode)
+            # If season_id is None, aggregate all episodes from all seasons (all-episodes mode)
             # Else find the specified season
-            if season_id is None and project.get("seasons"):
-                season = project["seasons"][0]
+            if season_id is None:
+                # All-episodes mode: Aggregate from all seasons
+                all_episodes = []
+                for s in project.get("seasons", []):
+                    for ep in s.get("episodes", []):
+                        all_episodes.append(ep)
+                # Sort by season number, then episode number
+                all_episodes.sort(key=lambda e: (e.get("seasonNumber", 0), e.get("episodeNumber", 0)))
+                episodes_list = all_episodes
+                sort_episodic = True  # Assume episodic for aggregated view
+                season_for_sort = None  # Not used for sorting in all-episodes
+                season_map = {}  # Not used for all-episodes
             else:
                 season = next(
                     (s for s in project.get("seasons", []) if s.get("id") == season_id),
                     None,
                 )
-            if not season:
-                self.log.error(f"Season not found: {season_id}")
-                self.show_error(f"Season not found: {season_id}")
-                return
+                if not season:
+                    self.log.error(f"Season not found: {season_id}")
+                    self.show_error(f"Season not found: {season_id}")
+                    return
+                episodes_list = season.get("episodes", [])
+                sort_episodic = season["episodes"][0].get("seasonNumber", 0) > 0 if season.get("episodes") else False
+                season_for_sort = season
+                season_map = {}  # Not used for specific season
 
-            episode_count = len(season.get("episodes", []))
+            episode_count = len(episodes_list)
             self.log.info(f"Processing {episode_count} episodes for project: {project_slug}, season: {season_id}")
             kodi_content_type = (
                 "movies" if content_type == "movies" else "tvshows" if content_type == "series" else "videos"
@@ -342,7 +378,6 @@ class KodiUIInterface:
             self.log.info(f"Setting content type for Kodi: {content_type} ({kodi_content_type})")
             xbmcplugin.setContent(self.handle, kodi_content_type)
 
-            episodes_list = season.get("episodes", [])
             for idx, episode in enumerate(episodes_list):
                 try:
                     episode_available = bool(episode.get("source"))
@@ -364,12 +399,13 @@ class KodiUIInterface:
                             self._apply_progress_bar(list_item, watch_position, duration)
 
                     # Create URL for seasons listing
+                    season_id_for_url = season_map.get(episode.get("guid", ""), season_for_sort["id"] if season_for_sort else None)
                     url = self.create_plugin_url(
                         base_url=self.kodi_url,
                         action="play_episode" if episode_available else "info",
                         content_type=content_type,
                         project_slug=project_slug,
-                        season_id=season["id"],
+                        season_id=season_id_for_url,
                         episode_id=episode["id"],
                         episode_guid=episode.get("guid", ""),
                     )
@@ -379,7 +415,7 @@ class KodiUIInterface:
                     self.log.warning(f"Skipping bad episode {idx} ({episode.get('name', 'Unknown')}): {e}")
                     continue
 
-            if season["episodes"][0].get("seasonNumber", 0) > 0:
+            if sort_episodic:
                 xbmcplugin.addSortMethod(self.handle, xbmcplugin.SORT_METHOD_EPISODE)
             else:
                 xbmcplugin.addSortMethod(self.handle, xbmcplugin.SORT_METHOD_VIDEO_SORT_TITLE)

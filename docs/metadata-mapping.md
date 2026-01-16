@@ -201,11 +201,11 @@ Added to episodes during playback to indicate codec and resolution:
 | `setSortTitle(str)` | string | ✅ | Generated (`f"Season {season_number:03d}"`) | Numeric sorting | Custom format; ensures proper order |
 | `setMediaType()` | string | ✅ | `kodi_content_mapper[content_type]` | Applied from project type | Inherits parent project type |
 
-### "[All Seasons]" Special Item
+### "[All Episodes]" Special Item
 
 | Property | Value | Status | Purpose |
 |---|---|---|---|
-| Label | "[All Seasons]" | ✅ | Display text in menu |
+| Label | "[All Episodes]" | ✅ | Display text in menu |
 | Icon | "DefaultRecentlyAddedEpisodes.png" | ✅ | Visual indicator |
 | Sort Title | "Season 999" | ✅ | Forces to end of list |
 | Parameter | `season_id=None` | ✅ | Triggers flattened episode view |
@@ -383,7 +383,7 @@ Manual Kodi testing checklist:
 - [ ] Artwork loads correctly (poster, fanart, logo)
 - [ ] Progress bars show accurate resume points
 - [ ] Season numbers sort correctly (numeric, not alphabetic)
-- [ ] "[All Seasons]" appears at end of list
+- [ ] "[All Episodes]" appears at end of list
 - [ ] Playback metadata displays (show title, episode #, etc.)
 
 ---

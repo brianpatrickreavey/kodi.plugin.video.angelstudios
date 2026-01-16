@@ -102,7 +102,7 @@ def router(paramstring):
                 ui_interface.seasons_menu(params["content_type"], params["project_slug"])
             elif params["action"] == "episodes_menu":
                 # Show episodes for a season using individual parameters
-                ui_interface.episodes_menu(params["content_type"], params["project_slug"], params["season_id"])
+                ui_interface.episodes_menu(params["content_type"], params["project_slug"], params.get("season_id"))
             elif params["action"] == "play_episode":
                 # Play an episode
                 ui_interface.play_episode(params["episode_guid"], params["project_slug"])
