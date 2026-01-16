@@ -1,7 +1,7 @@
 # Project Cleanup Plan (Grok Version)
 
 **Date:** January 16, 2026
-**Status:** Completed – Phase 0 Done
+**Status:** Active – Phase 1 Test Suite Cleanup
 **Owner:** Architecture & Product
 **Audience:** Developer, Code Reviewer, QA
 
@@ -80,3 +80,53 @@ This cleanup plan focuses on Phase 0 quick wins to establish a clean baseline be
 
 Author: Grok
 Last Updated: January 16, 2026
+
+---
+
+## Phase 1: Test Suite Cleanup
+
+**Status:** Planning Complete, Ready for Implementation
+
+**Scope:** Refine test suite by codifying norms, improving fixtures, consolidating patterns, and ensuring maintainability while preserving 100% coverage.
+
+**Risk Profile:** Low risk (documentation and test improvements).
+
+**Timeline Estimate:** 2–4 hours
+
+**Success Criteria:**
+1. TESTING.md created and comprehensive.
+2. Fixtures well-documented with docstrings.
+3. Patching patterns consolidated.
+4. Hardcoded data centralized.
+5. Coverage tests refactored.
+6. Isolation checks added.
+7. Parametrization expanded.
+8. README.md created for conventions.
+9. 100% test coverage maintained.
+10. Code passes black + flake8.
+
+**Implementation Steps:**
+
+1. **Create TESTING.md**: Create docs/TESTING.md with codified testing strategy, norms, mocking, fixtures, coverage goals, unittest_data use, class-based organization, parametrization, docstrings, error handling, naming conventions, and examples of good/bad practices. Commit "docs: add TESTING.md with codified testing norms (Phase 1 Step 1)".
+
+2. **Enhance fixture documentation**: Add complete docstrings to all fixtures in tests/unit/conftest.py. Commit "test: enhance fixture docstrings in conftest.py (Phase 1 Step 2)".
+
+3. **Consolidate patching patterns**: Replace individual patch calls with composed fixtures where possible. Commit "test: consolidate patching patterns using fixtures (Phase 1 Step 3)".
+
+4. **Centralize hardcoded test data**: Move hardcoded strings to unittest_data.py constants. Commit "test: centralize hardcoded data in unittest_data.py (Phase 1 Step 4)".
+
+5. **Refactor coverage tests**: Integrate coverage-specific tests into main classes, add comments. Commit "test: refactor coverage tests into main classes (Phase 1 Step 5)".
+
+6. **Add isolation checks**: Implement teardown checks in fixtures to prevent state leakage. Commit "test: add isolation checks in fixture teardown (Phase 1 Step 6)".
+
+7. **Expand parametrization**: Audit and add parametrization for missed edge cases/boundaries. Commit "test: expand parametrization for edge cases (Phase 1 Step 7)".
+
+8. **Create tests/unit/README.md**: Document fixture usage and mocking conventions. Commit "docs: add tests/unit/README.md with conventions (Phase 1 Step 8)".
+
+9. **Final validation**: Run all commands, tag phase-1-complete. Commit "Phase 1 complete: test suite cleanup applied".
+
+---
+
+## Phase 1 Progress Log
+
+- Step 1: Completed (TESTING.md created and committed).
