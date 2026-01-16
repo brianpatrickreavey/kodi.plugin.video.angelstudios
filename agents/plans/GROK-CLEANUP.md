@@ -70,6 +70,7 @@ This cleanup plan focuses on Phase 0 quick wins to establish a clean baseline be
 - Step 2: Completed (no duplicate found).
 - Step 3: Completed (verified absolute imports are correct).
 - Step 4: Completed (verified Kodi-agnostic).
+- Step 5: Completed (verified Kodi-agnostic).
 
 Author: Grok
 Last Updated: January 16, 2026
