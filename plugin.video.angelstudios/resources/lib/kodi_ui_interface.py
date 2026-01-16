@@ -399,7 +399,9 @@ class KodiUIInterface:
                             self._apply_progress_bar(list_item, watch_position, duration)
 
                     # Create URL for seasons listing
-                    season_id_for_url = season_map.get(episode.get("guid", ""), season_for_sort["id"] if season_for_sort else None)
+                    season_id_for_url = season_map.get(
+                        episode.get("guid", ""), season_for_sort["id"] if season_for_sort else None
+                    )
                     url = self.create_plugin_url(
                         base_url=self.kodi_url,
                         action="play_episode" if episode_available else "info",
@@ -1224,125 +1226,112 @@ class KodiUIInterface:
         return mapping.get(quality_value, {"mode": "auto", "target_height": None})
 
     def _process_attributes_to_infotags(self, list_item, info_dict):
-        """
-        Set VideoInfoTag attributes from a dictionary using known setters.
-        Only sets attributes present in the info_dict.
-        """
+        """Set VideoInfoTag attributes using direct dictionary access."""
+        timing_start = time.perf_counter()
         self.log.info(f"Processing attributes for list item: {list_item.getLabel()}")
         self.log.debug(f"Attribute dict: {info_dict}")
         info_tag = list_item.getVideoInfoTag()
-        mapping = {
-            "media_type": info_tag.setMediaType,
-            "name": info_tag.setTitle,
-            "theaterDescription": info_tag.setPlot,
-            "description": info_tag.setPlot,
-            "year": info_tag.setYear,
-            "genres": info_tag.setGenres,
-            "contentRating": info_tag.setMpaa,
-            "original_title": info_tag.setOriginalTitle,
-            "sort_title": info_tag.setSortTitle,
-            "tagline": info_tag.setTagLine,
-            "duration": info_tag.setDuration,
-            "cast": info_tag.setCast,
-            "episode": info_tag.setEpisode,
-            "episodeNumber": info_tag.setEpisode,
-            "season": info_tag.setSeason,
-            "seasonNumber": info_tag.setSeason,
-            "tvshowtitle": info_tag.setTvShowTitle,
-            "premiered": info_tag.setPremiered,
-            "rating": info_tag.setRating,
-            "votes": info_tag.setVotes,
-            "trailer": info_tag.setTrailer,
-            "playcount": info_tag.setPlaycount,
-            "unique_ids": info_tag.setUniqueIDs,
-            "imdbnumber": info_tag.setIMDBNumber,
-            "dateadded": info_tag.setDateAdded,
-        }
-        art_dict = {}
 
-        for key, value in info_dict.items():
-            self.log.debug(f"Processing key: {key} with value: '{value}'")
-            # Handle metadata keys that have setters
-            if key == "metadata":
-                for meta_key, meta_value in value.items():
-                    if meta_key in mapping and meta_value:
-                        mapping[meta_key](meta_value)
-            elif key == "cast" and isinstance(value, list):
-                # Validate and filter cast entries
-                valid_actors = []
-                for actor_entry in value:
-                    if not isinstance(actor_entry, dict):
-                        continue
-                    name = actor_entry.get("name")
-                    if name and isinstance(name, str) and name.strip():
-                        try:
-                            valid_actors.append(xbmc.Actor(name=name.strip()))
-                        except Exception:
-                            pass
-                if valid_actors:
-                    info_tag.setCast(valid_actors)
-            # Handle artwork
-            elif "Cloudinary" in key and value:
-                if key in ["discoveryPosterCloudinaryPath", "posterCloudinaryPath"]:
-                    art_dict["poster"] = self.angel_interface.get_cloudinary_url(value)
-                elif key in [
-                    "discoveryPosterLandscapeCloudinaryPath",
-                    "posterLandscapeCloudinaryPath",
-                ]:
-                    art_dict["landscape"] = self.angel_interface.get_cloudinary_url(value)
-                    art_dict["fanart"] = self.angel_interface.get_cloudinary_url(value)
-                elif key == "logoCloudinaryPath":
-                    art_dict["logo"] = self.angel_interface.get_cloudinary_url(value)
-                    art_dict["clearlogo"] = self.angel_interface.get_cloudinary_url(value)
-                    art_dict["icon"] = self.angel_interface.get_cloudinary_url(value)
-                else:
-                    self.log.info(f"Unknown Cloudinary key: {key}, skipping")
-            elif key in ("portraitStill1", "portraitStill2") and isinstance(value, dict):
-                cp = value.get("cloudinaryPath")
+        # Direct attribute setting
+        if info_dict.get("name"):
+            info_tag.setTitle(info_dict["name"])
+        if info_dict.get("description"):
+            info_tag.setPlot(info_dict["description"])
+        if info_dict.get("theaterDescription"):
+            info_tag.setPlot(info_dict["theaterDescription"])
+        if info_dict.get("duration"):
+            info_tag.setDuration(info_dict["duration"])
+        if info_dict.get("episodeNumber"):
+            info_tag.setEpisode(info_dict["episodeNumber"])
+        if info_dict.get("seasonNumber") is not None and info_dict["seasonNumber"] != 0:
+            info_tag.setSeason(info_dict["seasonNumber"])
+        if info_dict.get("media_type"):
+            info_tag.setMediaType(info_dict["media_type"])
+
+        # Handle nested metadata
+        metadata = info_dict.get("metadata", {})
+        if metadata.get("contentRating"):
+            info_tag.setMpaa(metadata["contentRating"])
+        if metadata.get("genres"):
+            info_tag.setGenres(metadata["genres"])
+
+        # Handle cast
+        cast_list = info_dict.get("cast")
+        if isinstance(cast_list, list):
+            valid_actors = []
+            for actor_entry in cast_list:
+                if not isinstance(actor_entry, dict):
+                    continue
+                name = actor_entry.get("name")
+                if name and isinstance(name, str) and name.strip():
+                    try:
+                        valid_actors.append(xbmc.Actor(name=name.strip()))
+                    except Exception:
+                        pass
+            if valid_actors:
+                info_tag.setCast(valid_actors)
+
+        # Handle nested season
+        season_dict = info_dict.get("season")
+        if isinstance(season_dict, dict):
+            season_num = season_dict.get("seasonNumber")
+            if season_num is not None:
+                info_tag.setSeason(season_num)
+
+        # Skip nested source and watchPosition - handled elsewhere
+
+        # Handle artwork with URL reuse
+        art_dict = {}
+        poster_path = info_dict.get("discoveryPosterCloudinaryPath") or info_dict.get("posterCloudinaryPath")
+        if poster_path:
+            art_dict["poster"] = self.angel_interface.get_cloudinary_url(poster_path)
+
+        landscape_path = info_dict.get("discoveryPosterLandscapeCloudinaryPath") or info_dict.get(
+            "posterLandscapeCloudinaryPath"
+        )
+        if landscape_path:
+            url = self.angel_interface.get_cloudinary_url(landscape_path)
+            art_dict["landscape"] = url
+            art_dict["fanart"] = url
+
+        logo_path = info_dict.get("logoCloudinaryPath")
+        if logo_path:
+            url = self.angel_interface.get_cloudinary_url(logo_path)
+            art_dict["logo"] = url
+            art_dict["clearlogo"] = url
+            art_dict["icon"] = url
+
+        # Handle stills
+        for still_key in ("portraitStill1", "portraitStill2", "portraitTitleImage"):
+            still_dict = info_dict.get(still_key)
+            if isinstance(still_dict, dict):
+                cp = still_dict.get("cloudinaryPath")
                 if cp:
-                    self.log.debug(f"[ART] Using {key}: {cp}")
+                    if still_key == "portraitTitleImage":
+                        self.log.debug(f"[ART] direct portraitTitleImage: {still_dict}")
+                        self.log.debug(f"[ART] Using direct portraitTitleImage: {cp}")
+                    else:
+                        self.log.debug(f"[ART] Using {still_key}: {cp}")
                     url = self.angel_interface.get_cloudinary_url(cp)
                     art_dict.setdefault("poster", url)
                     art_dict.setdefault("thumb", url)
-            elif key == "portraitTitleImage" and isinstance(value, dict):
-                self.log.debug(f"[ART] direct portraitTitleImage: {value}")
-                cp = value.get("cloudinaryPath")
-                if cp:
-                    self.log.debug(f"[ART] Using direct portraitTitleImage: {cp}")
-                    url = self.angel_interface.get_cloudinary_url(cp)
-                    art_dict.setdefault("poster", url)
-                    art_dict.setdefault("thumb", url)
-            elif key in ("landscapeStill1", "landscapeStill2") and isinstance(value, dict):
-                cp = value.get("cloudinaryPath")
+
+        for still_key in ("landscapeStill1", "landscapeStill2"):
+            still_dict = info_dict.get(still_key)
+            if isinstance(still_dict, dict):
+                cp = still_dict.get("cloudinaryPath")
                 if cp:
                     url = self.angel_interface.get_cloudinary_url(cp)
                     art_dict.setdefault("landscape", url)
                     art_dict.setdefault("fanart", url)
-            elif key == "seasonNumber" and value == 0:
-                self.log.info("Season is 0, skipping season info")
-            elif key == "season" and isinstance(value, dict):
-                # Extract seasonNumber from nested season object
-                season_num = value.get("seasonNumber")
-                if season_num is not None:
-                    info_tag.setSeason(season_num)
-            elif key == "source" and isinstance(value, dict):
-                # Skip nested source objects (handled separately in playback)
-                pass  # pragma: no cover - defensive skip of nested source
-            elif key == "watchPosition" and isinstance(value, dict):
-                # Skip nested watchPosition objects (handled separately for progress)
-                pass  # pragma: no cover - defensive skip of nested watchPosition
-            elif key == "cast":
-                # Cast handled above; skip here
-                pass
-            elif key in mapping:
-                mapping[key](value)
-            else:
-                self.log.debug(f"No known processor for key: {key}, skipping")
 
-        # Set artwork if available
         if art_dict:
             self.log.debug(f"Setting artwork: {art_dict}")
             list_item.setArt(art_dict)
+
+        timing_end = (time.perf_counter() - timing_start) * 1000
+        if self._is_trace():
+            self.log.debug(f"[TIMING-TRACE] _process_attributes_to_infotags completed in {timing_end:.1f}ms")
         return
 
     def _merge_stills_into_episodes(self, episodes, project_slug):

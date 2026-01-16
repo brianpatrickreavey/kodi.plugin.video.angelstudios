@@ -474,7 +474,7 @@ def seasons_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, pr
 
         seasons_data = project_data["seasons"]
 
-# If we have multiple seasons, items should be added (seasons + All Episodes)
+        # If we have multiple seasons, items should be added (seasons + All Episodes)
         if len(seasons_data) > 1:
             assert mock_add_item.call_count == len(seasons_data) + 1
             for i, season in enumerate(seasons_data):
@@ -516,7 +516,9 @@ def seasons_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, pr
             mock_add_item.assert_not_called()
             mock_end_dir.assert_not_called()
             mock_process_attrs.assert_not_called()
-            logger_mock.info.assert_called_with(f"Single season found: {project_data['seasons'][0]['name']}, using all-episodes mode")
+            logger_mock.info.assert_called_with(
+                f"Single season found: {project_data['seasons'][0]['name']}, using all-episodes mode"
+            )
 
 
 class TestSeasonsMenu:
