@@ -189,10 +189,9 @@ class TestMergeStillsIntoEpisodesUI:
 class TestContinueWatchingCoverage:
     """Tests for continue_watching_menu edge cases."""
 
-    def test_continue_watching_episode_with_embedded_project(self, ui_interface, mock_xbmc):
+    def test_continue_watching_episode_with_embedded_project(self, ui_interface, mock_kodi_xbmcplugin):
         """Test episode with embedded project but no projectSlug."""
         ui, logger_mock, angel_interface_mock = ui_interface
-        mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
         # Episode with embedded project but missing projectSlug field
         episode = {
@@ -208,10 +207,7 @@ class TestContinueWatchingCoverage:
 
         with (
             patch.object(angel_interface_mock, "get_resume_watching", return_value=resume_data),
-            patch("xbmcplugin.setContent"),
-            patch("xbmcplugin.addDirectoryItem"),
-            patch("xbmcplugin.endOfDirectory"),
-            patch.object(ui, "_create_list_item_from_episode", return_value=mock_list_item),
+            patch.object(ui, "_create_list_item_from_episode", return_value=MagicMock()),
         ):
             ui.continue_watching_menu()
 

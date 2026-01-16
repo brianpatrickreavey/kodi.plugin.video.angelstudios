@@ -131,3 +131,4 @@ Last Updated: January 16, 2026
 
 - Step 1: Completed (TESTING.md created and committed).
 - Step 2: Completed (fixture docstrings enhanced and naming standardized to mock_*).
+- Step 3: Completed (consolidated patching patterns, e.g., replaced individual patches with mock_kodi_xbmcplugin fixture).
