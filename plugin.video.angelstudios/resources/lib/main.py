@@ -24,9 +24,9 @@ import xbmcaddon  # type: ignore
 import xbmcgui  # type: ignore
 import xbmcvfs  # type: ignore
 
-from angel_interface import AngelStudiosInterface  # noqa: E402
-from kodi_utils import KodiLogger, get_session_file  # noqa: E402
-from kodi_ui_interface import KodiUIInterface  # noqa: E402
+from angel_interface import AngelStudiosInterface
+from kodi_utils import KodiLogger, get_session_file
+from kodi_ui_interface import KodiUIInterface
 
 # Plugin constants
 URL = sys.argv[0]

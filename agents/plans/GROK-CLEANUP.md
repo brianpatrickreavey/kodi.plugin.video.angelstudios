@@ -185,7 +185,7 @@ Last Updated: January 16, 2026
 ## Phase 2 Progress Log
 
 - Step 1: Completed (moved main.py to resources/lib/, updated addon.xml, changed imports to absolute for test compatibility, all tests pass 99% coverage)
-- Step 2: Pending
+- Step 2: Completed (renamed cache TTL constants for clarity, added _project_cache_ttl() and _episode_cache_ttl() methods as placeholders, tests pass 99% coverage)
 - Step 3: Pending
 - Step 4: Pending
 - Step 5: Pending

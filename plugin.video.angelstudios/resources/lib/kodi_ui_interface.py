@@ -22,9 +22,9 @@ REDACTED = "<redacted>"
 # Cache TTL defaults (in seconds)
 # Note: Current implementation uses addon settings via _cache_ttl(); these constants
 # exist for clarity and future use without changing runtime behavior.
-DEFAULT_CACHE_TTL_PROJECTS = 3600  # 1 hour (projects menu)
+DEFAULT_CACHE_TTL_PROJECTS_MENU = 3600  # 1 hour (projects menu)
 DEFAULT_CACHE_TTL_EPISODES = 86400 * 3  # 72 hours (episodes data)
-DEFAULT_CACHE_TTL_PROJECT = 28800  # 8 hours (individual project)
+DEFAULT_CACHE_TTL_INDIVIDUAL_PROJECT = 28800  # 8 hours (individual project)
 
 angel_menu_content_mapper = {
     "movies": "movie",
@@ -680,7 +680,7 @@ class KodiUIInterface:
         """Return timedelta for current cache expiration setting.
 
         Uses addon setting `cache_expiration_hours`. Module-level TTL constants
-        (DEFAULT_CACHE_TTL_PROJECTS, DEFAULT_CACHE_TTL_EPISODES, DEFAULT_CACHE_TTL_PROJECT)
+        (DEFAULT_CACHE_TTL_PROJECTS_MENU, DEFAULT_CACHE_TTL_EPISODES, DEFAULT_CACHE_TTL_INDIVIDUAL_PROJECT)
         are provided for clarity and future specialization but are not applied here
         to avoid changing existing behavior.
         """
@@ -694,6 +694,22 @@ class KodiUIInterface:
             hours = 12
 
         return timedelta(hours=hours)
+
+    def _project_cache_ttl(self):
+        """Return timedelta for project cache expiration.
+
+        Currently uses the same global cache_expiration_hours setting.
+        Future: may use separate project_cache_hours setting.
+        """
+        return self._cache_ttl()
+
+    def _episode_cache_ttl(self):
+        """Return timedelta for episode cache expiration.
+
+        Currently uses the same global cache_expiration_hours setting.
+        Future: may use separate episode_cache_hours setting.
+        """
+        return self._cache_ttl()
 
     def _get_debug_mode(self):
         """Return debug mode string in {'off','debug','trace'}"""
