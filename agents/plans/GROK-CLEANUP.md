@@ -189,6 +189,6 @@ Last Updated: January 16, 2026
 - Step 3: Completed (removed other_content_menu placeholder from menu, method, routing, tests, and data; tests pass 99% coverage)
 - Step 4: Completed (centralized content type mappings into _get_angel_project_type() and _get_kodi_content_type() methods, updated all usages, tests pass 99% coverage)
 - Step 5: Completed (improved error handling in episodes_menu to skip bad episodes instead of failing completely, removed TODO, tests pass 99% coverage)
-- Step 6: Pending
+- Step 6: Completed (addressed remaining TODOs: removed gross mapping in seasons_menu, removed commented code in main.py, removed outdated cache TODO in angel_interface.py, tests pass 99% coverage)
 - Step 7: Pending
 - Step 8: Pending

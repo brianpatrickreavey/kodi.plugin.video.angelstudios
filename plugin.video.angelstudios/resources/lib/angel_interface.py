@@ -195,7 +195,6 @@ class AngelStudiosInterface:
 
     def get_projects(self, project_type=None):
         """Get all projects available in the catalog of the matching content type"""
-        # TODO This should be cached, since we pull it for every menu load
         try:
             self.log.info("Fetching projects using GraphQL...")
             result = self._graphql_query("getProjectsForMenu", variables={})

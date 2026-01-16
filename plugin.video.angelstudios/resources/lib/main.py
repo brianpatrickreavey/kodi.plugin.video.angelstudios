@@ -65,8 +65,6 @@ def router(paramstring):
         # Route to appropriate function
         if not params:
             # Main entry point - show main menu with fresh authentication
-            # xbmc.log("Fresh app load - forcing reauthentication", xbmc.LOGINFO) # TODO fix this
-            # angel_studios_authentication.clear_session_cache()
             ui_interface.main_menu()
         else:
             # Subsequent navigation - use existing session if available

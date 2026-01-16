@@ -274,10 +274,7 @@ class KodiUIInterface:
             self.log.info(f"Project details: {json.dumps(project, indent=2)}")
             self.log.info(f"Processing {len(project.get('seasons', []))} seasons for project: {project_slug}")
 
-            # TODO Map this, this is gross.
-            kodi_content_type = (
-                "movies" if content_type == "movies" else "tvshows" if content_type == "series" else "videos"
-            )
+            kodi_content_type = self._get_kodi_content_type(content_type)
             self.log.info(f"Setting content type for Kodi: {content_type} ({kodi_content_type})")
             xbmcplugin.setContent(self.handle, kodi_content_type)
 
