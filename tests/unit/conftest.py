@@ -274,7 +274,13 @@ def ui_interface(mock_kodi_addon, mock_logger, mock_angel_interface, mock_simple
     ui.addon = mock_kodi_addon
     ui.cache = mock_simplecache_instance
 
-    return ui, mock_logger, mock_angel_interface
+    yield ui, mock_logger, mock_angel_interface
+
+    # Teardown: reset mocks to prevent state leakage between tests
+    mock_logger.reset_mock()
+    mock_angel_interface.reset_mock()
+    mock_simplecache_instance.reset_mock()
+    mock_kodi_addon.reset_mock()
 
 
 @pytest.fixture
