@@ -223,7 +223,8 @@ class TestAngelStudioSession:
 
         email_page = MagicMock(
             status_code=200,
-            content=b"<html><input id='state' name='state' value='state2'><input name='_csrf_token' value='csrf'></html>",
+            content=b"<html><input id='state' name='state' value='state2'>"
+            b"<input name='_csrf_token' value='csrf'></html>",
         )
 
         password_response = MagicMock(

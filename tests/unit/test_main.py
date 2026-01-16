@@ -1,11 +1,10 @@
 """Unit tests for plugin main entrypoint and router."""
 
-import os
 import runpy
 import sys
 from importlib import util
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from urllib.parse import urlencode
 
 import pytest

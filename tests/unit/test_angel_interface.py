@@ -7,8 +7,8 @@ from unittest.mock import patch, MagicMock, mock_open, PropertyMock
 # Add the lib path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "resources", "lib"))
 
-from angel_interface import AngelStudiosInterface, angel_graphql_url
-from .unittest_data import MOCK_PROJECT_DATA, MOCK_EPISODE_DATA, MOCK_GRAPHQL_RESPONSE
+from angel_interface import AngelStudiosInterface, angel_graphql_url  # noqa: E402
+from .unittest_data import MOCK_PROJECT_DATA, MOCK_EPISODE_DATA, MOCK_GRAPHQL_RESPONSE  # noqa: E402
 
 
 class TestAngelStudiosInterface:

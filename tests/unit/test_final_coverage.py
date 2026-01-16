@@ -1,6 +1,5 @@
 """Final tests to achieve 100% coverage for remaining uncovered lines."""
 
-import pytest
 from unittest.mock import MagicMock, patch
 
 from resources.lib.kodi_ui_interface import KodiUIInterface

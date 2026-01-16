@@ -1,9 +1,7 @@
-import pytest
 from unittest.mock import patch, MagicMock
-from kodi_ui_interface import KodiUIInterface
+import pytest
 from .unittest_data import MOCK_PROJECT_DATA, MOCK_EPISODE_DATA
 import copy
-from datetime import timedelta
 
 
 class TestEpisodePlayback:

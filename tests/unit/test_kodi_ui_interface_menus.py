@@ -52,12 +52,12 @@ class TestMainMenu:
             call_args = mock_add_item.call_args_list[i]
 
             args = call_args[0]  # Positional args tuple
-            kwargs = call_args[1]  # Keyword args dict
+            kwargs = call_args[1]  # Keyword args dict  # noqa: F841
 
             assert args[0] == ui.handle  # handle
             assert args[1] == expected_url  # url
             assert args[2] is mock_list_item.return_value  # listitem
-            assert args[3] == True  # isFolder
+            assert args[3] is True  # isFolder
 
             # Check that ListItem was created with the correct label
             list_item_call = mock_list_item.call_args_list[i]
@@ -273,7 +273,6 @@ class TestMainMenu:
         addon.getSettingInt = MagicMock(return_value=12)
 
     def test_cache_disabled_bypasses_get_set(self, ui_interface):
-        import xbmcaddon
 
         ui, logger_mock, angel_interface_mock = ui_interface
 
@@ -365,7 +364,7 @@ def projects_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, c
         assert args[0] == 1  # handle
         assert project["slug"] in args[1]  # url
         assert args[2] is mock_list_item.return_value  # listitem
-        assert args[3] == True  # isFolder
+        assert args[3] is True  # isFolder
 
         list_item_call = mock_list_item.call_args_list[i]
         assert list_item_call[1]["label"] == project["name"]
@@ -490,7 +489,7 @@ def seasons_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, pr
             assert "episodes_menu" in kwargs[1]  # url contains action
             assert str(season["id"]) in kwargs[1]  # url contains season_id
             assert kwargs[2] is mock_list_item.return_value  # listitem
-            assert kwargs[3] == True  # isFolder
+            assert kwargs[3] is True  # isFolder
 
             # Check ListItem creation
             list_item_call = mock_list_item.call_args_list[i]
@@ -545,7 +544,7 @@ class TestSeasonsMenu:
             assert result is None
 
             # Ensure cache was checked
-            ui.cache.get.assert_any_call(f"project_nonexistent-project")
+            ui.cache.get.assert_any_call("project_nonexistent-project")
 
             # Ensure get_project was called
             angel_interface_mock.get_project.assert_called_once_with("nonexistent-project")
@@ -649,7 +648,7 @@ def episodes_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, p
             else:
                 assert "info" in args[1]
             assert args[2] is mock_create_item.return_value  # listitem
-            assert args[3] == False  # isFolder
+            assert args[3] is False  # isFolder
 
             # Check _create_list_item_from_episode calls
             mock_create_item.assert_any_call(
@@ -744,11 +743,11 @@ class TestEpisodesMenu:
         angel_interface_mock.get_project.return_value = project_data
 
         with (
-            patch.object(ui, "_create_list_item_from_episode") as mock_create_item,
-            patch("xbmcplugin.setContent") as mock_set_content,
+            patch.object(ui, "_create_list_item_from_episode") as mock_create_item,  # noqa: F841
+            patch("xbmcplugin.setContent") as mock_set_content,  # noqa: F841
             patch("xbmcplugin.addSortMethod") as mock_add_sort,
-            patch("xbmcplugin.SORT_METHOD_EPISODE") as mock_episode_sort,
-            patch("xbmcplugin.SORT_METHOD_VIDEO_SORT_TITLE") as mock_title_sort,
+            patch("xbmcplugin.SORT_METHOD_EPISODE") as mock_episode_sort,  # noqa: F841
+            patch("xbmcplugin.SORT_METHOD_VIDEO_SORT_TITLE") as mock_title_sort,  # noqa: F841
             patch("xbmcplugin.SORT_METHOD_LABEL") as mock_label_sort,
         ):
             ui.episodes_menu(content_type="series", project_slug=project_data["slug"], season_id=season["id"])

@@ -4,8 +4,6 @@ import sys
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 import resources.lib.kodi_utils as kodi_utils
 
 

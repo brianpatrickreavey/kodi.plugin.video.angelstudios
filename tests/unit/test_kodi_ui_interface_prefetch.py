@@ -2,13 +2,7 @@
 Unit tests for prefetch functionality in Kodi UI Interface class.
 """
 
-import pytest
-from unittest.mock import MagicMock, patch, call
-from datetime import timedelta
-
-from resources.lib.kodi_ui_interface import KodiUIInterface
-
-from .unittest_data import MOCK_PROJECTS_DATA, MOCK_PROJECT_DATA, MOCK_EPISODE_DATA
+from unittest.mock import MagicMock, patch
 
 
 class TestDeferredPrefetchProject:

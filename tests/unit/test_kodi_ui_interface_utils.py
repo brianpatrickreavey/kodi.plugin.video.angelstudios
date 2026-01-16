@@ -278,7 +278,7 @@ class TestUtils:
         mock_info_tag.setTitle.assert_called_with("Test Episode")
         mock_info_tag.setMediaType.assert_called_with("episode")
         # Verify no error logged (source was quietly skipped)
-        logger_mock.info.assert_any_call(f"Processing attributes for list item: Test Episode")
+        logger_mock.info.assert_any_call("Processing attributes for list item: Test Episode")
 
     def test_process_attributes_to_infotags_with_nested_watchposition_dict(self, ui_interface, mock_xbmc):
         """Test _process_attributes_to_infotags skips nested watchPosition dict."""
@@ -302,7 +302,7 @@ class TestUtils:
         mock_info_tag.setTitle.assert_called_with("Test Episode")
         mock_info_tag.setMediaType.assert_called_with("episode")
         # Verify no error logged (watchPosition was quietly skipped)
-        logger_mock.info.assert_any_call(f"Processing attributes for list item: Test Episode")
+        logger_mock.info.assert_any_call("Processing attributes for list item: Test Episode")
 
     def test_show_error(self, ui_interface, mock_xbmc):
         """Test show_error displays an error dialog."""
