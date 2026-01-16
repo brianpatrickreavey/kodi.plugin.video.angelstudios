@@ -7,31 +7,40 @@ from unittest.mock import MagicMock, patch
 class TestMergeStillsIntoEpisodesUI:
     """Tests for _merge_stills_into_episodes in KodiUIInterface."""
 
-    def test_merge_with_no_cache(self, ui_interface):
-        """Test _merge_stills_into_episodes with no cached project data. (Coverage for cache miss path)."""
+    @pytest.mark.parametrize(
+        "cache_return, expected_log_call",
+        [
+            (None, ("debug", "No cached project for test-slug, skipping STILL merge")),
+            ({"title": {"__typename": "NotContentSeries"}}, ("debug", "No ContentSeries data in project test-slug")),
+        ],
+    )
+    def test_merge_stills_edge_cases(self, ui_interface, cache_return, expected_log_call):
+        """Test _merge_stills_into_episodes edge cases. (Coverage for cache miss and invalid data)."""
         ui, logger_mock, _ = ui_interface
         episodes = [{"id": "ep1", "guid": "g1"}]
 
-        ui.cache.get.return_value = None
-
-        result = ui._merge_stills_into_episodes(episodes, "test-slug")
-
-        print("Result:", result)
-        assert result == episodes
-        logger_mock.debug.assert_any_call("No cached project for test-slug, skipping STILL merge")
-
-    def test_merge_with_no_contentseries_data(self, ui_interface):
-        """Test _merge_stills_into_episodes with project lacking ContentSeries data. (Coverage for non-ContentSeries typename)."""
-        ui, logger_mock, _ = ui_interface
-        episodes = [{"id": "ep1", "guid": "g1"}]
-        project = {"title": {"__typename": "NotContentSeries"}}
-
-        ui.cache.get.return_value = project
+        if cache_return is None:
+            ui.cache.get.return_value = None
+        else:
+            ui.cache.get.return_value = cache_return
 
         result = ui._merge_stills_into_episodes(episodes, "test-slug")
 
         assert result == episodes
-        logger_mock.debug.assert_any_call("No ContentSeries data in project test-slug")
+        log_level, log_msg = expected_log_call
+        getattr(logger_mock, log_level).assert_any_call(log_msg)
+
+    def test_merge_handles_exception(self, ui_interface):
+        """Test _merge_stills_into_episodes exception handling. (Coverage for error path in STILL merge)."""
+        ui, logger_mock, _ = ui_interface
+        episodes = [{"id": "ep1"}]
+
+        ui.cache.get.side_effect = Exception("Cache error")
+
+        result = ui._merge_stills_into_episodes(episodes, "test-slug")
+
+        assert result == episodes
+        logger_mock.error.assert_called()
 
     def test_merge_stills_success(self, ui_interface):
         ui, logger_mock, angel_interface_mock = ui_interface
@@ -88,18 +97,6 @@ class TestMergeStillsIntoEpisodesUI:
         assert "portraitStill1" not in result[1]
         logger_mock.info.assert_any_call("Merging ContentSeries STILLs from 1 episodes into 2 episodes")
 
-    def test_merge_handles_exception(self, ui_interface):
-        """Test _merge_stills_into_episodes exception handling. (Coverage for error path in STILL merge)."""
-        ui, logger_mock, _ = ui_interface
-        episodes = [{"id": "ep1"}]
-
-        ui.cache.get.side_effect = Exception("Cache error")
-
-        result = ui._merge_stills_into_episodes(episodes, "test-slug")
-
-        assert result == episodes
-        logger_mock.error.assert_called()
-
     def test_merge_skips_none_episode(self, ui_interface):
         ui, logger_mock, angel_interface_mock = ui_interface
         episodes = [None, {"id": "ep1", "displayName": "Episode 1"}]
@@ -154,39 +151,40 @@ class TestMergeStillsIntoEpisodesUI:
         assert result[1]["portraitStill1"] == {"cloudinaryPath": "portrait1.jpg"}
         assert result[1]["landscapeStill1"] == {"cloudinaryPath": "landscape1.jpg"}
 
-    def test_normalize_contentseries_episode_with_none(self, ui_interface):
-        """Test _normalize_contentseries_episode with None input."""
+    @pytest.mark.parametrize(
+        "input_data, expected",
+        [
+            (None, {}),
+            ("not a dict", {}),
+            (123, {}),
+            (
+                {
+                    "id": "ep1",
+                    "name": "Episode 1",
+                    "subtitle": "Subtitle",
+                    "description": "Description",
+                    "episodeNumber": 5,
+                    "portraitStill1": {"cloudinaryPath": "portrait1.jpg"},
+                    "landscapeStill2": {"cloudinaryPath": "landscape2.jpg"},
+                    "extraField": "should be ignored",
+                },
+                {
+                    "id": "ep1",
+                    "name": "Episode 1",
+                    "subtitle": "Subtitle",
+                    "description": "Description",
+                    "episodeNumber": 5,
+                    "portraitStill1": {"cloudinaryPath": "portrait1.jpg"},
+                    "landscapeStill2": {"cloudinaryPath": "landscape2.jpg"},
+                },
+            ),
+        ],
+    )
+    def test_normalize_contentseries_episode(self, ui_interface, input_data, expected):
+        """Test _normalize_contentseries_episode with various inputs. (Coverage for input validation)."""
         ui, logger_mock, _ = ui_interface
-        result = ui._normalize_contentseries_episode(None)
-        assert result == {}
-
-    def test_normalize_contentseries_episode_with_non_dict(self, ui_interface):
-        """Test _normalize_contentseries_episode with non-dict input."""
-        ui, logger_mock, _ = ui_interface
-        result = ui._normalize_contentseries_episode("not a dict")
-        assert result == {}
-        result = ui._normalize_contentseries_episode(123)
-        assert result == {}
-
-    def test_normalize_contentseries_episode_with_valid_data(self, ui_interface):
-        """Test _normalize_contentseries_episode with valid episode data."""
-        ui, logger_mock, _ = ui_interface
-        episode = {
-            "id": "ep1",
-            "name": "Episode 1",
-            "subtitle": "Subtitle",
-            "description": "Description",
-            "episodeNumber": 5,
-            "portraitStill1": {"cloudinaryPath": "portrait1.jpg"},
-            "landscapeStill2": {"cloudinaryPath": "landscape2.jpg"},
-            "extraField": "should be ignored",
-        }
-        result = ui._normalize_contentseries_episode(episode)
-        assert result["id"] == "ep1"
-        assert result["name"] == "Episode 1"
-        assert result["portraitStill1"] == {"cloudinaryPath": "portrait1.jpg"}
-        assert result["landscapeStill2"] == {"cloudinaryPath": "landscape2.jpg"}
-        assert "extraField" not in result
+        result = ui._normalize_contentseries_episode(input_data)
+        assert result == expected
 
 
 class TestContinueWatchingCoverage:
