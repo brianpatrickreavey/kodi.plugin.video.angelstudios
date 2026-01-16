@@ -197,7 +197,7 @@ class KodiUIInterface:
             else:
                 self.log.info(f"Fetching projects from AngelStudiosInterface for content type: {content_type}")
                 projects = self.angel_interface.get_projects(
-                    project_type=angel_menu_content_mapper.get(content_type, "videos")
+                    project_type=self._get_angel_project_type(content_type)
                 )
                 if cache_enabled:
                     self.cache.set(cache_key, projects, expiration=self._cache_ttl())
@@ -227,7 +227,7 @@ class KodiUIInterface:
                 # Create list item
                 list_item = xbmcgui.ListItem(label=project["name"])
                 info_tag = list_item.getVideoInfoTag()
-                info_tag.setMediaType(kodi_content_mapper.get(project["projectType"], "video"))
+                info_tag.setMediaType(self._get_kodi_content_type(project["projectType"]))
                 self._process_attributes_to_infotags(list_item, project)
 
                 # Create URL for seasons listing
@@ -258,7 +258,7 @@ class KodiUIInterface:
 
         except Exception as e:
             self.log.error(f"Error listing {content_type}: {e}")
-            self.show_error(f"Failed to load {angel_menu_content_mapper.get(content_type)}: {str(e)}")
+            self.show_error(f"Failed to load {self._get_angel_project_type(content_type)}: {str(e)}")
             raise e
 
     def seasons_menu(self, content_type, project_slug):
@@ -291,7 +291,7 @@ class KodiUIInterface:
                     # Create list item
                     list_item = xbmcgui.ListItem(label=season["name"])
                     info_tag = list_item.getVideoInfoTag()
-                    info_tag.setMediaType(kodi_content_mapper.get(content_type, "video"))
+                    info_tag.setMediaType(self._get_kodi_content_type(content_type))
                     self._process_attributes_to_infotags(list_item, season)
 
                     # Create URL for seasons listing
@@ -698,6 +698,14 @@ class KodiUIInterface:
         Future: may use separate episode_cache_hours setting.
         """
         return self._cache_ttl()
+
+    def _get_angel_project_type(self, menu_content_type):
+        """Map menu content type to Angel Studios project type for API calls."""
+        return angel_menu_content_mapper.get(menu_content_type, "videos")
+
+    def _get_kodi_content_type(self, content_type):
+        """Map content type to Kodi media type for info tags."""
+        return kodi_content_mapper.get(content_type, "video")
 
     def _get_debug_mode(self):
         """Return debug mode string in {'off','debug','trace'}"""
@@ -1156,7 +1164,7 @@ class KodiUIInterface:
             if project:
                 info_tag.setTvShowTitle(project.get("name"))
         else:
-            info_tag.setMediaType(kodi_content_mapper.get(content_type, "video"))
+            info_tag.setMediaType(self._get_kodi_content_type(content_type))
             info_tag.setTitle(episode_subtitle)
 
         return list_item
