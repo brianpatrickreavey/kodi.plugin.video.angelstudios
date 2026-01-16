@@ -196,9 +196,7 @@ class KodiUIInterface:
                 self.log.info(f"Using cached projects for content type: {content_type}")
             else:
                 self.log.info(f"Fetching projects from AngelStudiosInterface for content type: {content_type}")
-                projects = self.angel_interface.get_projects(
-                    project_type=self._get_angel_project_type(content_type)
-                )
+                projects = self.angel_interface.get_projects(project_type=self._get_angel_project_type(content_type))
                 if cache_enabled:
                     self.cache.set(cache_key, projects, expiration=self._cache_ttl())
             try:
