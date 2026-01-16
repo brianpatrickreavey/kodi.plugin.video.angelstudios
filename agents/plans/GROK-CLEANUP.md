@@ -71,6 +71,8 @@ This cleanup plan focuses on Phase 0 quick wins to establish a clean baseline be
 - Step 3: Completed (verified absolute imports are correct).
 - Step 4: Completed (verified Kodi-agnostic).
 - Step 5: Completed (verified Kodi-agnostic).
+- Step 6: Completed (no unused vars found).
+- Step 7: Completed (no long line found).
 
 Author: Grok
 Last Updated: January 16, 2026
