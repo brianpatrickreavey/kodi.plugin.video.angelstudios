@@ -212,7 +212,7 @@ class TestMainLine122:
                 # Run main as __main__ - this triggers line 122
                 try:
                     runpy.run_path(
-                        "/home/bpreavey/Code/kodi.plugin.video.angelstudios/plugin.video.angelstudios/main.py",
+                        "/home/bpreavey/Code/kodi.plugin.video.angelstudios/plugin.video.angelstudios/resources/lib/main.py",
                         run_name="__main__",
                     )
                 except SystemExit:

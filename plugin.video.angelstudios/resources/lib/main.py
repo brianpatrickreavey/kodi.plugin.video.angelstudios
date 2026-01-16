@@ -24,9 +24,6 @@ import xbmcaddon  # type: ignore
 import xbmcgui  # type: ignore
 import xbmcvfs  # type: ignore
 
-# Add resources/lib to path (ignore E402 for import order)
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "resources/lib"))
-
 from angel_interface import AngelStudiosInterface  # noqa: E402
 from kodi_utils import KodiLogger, get_session_file  # noqa: E402
 from kodi_ui_interface import KodiUIInterface  # noqa: E402

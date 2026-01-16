@@ -138,3 +138,57 @@ Last Updated: January 16, 2026
 - Step 7: Completed (expanded parametrization for edge cases, e.g., combined normalize_contentseries_episode tests and merge edge cases).
 - Step 8: Completed (created tests/unit/README.md with fixture usage and mocking conventions).
 - Step 9: Completed (final validation passed: 344 tests, 99% coverage, black and flake8 clean).
+
+---
+
+## Phase 2: Code Refinement
+
+**Status:** Planning Complete, Ready for Implementation
+
+**Scope:** Refine code for maintainability, consistency, and tooling support through targeted improvements without behavioral changes.
+
+**Risk Profile:** Low risk (structural and cleanup changes).
+
+**Timeline Estimate:** 4–6 hours
+
+**Success Criteria:**
+1. Restructure main.py completed and pyright issues resolved.
+2. Cache TTLs clarified/implemented.
+3. Placeholders removed.
+4. Mappings centralized.
+5. Error handling improved.
+6. TODOs addressed.
+7. Minor refinements applied.
+8. 100% test coverage maintained.
+9. Code passes black + flake8.
+
+**Implementation Steps:**
+
+1. **Restructure main.py for consistent Kodi imports**: Move [main.py](plugin.video.angelstudios/main.py) to [resources/lib/main.py](plugin.video.angelstudios/resources/lib/main.py), update [addon.xml](plugin.video.angelstudios/addon.xml) with `library="resources/lib/main.py"` and add `<extension point="xbmc.python.module" library="resources/lib/"/>`, convert imports to relative (e.g., `from .angel_interface import AngelStudiosInterface`), remove `sys.path.insert`. Commit "refactor: restructure main.py into resources/lib/ for consistent Kodi imports (Phase 2 Step 1)".
+
+2. **Review and potentially implement differentiated cache TTLs**: Clarify naming (e.g., rename `DEFAULT_CACHE_TTL_PROJECTS` to `DEFAULT_CACHE_TTL_PROJECTS_MENU`) and consider adding separate settings for project/episode TTLs (e.g., `project_cache_hours`, `episode_cache_hours`) with new `_project_cache_ttl()` and `_episode_cache_ttl()` methods. Keeps constants as placeholders for future use. Commit "refactor: clarify cache TTL constants and prepare for differentiated TTLs (Phase 2 Step 2)".
+
+3. **Remove other_content_menu placeholder**: Eliminate the unused `other_content_menu` method and related menu definition, as it's not functional and clutters the UI. Commit "refactor: remove other_content_menu placeholder (Phase 2 Step 3)".
+
+4. **Centralize content type mappings**: Consolidate `angel_menu_content_mapper` and `kodi_content_mapper` into a single, shared utility or method to reduce duplication and improve maintainability. Commit "refactor: centralize content type mappings (Phase 2 Step 4)".
+
+5. **Improve error handling for episodes**: Update `episodes_menu` to skip bad/unavailable episodes instead of failing completely, per the TODO comment. Commit "refactor: improve error handling in episodes_menu to skip bad episodes (Phase 2 Step 5)".
+
+6. **Address remaining TODOs**: Resolve minor TODOs in code (e.g., "Map this, this is gross" in `seasons_menu` for content type mapping). Commit "refactor: address remaining TODOs in code (Phase 2 Step 6)".
+
+7. **Minor refinements**: Remove any unused imports/code, ensure consistent logging, and validate with `make unittest-with-coverage` for 100% coverage. Commit "refactor: apply minor refinements and cleanup (Phase 2 Step 7)".
+
+8. **Final validation**: Run all commands, tag phase-2-complete. Commit "Phase 2 complete: code refinement applied".
+
+---
+
+## Phase 2 Progress Log
+
+- Step 1: Completed (moved main.py to resources/lib/, updated addon.xml, changed imports to absolute for test compatibility, all tests pass 99% coverage)
+- Step 2: Pending
+- Step 3: Pending
+- Step 4: Pending
+- Step 5: Pending
+- Step 6: Pending
+- Step 7: Pending
+- Step 8: Pending

@@ -11,7 +11,7 @@ import pytest
 
 from .unittest_data import ROUTER_DISPATCH_CASES
 
-MAIN_PATH = Path(__file__).resolve().parents[2] / "plugin.video.angelstudios" / "main.py"
+MAIN_PATH = Path(__file__).resolve().parents[2] / "plugin.video.angelstudios" / "resources" / "lib" / "main.py"
 RES_LIB = MAIN_PATH.parent / "resources" / "lib"
 
 

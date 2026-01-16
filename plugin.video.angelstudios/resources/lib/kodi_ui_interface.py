@@ -59,6 +59,8 @@ class KodiUIInterface:
         addon_path = xbmcvfs.translatePath(self.addon.getAddonInfo("path"))
         self.default_icon = os.path.join(addon_path, "resources", "images", "icons", "Angel_Studios_Logo.png")
         self.default_settings_icon = "DefaultAddonService.png"
+
+        # Trace directory setup
         profile_path = xbmcvfs.translatePath(self.addon.getAddonInfo("profile"))
         self.trace_dir = os.path.join(profile_path, "temp")
 
@@ -147,6 +149,496 @@ class KodiUIInterface:
         }
 
         self.menu_items = []
+
+    def main_menu(self):
+        """Show the main menu with content type options"""
+
+        # Rebuild menu items to reflect current settings
+        self._load_menu_items()
+
+        # Create directory items for each menu option
+        for item in self.menu_items:
+            # Create list item
+            list_item = xbmcgui.ListItem(label=item["label"])
+
+            if item.get("icon"):
+                list_item.setArt({"icon": item["icon"], "thumb": item["icon"]})
+
+            # Set info tags
+            info_tag = list_item.getVideoInfoTag()
+            info_tag.setPlot(item["description"])
+
+            # Create URL
+            self.log.debug(f"Creating URL for action: {item['action']}, content_type: {item['content_type']}")
+            url = self.create_plugin_url(
+                base_url=self.kodi_url,
+                action=item["action"],
+                content_type=item["content_type"],
+            )
+
+            # Add to directory
+            xbmcplugin.addDirectoryItem(self.handle, url, list_item, True)
+
+        # Finish directory
+        xbmcplugin.endOfDirectory(self.handle)
+
+    def projects_menu(self, content_type=""):
+        """Display a menu of projects based on content type, with persistent caching."""
+        try:
+            self.log.info("Fetching projects from AngelStudiosInterface...")
+
+            cache_key = f"projects_{content_type or 'all'}"
+            cache_enabled = self._cache_enabled()
+            projects = None
+            if cache_enabled:
+                projects = self.cache.get(cache_key)
+                if projects:
+                    self.log.debug(f"Cache hit for {cache_key}")
+                else:
+                    self.log.debug(f"Cache miss for {cache_key}")
+            else:
+                self.log.debug("Cache disabled; bypassing projects cache")
+
+            if projects:
+                self.log.info(f"Using cached projects for content type: {content_type}")
+            else:
+                self.log.info(f"Fetching projects from AngelStudiosInterface for content type: {content_type}")
+                projects = self.angel_interface.get_projects(
+                    project_type=angel_menu_content_mapper.get(content_type, "videos")
+                )
+                if cache_enabled:
+                    self.cache.set(cache_key, projects, expiration=self._cache_ttl())
+            try:
+                self.log.info(f"Projects: {json.dumps(projects, indent=2)}")
+            except TypeError:
+                self.log.info(f"Projects: <non-serializable type {type(projects).__name__}>")
+
+            if not projects:
+                self.show_error(f"No projects found for content type: {content_type}")
+                return
+
+            self.log.info(
+                f"Processing {len(projects)} '{content_type if content_type else 'all content type'}' projects"
+            )
+
+            # Set content type for the plugin
+            kodi_content_type = (
+                "movies" if content_type == "movies" else "tvshows" if content_type == "series" else "videos"
+            )
+            xbmcplugin.setContent(self.handle, kodi_content_type)
+            # Create list items for each project
+            for project in projects:
+                self.log.info(f"Processing project: {project['name']}")
+                self.log.debug(f"Project dictionary: {json.dumps(project, indent=2)}")
+
+                # Create list item
+                list_item = xbmcgui.ListItem(label=project["name"])
+                info_tag = list_item.getVideoInfoTag()
+                info_tag.setMediaType(kodi_content_mapper.get(project["projectType"], "video"))
+                self._process_attributes_to_infotags(list_item, project)
+
+                # Create URL for seasons listing
+                url = self.create_plugin_url(
+                    base_url=self.kodi_url,
+                    action="seasons_menu",
+                    content_type=content_type,
+                    project_slug=project["slug"],
+                )
+
+                # Add to directory
+                xbmcplugin.addDirectoryItem(self.handle, url, list_item, True)
+
+            xbmcplugin.addSortMethod(self.handle, xbmcplugin.SORT_METHOD_LABEL)
+
+            try:
+                enable_prefetch = self.addon.getSettingBool("enable_prefetch")
+                if enable_prefetch:
+                    max_count = self.addon.getSettingInt("prefetch_project_count") or 5
+                    if max_count <= 0:
+                        max_count = 5
+                    slugs = [p.get("slug") for p in projects if p.get("slug")]
+                    self._deferred_prefetch_project(slugs, max_count)
+            except Exception as exc:
+                self.log.warning(f"prefetch settings read failed; skipping prefetch: {exc}")
+
+            xbmcplugin.endOfDirectory(self.handle)
+
+        except Exception as e:
+            self.log.error(f"Error listing {content_type}: {e}")
+            self.show_error(f"Failed to load {angel_menu_content_mapper.get(content_type)}: {str(e)}")
+            raise e
+
+    def seasons_menu(self, content_type, project_slug):
+        """Display a menu of seasons for a specific project, with persistent caching."""
+        self.log.info(f"Fetching seasons for project: {project_slug}")
+        try:
+            self.log.info(f"Fetching seasons for project: {project_slug}")
+            project = self._get_project(project_slug)
+            if not project:
+                self.log.error(f"Project not found: {project_slug}")
+                self.show_error(f"Project not found: {project_slug}")
+                return
+            self.log.info(f"Project details: {json.dumps(project, indent=2)}")
+            self.log.info(f"Processing {len(project.get('seasons', []))} seasons for project: {project_slug}")
+
+            # TODO Map this, this is gross.
+            kodi_content_type = (
+                "movies" if content_type == "movies" else "tvshows" if content_type == "series" else "videos"
+            )
+            self.log.info(f"Setting content type for Kodi: {content_type} ({kodi_content_type})")
+            xbmcplugin.setContent(self.handle, kodi_content_type)
+
+            if len(project.get("seasons", [])) == 1:
+                self.log.info(f"Single season found: {project['seasons'][0]['name']}")
+                self.episodes_menu(content_type, project["slug"], season_id=project["seasons"][0]["id"])
+            else:
+                for season in project.get("seasons", []):
+                    self.log.info(f"Processing season: {season['name']}")
+                    self.log.debug(f"Season dictionary: {json.dumps(season, indent=2)}")
+                    # Create list item
+                    list_item = xbmcgui.ListItem(label=season["name"])
+                    info_tag = list_item.getVideoInfoTag()
+                    info_tag.setMediaType(kodi_content_mapper.get(content_type, "video"))
+                    self._process_attributes_to_infotags(list_item, season)
+
+                    # Create URL for seasons listing
+                    url = self.create_plugin_url(
+                        base_url=self.kodi_url,
+                        action="episodes_menu",
+                        content_type=content_type,
+                        project_slug=project_slug,
+                        season_id=season["id"],
+                    )
+
+                    xbmcplugin.addDirectoryItem(self.handle, url, list_item, True)
+
+                xbmcplugin.addSortMethod(self.handle, xbmcplugin.SORT_METHOD_LABEL)
+                xbmcplugin.endOfDirectory(self.handle)
+
+            return True
+
+        except Exception as e:
+            self.log.error(f"Error fetching project {project_slug}: {e}")
+            self.show_error(f"Error fetching project {project_slug}: {str(e)}")
+            return False
+
+    def episodes_menu(self, content_type, project_slug, season_id=None):
+        """Display a menu of episodes for a specific season, with persistent caching."""
+        self.log.info(f"Fetching episodes for project: {project_slug}, season: {season_id}")
+        try:
+            project = self._get_project(project_slug)
+            if not project:
+                self.log.error(f"Project not found: {project_slug}")
+                self.show_error(f"Project not found: {project_slug}")
+                return
+
+            # If season_id is None, use first season (all-seasons mode)
+            # Else find the specified season
+            if season_id is None and project.get("seasons"):
+                season = project["seasons"][0]
+            else:
+                season = next(
+                    (s for s in project.get("seasons", []) if s.get("id") == season_id),
+                    None,
+                )
+            if not season:
+                self.log.error(f"Season not found: {season_id}")
+                self.show_error(f"Season not found: {season_id}")
+                return
+
+            episode_count = len(season.get("episodes", []))
+            self.log.info(f"Processing {episode_count} episodes for project: {project_slug}, season: {season_id}")
+            kodi_content_type = (
+                "movies" if content_type == "movies" else "tvshows" if content_type == "series" else "videos"
+            )
+            self.log.info(f"Setting content type for Kodi: {content_type} ({kodi_content_type})")
+            xbmcplugin.setContent(self.handle, kodi_content_type)
+
+            episodes_list = season.get("episodes", [])
+            for idx, episode in enumerate(episodes_list):
+                episode_available = bool(episode.get("source"))
+                list_item = self._create_list_item_from_episode(
+                    episode,
+                    project=project,
+                    content_type=content_type,
+                    stream_url=None,
+                    is_playback=False,
+                )
+
+                # Apply progress bar if watch position data is available
+                if episode.get("watchPosition"):
+                    watch_position = episode["watchPosition"].get("position")
+                    duration = (
+                        episode.get("source", {}).get("duration") if episode_available else episode.get("duration")
+                    )
+                    if watch_position is not None and duration is not None:
+                        self._apply_progress_bar(list_item, watch_position, duration)
+
+                # Create URL for seasons listing
+                url = self.create_plugin_url(
+                    base_url=self.kodi_url,
+                    action="play_episode" if episode_available else "info",
+                    content_type=content_type,
+                    project_slug=project_slug,
+                    season_id=season["id"],
+                    episode_id=episode["id"],
+                    episode_guid=episode.get("guid", ""),
+                )
+
+                xbmcplugin.addDirectoryItem(self.handle, url, list_item, False)
+
+            if season["episodes"][0].get("seasonNumber", 0) > 0:
+                xbmcplugin.addSortMethod(self.handle, xbmcplugin.SORT_METHOD_EPISODE)
+            else:
+                xbmcplugin.addSortMethod(self.handle, xbmcplugin.SORT_METHOD_VIDEO_SORT_TITLE)
+            xbmcplugin.addSortMethod(self.handle, xbmcplugin.SORT_METHOD_LABEL)
+            xbmcplugin.endOfDirectory(self.handle)
+
+        except Exception as e:
+            # TODO: this needs to handle episodes that are stubs.  Should not fail completely if one episode is bad.
+            self.log.error(f"Error fetching season {season_id}: {e}")
+            self.show_error(f"Error fetching season {season_id}: {str(e)}")
+            return
+
+    def watchlist_menu(self):
+        """Placeholder for user watchlist until API support is added."""
+        self.log.info("Watchlist menu requested, but not yet implemented.")
+        self.show_error("Watchlist is not available yet.")
+
+    def continue_watching_menu(self, after=None):
+        """Display continue watching menu with pagination."""
+        try:
+            self.log.info(f"Fetching continue watching items, after={after}")
+
+            # Step 1: Fetch resume watching guids (lightweight)
+            resume_data = self.angel_interface.get_resume_watching(first=10, after=after)
+
+            if not resume_data:
+                self.show_error("Failed to load Continue Watching")
+                return
+
+            # Fallback: handle legacy shape with 'episodes' list containing embedded project
+            if (
+                isinstance(resume_data, dict)
+                and "episodes" in resume_data
+                and isinstance(resume_data["episodes"], list)
+            ):
+                xbmcplugin.setContent(self.handle, "videos")
+                for episode in resume_data["episodes"]:
+                    project = episode.get("project") if isinstance(episode, dict) else None
+                    list_item = self._create_list_item_from_episode(
+                        episode,
+                        project=project,
+                        content_type="",
+                        stream_url=None,
+                        is_playback=False,
+                    )
+                    project_slug = episode.get("projectSlug") or (project or {}).get("slug", "")
+                    url = self.create_plugin_url(
+                        base_url=self.kodi_url,
+                        action="play_episode",
+                        content_type="",
+                        project_slug=project_slug,
+                        episode_guid=episode.get("guid", ""),
+                    )
+                    xbmcplugin.addDirectoryItem(self.handle, url, list_item, False)
+                xbmcplugin.endOfDirectory(self.handle)
+                return
+
+            guids = resume_data.get("guids", [])
+            positions = resume_data.get("positions", {})
+            page_info = resume_data.get("pageInfo", {})
+
+            if not guids:
+                self.log.info("No continue watching items found")
+                self.show_notification("No items in Continue Watching")
+                return
+
+            # Step 2: Batch fetch full episode data for all guids
+            self.log.info(f"Batch fetching {len(guids)} episodes")
+            episodes_data = self.angel_interface.get_episodes_for_guids(guids)
+
+            if not episodes_data:
+                self.log.error("Failed to fetch episode data for continue watching")
+                self.show_error("Failed to load episode details")
+                return
+
+            # Step 2b: Fetch unique project names for enrichment
+            unique_slugs = set()
+            for guid in guids:
+                episode_key = f"episode_{guid}"
+                episode = episodes_data.get(episode_key, {})
+                if episode.get("projectSlug"):
+                    unique_slugs.add(episode["projectSlug"])
+
+            project_names = {}
+            if unique_slugs:
+                self.log.info(f"Fetching project names for {len(unique_slugs)} projects")
+                project_names = self.angel_interface.get_projects_by_slugs(list(unique_slugs))
+
+            self.log.info(f"Processing {len(guids)} continue watching items")
+            xbmcplugin.setContent(self.handle, "videos")
+
+            # Step 3: Render menu in guid order, merging watch positions
+            for guid in guids:
+                episode_key = f"episode_{guid}"
+                episode = episodes_data.get(episode_key)
+
+                if not episode:
+                    self.log.warning(f"Episode {guid} not found in batch response, skipping")
+                    continue
+
+                # Enrich with project name if available
+                project_slug = episode.get("projectSlug")
+                project_for_display = None
+                if project_slug and project_slug in project_names:
+                    project_for_display = project_names[project_slug]
+
+                # Enrich with watch position from resume watching response
+                watch_position = positions.get(guid)
+                if watch_position is not None and "watchPosition" not in episode:
+                    episode["watchPosition"] = {"position": watch_position}
+
+                # Create list item using shared helper
+                list_item = self._create_list_item_from_episode(
+                    episode,
+                    project=project_for_display,
+                    content_type="",
+                    stream_url=None,
+                    is_playback=False,
+                )
+
+                # Apply progress bar if available
+                if episode.get("watchPosition"):
+                    watch_position_val = episode["watchPosition"].get("position")
+                    duration = episode.get("duration")
+                    if watch_position_val is not None and duration is not None:
+                        self._apply_progress_bar(list_item, watch_position_val, duration)
+
+                # Create URL for playback
+                project_slug = episode.get("projectSlug", "")
+
+                url = self.create_plugin_url(
+                    base_url=self.kodi_url,
+                    action="play_episode",
+                    content_type="",
+                    project_slug=project_slug,
+                    episode_guid=guid,
+                )
+
+                xbmcplugin.addDirectoryItem(self.handle, url, list_item, False)
+
+            # Add "Load More" if pagination available
+            if page_info.get("hasNextPage"):
+                end_cursor = page_info.get("endCursor")
+                if end_cursor:
+                    list_item = xbmcgui.ListItem(label="[Load More...]")
+                    url = self.create_plugin_url(
+                        base_url=self.kodi_url,
+                        action="continue_watching_menu",
+                        after=end_cursor,
+                    )
+                    xbmcplugin.addDirectoryItem(self.handle, url, list_item, True)
+
+            xbmcplugin.endOfDirectory(self.handle)
+
+        except Exception as e:
+            self.log.error(f"Error in continue_watching_menu: {e}")
+            self.show_error(f"Failed to load Continue Watching: {str(e)}")
+
+    def top_picks_menu(self):
+        """Placeholder for top picks until API support is added."""
+        self.log.info("Top picks menu requested, but not yet implemented.")
+        self.show_error("Top Picks is not available yet.")
+
+    def other_content_menu(self):
+        """Placeholder for other content until API support is added."""
+        self.log.info("Other content menu requested, but not yet implemented.")
+        self.show_error("Other Content is not available yet.")
+
+    def play_episode(self, episode_guid, project_slug):
+        """Play an episode using cached project data (no separate API call)."""
+        try:
+            # Fetch project data (uses cache if available)
+            project = self._get_project(project_slug)
+            if not project:
+                self.log.error(f"Project not found: {project_slug}")
+                self.show_error(f"Project not found: {project_slug}")
+                return
+
+            # Find episode in project seasons
+            episode = None
+            for season in project.get("seasons", []):
+                for ep in season.get("episodes", []):
+                    if ep.get("guid") == episode_guid:
+                        episode = ep
+                        break
+                if episode:
+                    break
+
+            if not episode:
+                self.log.error(f"Episode {episode_guid} not found in project {project_slug}")
+                self.show_error(f"Episode not found: {episode_guid}")
+                return
+
+            # Check for playable source
+            source = episode.get("source")
+            if not source or not source.get("url"):
+                self.show_error("No playable stream URL found for this episode")
+                self.log.error(f"No stream URL for episode: {episode_guid} in project: {project_slug}")
+                return
+
+            episode_name = episode.get("subtitle") or episode.get("name", "Unknown")
+            project_name = project.get("name", "Unknown")
+            self.log.info(f"Playing episode: {episode_name} from project: {project_name}")
+
+            # Play using existing episode data
+            self.play_video(episode_data={"episode": episode, "project": project})
+
+        except Exception as e:
+            self.log.error(f"Error playing episode {episode_guid}: {e}")
+            self.show_error(f"Failed to play episode: {str(e)}")
+
+    def play_video(self, stream_url=None, episode_data=None):
+        """Play a video stream with optional enhanced metadata"""
+        if stream_url and episode_data:
+            raise ValueError("Provide only stream_url or episode_data, not both")
+        if not stream_url and not episode_data:
+            raise ValueError("Must provide either stream_url or episode_data to play video")
+
+        list_item = xbmcgui.ListItem(offscreen=True)
+
+        try:
+            if episode_data:
+                # Enhanced playback with metadata
+                episode = episode_data.get("episode", {})
+                project = episode_data.get("project", {})
+
+                # Create ListItem with metadata using helper
+                list_item = self._create_list_item_from_episode(
+                    episode=episode, project=project, content_type="", is_playback=True
+                )
+
+                episode_name = episode.get("subtitle", "Unknown")
+                project_name = project.get("name", "Unknown")
+                self.log.info(f"Playing enhanced video: {episode_name} from project: {project_name}")
+            elif stream_url:
+                # Basic playback (fallback for play_content)
+                list_item = xbmcgui.ListItem(offscreen=True)
+                list_item.setPath(stream_url)
+                list_item.setIsFolder(False)
+                list_item.setProperty("IsPlayable", "true")
+                list_item.addStreamInfo("video", {"codec": "h264"})
+
+                self.log.info(f"Playing basic video from URL: {stream_url}")
+
+            # Resolve and play
+            xbmcplugin.setResolvedUrl(self.handle, True, listitem=list_item)
+            self.log.info(f"Playing stream: {list_item.getPath()}")
+
+        except Exception as e:
+            self.show_error(f"Error playing video: {e}")
+            self.log.error(f"Error playing video: {e}")
 
     def _ensure_isa_available(self, manifest_type: str = "hls") -> bool:
         """Check if InputStream Adaptive is available (and installed/enabled)."""
@@ -346,495 +838,6 @@ class KodiUIInterface:
                 "icon": self.default_settings_icon,
             }
         )
-
-    def main_menu(self):
-        """Show the main menu with content type options"""
-
-        # Rebuild menu items to reflect current settings
-        self._load_menu_items()
-
-        # Create directory items for each menu option
-        for item in self.menu_items:
-            # Create list item
-            list_item = xbmcgui.ListItem(label=item["label"])
-
-            if item.get("icon"):
-                list_item.setArt({"icon": item["icon"], "thumb": item["icon"]})
-
-            # Set info tags
-            info_tag = list_item.getVideoInfoTag()
-            info_tag.setPlot(item["description"])
-
-            # Create URL
-            self.log.debug(f"Creating URL for action: {item['action']}, content_type: {item['content_type']}")
-            url = self.create_plugin_url(
-                base_url=self.kodi_url,
-                action=item["action"],
-                content_type=item["content_type"],
-            )
-
-            # Add to directory
-            xbmcplugin.addDirectoryItem(self.handle, url, list_item, True)
-
-        # Finish directory
-        xbmcplugin.endOfDirectory(self.handle)
-
-    def watchlist_menu(self):
-        """Placeholder for user watchlist until API support is added."""
-        self.log.info("Watchlist menu requested, but not yet implemented.")
-        self.show_error("Watchlist is not available yet.")
-
-    def continue_watching_menu(self, after=None):
-        """Display continue watching menu with pagination."""
-        try:
-            self.log.info(f"Fetching continue watching items, after={after}")
-
-            # Step 1: Fetch resume watching guids (lightweight)
-            resume_data = self.angel_interface.get_resume_watching(first=10, after=after)
-
-            if not resume_data:
-                self.show_error("Failed to load Continue Watching")
-                return
-
-            # Fallback: handle legacy shape with 'episodes' list containing embedded project
-            if (
-                isinstance(resume_data, dict)
-                and "episodes" in resume_data
-                and isinstance(resume_data["episodes"], list)
-            ):
-                xbmcplugin.setContent(self.handle, "videos")
-                for episode in resume_data["episodes"]:
-                    project = episode.get("project") if isinstance(episode, dict) else None
-                    list_item = self._create_list_item_from_episode(
-                        episode,
-                        project=project,
-                        content_type="",
-                        stream_url=None,
-                        is_playback=False,
-                    )
-                    project_slug = episode.get("projectSlug") or (project or {}).get("slug", "")
-                    url = self.create_plugin_url(
-                        base_url=self.kodi_url,
-                        action="play_episode",
-                        content_type="",
-                        project_slug=project_slug,
-                        episode_guid=episode.get("guid", ""),
-                    )
-                    xbmcplugin.addDirectoryItem(self.handle, url, list_item, False)
-                xbmcplugin.endOfDirectory(self.handle)
-                return
-
-            guids = resume_data.get("guids", [])
-            positions = resume_data.get("positions", {})
-            page_info = resume_data.get("pageInfo", {})
-
-            if not guids:
-                self.log.info("No continue watching items found")
-                self.show_notification("No items in Continue Watching")
-                return
-
-            # Step 2: Batch fetch full episode data for all guids
-            self.log.info(f"Batch fetching {len(guids)} episodes")
-            episodes_data = self.angel_interface.get_episodes_for_guids(guids)
-
-            if not episodes_data:
-                self.log.error("Failed to fetch episode data for continue watching")
-                self.show_error("Failed to load episode details")
-                return
-
-            # Step 2b: Fetch unique project names for enrichment
-            unique_slugs = set()
-            for guid in guids:
-                episode_key = f"episode_{guid}"
-                episode = episodes_data.get(episode_key, {})
-                if episode.get("projectSlug"):
-                    unique_slugs.add(episode["projectSlug"])
-
-            project_names = {}
-            if unique_slugs:
-                self.log.info(f"Fetching project names for {len(unique_slugs)} projects")
-                project_names = self.angel_interface.get_projects_by_slugs(list(unique_slugs))
-
-            self.log.info(f"Processing {len(guids)} continue watching items")
-            xbmcplugin.setContent(self.handle, "videos")
-
-            # Step 3: Render menu in guid order, merging watch positions
-            for guid in guids:
-                episode_key = f"episode_{guid}"
-                episode = episodes_data.get(episode_key)
-
-                if not episode:
-                    self.log.warning(f"Episode {guid} not found in batch response, skipping")
-                    continue
-
-                # Enrich with project name if available
-                project_slug = episode.get("projectSlug")
-                project_for_display = None
-                if project_slug and project_slug in project_names:
-                    project_for_display = project_names[project_slug]
-
-                # Enrich with watch position from resume watching response
-                watch_position = positions.get(guid)
-                if watch_position is not None and "watchPosition" not in episode:
-                    episode["watchPosition"] = {"position": watch_position}
-
-                # Create list item using shared helper
-                list_item = self._create_list_item_from_episode(
-                    episode,
-                    project=project_for_display,
-                    content_type="",
-                    stream_url=None,
-                    is_playback=False,
-                )
-
-                # Apply progress bar if available
-                if episode.get("watchPosition"):
-                    watch_position_val = episode["watchPosition"].get("position")
-                    duration = episode.get("duration")
-                    if watch_position_val is not None and duration is not None:
-                        self._apply_progress_bar(list_item, watch_position_val, duration)
-
-                # Create URL for playback
-                project_slug = episode.get("projectSlug", "")
-
-                url = self.create_plugin_url(
-                    base_url=self.kodi_url,
-                    action="play_episode",
-                    content_type="",
-                    project_slug=project_slug,
-                    episode_guid=guid,
-                )
-
-                xbmcplugin.addDirectoryItem(self.handle, url, list_item, False)
-
-            # Add "Load More" if pagination available
-            if page_info.get("hasNextPage"):
-                end_cursor = page_info.get("endCursor")
-                if end_cursor:
-                    list_item = xbmcgui.ListItem(label="[Load More...]")
-                    url = self.create_plugin_url(
-                        base_url=self.kodi_url,
-                        action="continue_watching_menu",
-                        after=end_cursor,
-                    )
-                    xbmcplugin.addDirectoryItem(self.handle, url, list_item, True)
-
-            xbmcplugin.endOfDirectory(self.handle)
-
-        except Exception as e:
-            self.log.error(f"Error in continue_watching_menu: {e}")
-            self.show_error(f"Failed to load Continue Watching: {str(e)}")
-
-    def top_picks_menu(self):
-        """Placeholder for top picks until API support is added."""
-        self.log.info("Top picks menu requested, but not yet implemented.")
-        self.show_error("Top Picks is not available yet.")
-
-    def other_content_menu(self):
-        """Placeholder for other content until API support is added."""
-        self.log.info("Other content menu requested, but not yet implemented.")
-        self.show_error("Other Content is not available yet.")
-
-    def projects_menu(self, content_type=""):
-        """Display a menu of projects based on content type, with persistent caching."""
-        try:
-            self.log.info("Fetching projects from AngelStudiosInterface...")
-
-            cache_key = f"projects_{content_type or 'all'}"
-            cache_enabled = self._cache_enabled()
-            projects = None
-            if cache_enabled:
-                projects = self.cache.get(cache_key)
-                if projects:
-                    self.log.debug(f"Cache hit for {cache_key}")
-                else:
-                    self.log.debug(f"Cache miss for {cache_key}")
-            else:
-                self.log.debug("Cache disabled; bypassing projects cache")
-
-            if projects:
-                self.log.info(f"Using cached projects for content type: {content_type}")
-            else:
-                self.log.info(f"Fetching projects from AngelStudiosInterface for content type: {content_type}")
-                projects = self.angel_interface.get_projects(
-                    project_type=angel_menu_content_mapper.get(content_type, "videos")
-                )
-                if cache_enabled:
-                    self.cache.set(cache_key, projects, expiration=self._cache_ttl())
-            try:
-                self.log.info(f"Projects: {json.dumps(projects, indent=2)}")
-            except TypeError:
-                self.log.info(f"Projects: <non-serializable type {type(projects).__name__}>")
-
-            if not projects:
-                self.show_error(f"No projects found for content type: {content_type}")
-                return
-
-            self.log.info(
-                f"Processing {len(projects)} '{content_type if content_type else 'all content type'}' projects"
-            )
-
-            # Set content type for the plugin
-            kodi_content_type = (
-                "movies" if content_type == "movies" else "tvshows" if content_type == "series" else "videos"
-            )
-            xbmcplugin.setContent(self.handle, kodi_content_type)
-            # Create list items for each project
-            for project in projects:
-                self.log.info(f"Processing project: {project['name']}")
-                self.log.debug(f"Project dictionary: {json.dumps(project, indent=2)}")
-
-                # Create list item
-                list_item = xbmcgui.ListItem(label=project["name"])
-                info_tag = list_item.getVideoInfoTag()
-                info_tag.setMediaType(kodi_content_mapper.get(project["projectType"], "video"))
-                self._process_attributes_to_infotags(list_item, project)
-
-                # Create URL for seasons listing
-                url = self.create_plugin_url(
-                    base_url=self.kodi_url,
-                    action="seasons_menu",
-                    content_type=content_type,
-                    project_slug=project["slug"],
-                )
-
-                # Add to directory
-                xbmcplugin.addDirectoryItem(self.handle, url, list_item, True)
-
-            xbmcplugin.addSortMethod(self.handle, xbmcplugin.SORT_METHOD_LABEL)
-
-            try:
-                enable_prefetch = self.addon.getSettingBool("enable_prefetch")
-                if enable_prefetch:
-                    max_count = self.addon.getSettingInt("prefetch_project_count") or 5
-                    if max_count <= 0:
-                        max_count = 5
-                    slugs = [p.get("slug") for p in projects if p.get("slug")]
-                    self._deferred_prefetch_project(slugs, max_count)
-            except Exception as exc:
-                self.log.warning(f"prefetch settings read failed; skipping prefetch: {exc}")
-
-            xbmcplugin.endOfDirectory(self.handle)
-
-        except Exception as e:
-            self.log.error(f"Error listing {content_type}: {e}")
-            self.show_error(f"Failed to load {angel_menu_content_mapper.get(content_type)}: {str(e)}")
-            raise e
-
-    def seasons_menu(self, content_type, project_slug):
-        """Display a menu of seasons for a specific project, with persistent caching."""
-        self.log.info(f"Fetching seasons for project: {project_slug}")
-        try:
-            self.log.info(f"Fetching seasons for project: {project_slug}")
-            project = self._get_project(project_slug)
-            if not project:
-                self.log.error(f"Project not found: {project_slug}")
-                self.show_error(f"Project not found: {project_slug}")
-                return
-            self.log.info(f"Project details: {json.dumps(project, indent=2)}")
-            self.log.info(f"Processing {len(project.get('seasons', []))} seasons for project: {project_slug}")
-
-            # TODO Map this, this is gross.
-            kodi_content_type = (
-                "movies" if content_type == "movies" else "tvshows" if content_type == "series" else "videos"
-            )
-            self.log.info(f"Setting content type for Kodi: {content_type} ({kodi_content_type})")
-            xbmcplugin.setContent(self.handle, kodi_content_type)
-
-            if len(project.get("seasons", [])) == 1:
-                self.log.info(f"Single season found: {project['seasons'][0]['name']}")
-                self.episodes_menu(content_type, project["slug"], season_id=project["seasons"][0]["id"])
-            else:
-                for season in project.get("seasons", []):
-                    self.log.info(f"Processing season: {season['name']}")
-                    self.log.debug(f"Season dictionary: {json.dumps(season, indent=2)}")
-                    # Create list item
-                    list_item = xbmcgui.ListItem(label=season["name"])
-                    info_tag = list_item.getVideoInfoTag()
-                    info_tag.setMediaType(kodi_content_mapper.get(content_type, "video"))
-                    self._process_attributes_to_infotags(list_item, season)
-
-                    # Create URL for seasons listing
-                    url = self.create_plugin_url(
-                        base_url=self.kodi_url,
-                        action="episodes_menu",
-                        content_type=content_type,
-                        project_slug=project_slug,
-                        season_id=season["id"],
-                    )
-
-                    xbmcplugin.addDirectoryItem(self.handle, url, list_item, True)
-
-                xbmcplugin.addSortMethod(self.handle, xbmcplugin.SORT_METHOD_LABEL)
-                xbmcplugin.endOfDirectory(self.handle)
-
-            return True
-
-        except Exception as e:
-            self.log.error(f"Error fetching project {project_slug}: {e}")
-            self.show_error(f"Error fetching project {project_slug}: {str(e)}")
-            return False
-
-    def episodes_menu(self, content_type, project_slug, season_id=None):
-        """Display a menu of episodes for a specific season, with persistent caching."""
-        self.log.info(f"Fetching episodes for project: {project_slug}, season: {season_id}")
-        try:
-            project = self._get_project(project_slug)
-            if not project:
-                self.log.error(f"Project not found: {project_slug}")
-                self.show_error(f"Project not found: {project_slug}")
-                return
-
-            # If season_id is None, use first season (all-seasons mode)
-            if season_id is None and project.get("seasons"):
-                season = project["seasons"][0]
-            else:
-                season = next(
-                    (s for s in project.get("seasons", []) if s.get("id") == season_id),
-                    None,
-                )
-            if not season:
-                self.log.error(f"Season not found: {season_id}")
-                self.show_error(f"Season not found: {season_id}")
-                return
-
-            episode_count = len(season.get("episodes", []))
-            self.log.info(f"Processing {episode_count} episodes for project: {project_slug}, season: {season_id}")
-            kodi_content_type = (
-                "movies" if content_type == "movies" else "tvshows" if content_type == "series" else "videos"
-            )
-            self.log.info(f"Setting content type for Kodi: {content_type} ({kodi_content_type})")
-            xbmcplugin.setContent(self.handle, kodi_content_type)
-
-            episodes_list = season.get("episodes", [])
-            for idx, episode in enumerate(episodes_list):
-                episode_available = bool(episode.get("source"))
-                list_item = self._create_list_item_from_episode(
-                    episode,
-                    project=project,
-                    content_type=content_type,
-                    stream_url=None,
-                    is_playback=False,
-                )
-
-                # Apply progress bar if watch position data is available
-                if episode.get("watchPosition"):
-                    watch_position = episode["watchPosition"].get("position")
-                    duration = (
-                        episode.get("source", {}).get("duration") if episode_available else episode.get("duration")
-                    )
-                    if watch_position is not None and duration is not None:
-                        self._apply_progress_bar(list_item, watch_position, duration)
-
-                # Create URL for seasons listing
-                url = self.create_plugin_url(
-                    base_url=self.kodi_url,
-                    action="play_episode" if episode_available else "info",
-                    content_type=content_type,
-                    project_slug=project_slug,
-                    season_id=season["id"],
-                    episode_id=episode["id"],
-                    episode_guid=episode.get("guid", ""),
-                )
-
-                xbmcplugin.addDirectoryItem(self.handle, url, list_item, False)
-
-            if season["episodes"][0].get("seasonNumber", 0) > 0:
-                xbmcplugin.addSortMethod(self.handle, xbmcplugin.SORT_METHOD_EPISODE)
-            else:
-                xbmcplugin.addSortMethod(self.handle, xbmcplugin.SORT_METHOD_VIDEO_SORT_TITLE)
-            xbmcplugin.addSortMethod(self.handle, xbmcplugin.SORT_METHOD_LABEL)
-            xbmcplugin.endOfDirectory(self.handle)
-
-        except Exception as e:
-            # TODO: this needs to handle episodes that are stubs.  Should not fail completely if one episode is bad.
-            self.log.error(f"Error fetching season {season_id}: {e}")
-            self.show_error(f"Error fetching season {season_id}: {str(e)}")
-            return
-
-    def play_episode(self, episode_guid, project_slug):
-        """Play an episode using cached project data (no separate API call)."""
-        try:
-            # Fetch project data (uses cache if available)
-            project = self._get_project(project_slug)
-            if not project:
-                self.log.error(f"Project not found: {project_slug}")
-                self.show_error(f"Project not found: {project_slug}")
-                return
-
-            # Find episode in project seasons
-            episode = None
-            for season in project.get("seasons", []):
-                for ep in season.get("episodes", []):
-                    if ep.get("guid") == episode_guid:
-                        episode = ep
-                        break
-                if episode:
-                    break
-
-            if not episode:
-                self.log.error(f"Episode {episode_guid} not found in project {project_slug}")
-                self.show_error(f"Episode not found: {episode_guid}")
-                return
-
-            # Check for playable source
-            source = episode.get("source")
-            if not source or not source.get("url"):
-                self.show_error("No playable stream URL found for this episode")
-                self.log.error(f"No stream URL for episode: {episode_guid} in project: {project_slug}")
-                return
-
-            episode_name = episode.get("subtitle") or episode.get("name", "Unknown")
-            project_name = project.get("name", "Unknown")
-            self.log.info(f"Playing episode: {episode_name} from project: {project_name}")
-
-            # Play using existing episode data
-            self.play_video(episode_data={"episode": episode, "project": project})
-
-        except Exception as e:
-            self.log.error(f"Error playing episode {episode_guid}: {e}")
-            self.show_error(f"Failed to play episode: {str(e)}")
-
-    def play_video(self, stream_url=None, episode_data=None):
-        """Play a video stream with optional enhanced metadata"""
-        if stream_url and episode_data:
-            raise ValueError("Provide only stream_url or episode_data, not both")
-        if not stream_url and not episode_data:
-            raise ValueError("Must provide either stream_url or episode_data to play video")
-
-        list_item = xbmcgui.ListItem(offscreen=True)
-
-        try:
-            if episode_data:
-                # Enhanced playback with metadata
-                episode = episode_data.get("episode", {})
-                project = episode_data.get("project", {})
-
-                # Create ListItem with metadata using helper
-                list_item = self._create_list_item_from_episode(
-                    episode=episode, project=project, content_type="", is_playback=True
-                )
-
-                episode_name = episode.get("subtitle", "Unknown")
-                project_name = project.get("name", "Unknown")
-                self.log.info(f"Playing enhanced video: {episode_name} from project: {project_name}")
-            elif stream_url:
-                # Basic playback (fallback for play_content)
-                list_item = xbmcgui.ListItem(offscreen=True)
-                list_item.setPath(stream_url)
-                list_item.setIsFolder(False)
-                list_item.setProperty("IsPlayable", "true")
-                list_item.addStreamInfo("video", {"codec": "h264"})
-
-                self.log.info(f"Playing basic video from URL: {stream_url}")
-
-            # Resolve and play
-            xbmcplugin.setResolvedUrl(self.handle, True, listitem=list_item)
-            self.log.info(f"Playing stream: {list_item.getPath()}")
-
-        except Exception as e:
-            self.show_error(f"Error playing video: {e}")
-            self.log.error(f"Error playing video: {e}")
 
     def show_error(self, message, title="Angel Studios"):
         """Show error dialog to user"""
