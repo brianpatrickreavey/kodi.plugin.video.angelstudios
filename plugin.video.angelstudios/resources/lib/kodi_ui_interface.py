@@ -77,7 +77,6 @@ class KodiUIInterface:
             "show_livestreams": False,
             "show_continue_watching": False,
             "show_top_picks": False,
-            "show_other_content": False,
         }
 
         # Static menu definitions (settings are applied when rendering)
@@ -139,12 +138,6 @@ class KodiUIInterface:
                 "action": "top_picks_menu",
                 "description": "Browse top picks for you",
                 "icon": "DefaultMusicTop100.png",
-            },
-            "show_other_content": {
-                "label": "Other Content",
-                "content_type": "video",
-                "action": "other_content_menu",
-                "description": "Other content types not categorized above",
             },
         }
 
@@ -550,11 +543,6 @@ class KodiUIInterface:
         """Placeholder for top picks until API support is added."""
         self.log.info("Top picks menu requested, but not yet implemented.")
         self.show_error("Top Picks is not available yet.")
-
-    def other_content_menu(self):
-        """Placeholder for other content until API support is added."""
-        self.log.info("Other content menu requested, but not yet implemented.")
-        self.show_error("Other Content is not available yet.")
 
     def play_episode(self, episode_guid, project_slug):
         """Play an episode using cached project data (no separate API call)."""

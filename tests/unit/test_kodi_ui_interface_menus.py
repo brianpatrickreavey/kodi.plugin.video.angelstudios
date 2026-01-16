@@ -84,15 +84,6 @@ class TestMainMenu:
         mock_show_error.assert_called_once_with("Top Picks is not available yet.")
         logger_mock.info.assert_any_call("Top picks menu requested, but not yet implemented.")
 
-    def test_other_content_menu_placeholder(self, ui_interface):
-        ui, logger_mock, angel_interface_mock = ui_interface
-
-        with patch.object(ui, "show_error") as mock_show_error:
-            ui.other_content_menu()
-
-        mock_show_error.assert_called_once_with("Other Content is not available yet.")
-        logger_mock.info.assert_any_call("Other content menu requested, but not yet implemented.")
-
     def test_main_menu_settings_error_defaults_enabled(self, mock_xbmc):
         """If settings read fails, menu defaults stay enabled."""
         import xbmcaddon

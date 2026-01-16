@@ -227,7 +227,6 @@ ROUTER_DISPATCH_CASES = [
     ("watchlist_menu", "watchlist_menu", {}),
     ("continue_watching_menu", "continue_watching_menu", {}),
     ("top_picks_menu", "top_picks_menu", {}),
-    ("other_content_menu", "other_content_menu", {}),
     ("all_content_menu", None, {}),
     ("seasons_menu", "seasons_menu", {"content_type": "series", "project_slug": "slug"}),
     ("episodes_menu", "episodes_menu", {"content_type": "series", "project_slug": "slug", "season_id": "1"}),

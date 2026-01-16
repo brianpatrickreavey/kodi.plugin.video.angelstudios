@@ -16,7 +16,6 @@
 Angel Studios Kodi addon - Clean, modular implementation
 """
 
-import os
 import sys
 from urllib.parse import parse_qsl
 
@@ -96,9 +95,6 @@ def router(paramstring):
             elif params["action"] == "top_picks_menu":
                 # Show Top Picks (placeholder)
                 ui_interface.top_picks_menu()
-            elif params["action"] == "other_content_menu":
-                # Show Other Content (placeholder)
-                ui_interface.other_content_menu()
             elif params["action"] == "all_content_menu":
                 # Show all content (except podcasts & livestreams)
                 # all_content_menu()
