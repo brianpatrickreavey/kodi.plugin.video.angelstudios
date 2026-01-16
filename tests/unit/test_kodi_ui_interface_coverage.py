@@ -191,7 +191,7 @@ class TestContinueWatchingCoverage:
     """Tests for continue_watching_menu edge cases."""
 
     def test_continue_watching_episode_with_embedded_project(self, ui_interface, mock_kodi_xbmcplugin):
-        """Test episode with embedded project but no projectSlug. (Coverage for embedded project slug extraction in continue_watching_menu)."""
+        """Test episode with embedded project but no projectSlug."""
         ui, logger_mock, angel_interface_mock = ui_interface
 
         # Episode with embedded project but missing projectSlug field
@@ -214,7 +214,8 @@ class TestContinueWatchingCoverage:
 
             # Should extract slug from embedded project
             ui._create_list_item_from_episode.assert_called_once()
-            call_kwargs = ui._create_list_item_from_episode.call_args
+
+
 class TestProcessAttributesCoverage:
     """Tests for _process_attributes_to_infotags cast handling."""
 
