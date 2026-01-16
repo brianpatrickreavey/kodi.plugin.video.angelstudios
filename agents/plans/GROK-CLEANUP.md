@@ -109,7 +109,7 @@ Last Updated: January 16, 2026
 
 1. **Create TESTING.md**: Create docs/TESTING.md with codified testing strategy, norms, mocking, fixtures, coverage goals, unittest_data use, class-based organization, parametrization, docstrings, error handling, naming conventions, and examples of good/bad practices. Commit "docs: add TESTING.md with codified testing norms (Phase 1 Step 1)".
 
-2. **Enhance fixture documentation**: Add complete docstrings to all fixtures in tests/unit/conftest.py. Commit "test: enhance fixture docstrings in conftest.py (Phase 1 Step 2)".
+2. **Enhance fixture documentation**: Add complete docstrings to all fixtures in tests/unit/conftest.py and standardize naming to mock_* convention. Commit "test: enhance fixture docstrings and standardize naming in conftest.py (Phase 1 Step 2)".
 
 3. **Consolidate patching patterns**: Replace individual patch calls with composed fixtures where possible. Commit "test: consolidate patching patterns using fixtures (Phase 1 Step 3)".
 
@@ -130,3 +130,4 @@ Last Updated: January 16, 2026
 ## Phase 1 Progress Log
 
 - Step 1: Completed (TESTING.md created and committed).
+- Step 2: Completed (fixture docstrings enhanced and naming standardized to mock_*).
