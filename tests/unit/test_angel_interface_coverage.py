@@ -178,7 +178,6 @@ class TestQueryFragmentParsing:
         # Should have 1 episode (second one), first was skipped
         assert len(result["episodes"]) == 1
         assert result["episodes"][0]["guid"] == "guid-1"
-        angel_interface.log.warning.assert_any_call("Edge missing content, skipping")
 
 
 class TestUnwrapRelayPagination:

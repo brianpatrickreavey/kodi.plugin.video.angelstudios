@@ -1304,16 +1304,24 @@ class KodiUIInterface:
         # Handle stills
         for still_key in ("portraitStill1", "portraitStill2", "portraitTitleImage"):
             still_dict = info_dict.get(still_key)
+            if not isinstance(still_dict, dict):
+                # Check nested in title for projects
+                title_dict = info_dict.get("title", {})
+                if isinstance(title_dict, dict):
+                    still_dict = title_dict.get(still_key)
             if isinstance(still_dict, dict):
                 cp = still_dict.get("cloudinaryPath")
                 if cp:
+                    url = self.angel_interface.get_cloudinary_url(cp)
                     if still_key == "portraitTitleImage":
                         self.log.debug(f"[ART] direct portraitTitleImage: {still_dict}")
                         self.log.debug(f"[ART] Using direct portraitTitleImage: {cp}")
+                        art_dict["poster"] = url
+                    elif still_key == "portraitStill1":
+                        self.log.debug(f"[ART] Using {still_key}: {cp}")
+                        art_dict["poster"] = url
                     else:
                         self.log.debug(f"[ART] Using {still_key}: {cp}")
-                    url = self.angel_interface.get_cloudinary_url(cp)
-                    art_dict.setdefault("poster", url)
                     art_dict.setdefault("thumb", url)
 
         for still_key in ("landscapeStill1", "landscapeStill2"):

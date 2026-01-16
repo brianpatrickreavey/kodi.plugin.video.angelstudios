@@ -47,6 +47,66 @@ query getProject($slug: String!, $includePrerelease: Boolean = false, $includeSe
                     id
                     name
                     watchableAvailabilityStatus
+                    portraitStill1: image(aspect: "2:3", category: STILL_1) {
+                      aspect
+                      category
+                      cloudinaryPath
+                      __typename
+                    }
+                    portraitStill2: image(aspect: "2:3", category: STILL_2) {
+                      aspect
+                      category
+                      cloudinaryPath
+                      __typename
+                    }
+                    portraitStill3: image(aspect: "2:3", category: STILL_3) {
+                      aspect
+                      category
+                      cloudinaryPath
+                      __typename
+                    }
+                    portraitStill4: image(aspect: "2:3", category: STILL_4) {
+                      aspect
+                      category
+                      cloudinaryPath
+                      __typename
+                    }
+                    portraitStill5: image(aspect: "2:3", category: STILL_5) {
+                      aspect
+                      category
+                      cloudinaryPath
+                      __typename
+                    }
+                    landscapeStill1: image(aspect: "16:9", category: STILL_1) {
+                      aspect
+                      category
+                      cloudinaryPath
+                      __typename
+                    }
+                    landscapeStill2: image(aspect: "16:9", category: STILL_2) {
+                      aspect
+                      category
+                      cloudinaryPath
+                      __typename
+                    }
+                    landscapeStill3: image(aspect: "16:9", category: STILL_3) {
+                      aspect
+                      category
+                      cloudinaryPath
+                      __typename
+                    }
+                    landscapeStill4: image(aspect: "16:9", category: STILL_4) {
+                      aspect
+                      category
+                      cloudinaryPath
+                      __typename
+                    }
+                    landscapeStill5: image(aspect: "16:9", category: STILL_5) {
+                      aspect
+                      category
+                      cloudinaryPath
+                      __typename
+                    }
                   }
                   __typename
                 }

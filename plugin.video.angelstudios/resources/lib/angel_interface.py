@@ -231,15 +231,17 @@ class AngelStudiosInterface:
                 return None
             # If ContentSeries display data is present, merge into playback episodes
             title = project.get("title") or {}
+            self.log.debug(f"Project title: {title.get('__typename')}, has seasons: {'seasons' in title}")
             if isinstance(title, dict) and title.get("__typename") == "ContentSeries":
+                self.log.info("ContentSeries detected, merging STILL images")
                 # Build a map of display episodes by id from relay-style seasons
                 display_map = {}
-                seasons_edges = (title.get("seasons") or {}).get("edges") or []
-                for edge in seasons_edges:
-                    node = edge.get("node") or {}
-                    ep_edges = (node.get("episodes") or {}).get("edges") or []
-                    for ep_edge in ep_edges:
-                        ep_node = ep_edge.get("node") or {}
+                seasons = self._unwrap_relay_pagination(title.get("seasons") or {})
+                self.log.debug(f"Found {len(seasons)} seasons in ContentSeries")
+                for season in seasons:
+                    episodes = self._unwrap_relay_pagination(season.get("episodes") or {})
+                    self.log.debug(f"Season has {len(episodes)} episodes")
+                    for ep_node in episodes:
                         ep_id = ep_node.get("id")
                         if ep_id:
                             normalized = self._normalize_contentseries_episode(ep_node)
@@ -257,6 +259,7 @@ class AngelStudiosInterface:
                             display_map[ep_id] = normalized
 
                 # Merge display data into playback list
+                merged_count = 0
                 for season in project.get("seasons", []) or []:
                     for idx, playback_ep in enumerate(season.get("episodes", []) or []):
                         ep_id = playback_ep.get("id") or playback_ep.get("guid")
@@ -272,6 +275,7 @@ class AngelStudiosInterface:
                             ]
                             if merged_stills:
                                 self.log.debug(f"Merged episode {ep_id}: Has {len(merged_stills)} STILL fields")
+                                merged_count += 1
                             else:
                                 # Warn if display had STILLs but merged result doesn't
                                 display_stills = [
@@ -286,6 +290,7 @@ class AngelStudiosInterface:
                         else:
                             # No display data found; continue with playback as-is
                             pass
+                self.log.info(f"ContentSeries merge complete: {merged_count} episodes merged with STILL data")
 
             return project
         except Exception as e:
@@ -627,4 +632,22 @@ class AngelStudiosInterface:
             self.log.error(f"Logout failed: {e}")
             return False
 
-    # Interface remains KODI-agnostic and does not manage cache internally
+    def _unwrap_relay_pagination(self, edges_structure):
+        """Unwrap GraphQL relay pagination edges to a list of nodes."""
+        if not isinstance(edges_structure, dict):
+            return []
+        edges = edges_structure.get("edges", [])
+        return [edge.get("node") for edge in edges if isinstance(edge, dict) and edge.get("node")]
+
+    def _merge_episode_data(self, display_ep, playback_ep):
+        """Merge display episode data (STILLs) into playback episode data."""
+        if not isinstance(display_ep, dict):
+            return playback_ep.copy() if isinstance(playback_ep, dict) else {}
+        if playback_ep is None:
+            return display_ep.copy()
+        if not isinstance(playback_ep, dict):
+            return display_ep.copy()
+        
+        merged = playback_ep.copy()
+        merged.update(display_ep)  # Add STILL fields from display
+        return merged
