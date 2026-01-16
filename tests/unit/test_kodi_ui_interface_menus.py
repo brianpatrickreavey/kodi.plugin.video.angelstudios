@@ -7,22 +7,14 @@ import tempfile
 import copy
 
 import pytest
-import unittest
+from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 from kodi_ui_interface import KodiUIInterface
 
-import copy
-
-from datetime import timedelta
-
-# from kodi_ui_interface import KodiUIInterface
-
 from .unittest_data import (
     MOCK_PROJECTS_DATA,
     MOCK_PROJECT_DATA,
-    # MOCK_SEASON_DATA,
-    MOCK_EPISODE_DATA,
 )
 
 parameterized_project_types = pytest.mark.parametrize(
@@ -31,9 +23,7 @@ parameterized_project_types = pytest.mark.parametrize(
 )
 
 episodes_menu_cases = [
-    (project_key, season["id"])
-    for project_key, project in MOCK_PROJECT_DATA.items()
-    for season in project["seasons"]
+    (project_key, season["id"]) for project_key, project in MOCK_PROJECT_DATA.items() for season in project["seasons"]
 ]
 
 
@@ -168,9 +158,7 @@ class TestMainMenu:
 
         addon = xbmcaddon.Addon.return_value
         original_side_effect = addon.getSettingBool.side_effect
-        addon.getSettingBool.side_effect = (
-            lambda key: False if key == "show_series" else True
-        )
+        addon.getSettingBool.side_effect = lambda key: False if key == "show_series" else True
 
         ui = KodiUIInterface(
             handle=1,
@@ -286,7 +274,7 @@ class TestMainMenu:
 
     def test_cache_disabled_bypasses_get_set(self, ui_interface):
         import xbmcaddon
-        from unittest.mock import MagicMock
+        # MagicMock already imported at module scope
 
         ui, logger_mock, angel_interface_mock = ui_interface
 
@@ -345,9 +333,7 @@ class TestMainMenu:
         addon.getSettingString.return_value = "off"
 
 
-def projects_menu_logic_helper(
-    ui_interface, mock_xbmc, mock_cache, cache_hit, content_type, expected_project_type
-):
+def projects_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, content_type, expected_project_type):
     """Shared logic for projects_menu cache miss/hit."""
     ui, logger_mock, angel_interface_mock = ui_interface
     mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
@@ -368,13 +354,9 @@ def projects_menu_logic_helper(
         angel_interface_mock.get_projects.assert_not_called()
         ui.cache.set.assert_not_called()
     else:
-        angel_interface_mock.get_projects.assert_called_once_with(
-            project_type=expected_project_type
-        )
+        angel_interface_mock.get_projects.assert_called_once_with(project_type=expected_project_type)
         cache_key = f"projects_{content_type}"
-        ui.cache.set.assert_called_once_with(
-            cache_key, projects_data, expiration=timedelta(hours=12)
-        )
+        ui.cache.set.assert_called_once_with(cache_key, projects_data, expiration=timedelta(hours=12))
 
     # Directory item assertions
     assert mock_add_item.call_count == len(projects_data)
@@ -415,9 +397,7 @@ class TestProjectsMenu:
         )
 
     @parameterized_project_types
-    def test_projects_menu_no_projects(
-        self, ui_interface, mock_xbmc, mock_cache, content_type, expected_project_type
-    ):
+    def test_projects_menu_no_projects(self, ui_interface, mock_xbmc, mock_cache, content_type, expected_project_type):
         """Test projects_menu shows error when no projects are found."""
         ui, logger_mock, angel_interface_mock = ui_interface
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
@@ -432,34 +412,24 @@ class TestProjectsMenu:
             ui.cache.get.assert_called_once()
 
             # Ensure get_projects was called
-            angel_interface_mock.get_projects.assert_called_once_with(
-                project_type=expected_project_type
-            )
+            angel_interface_mock.get_projects.assert_called_once_with(project_type=expected_project_type)
 
             # Ensure show_error was called with the correct message
-            mock_show_error.assert_called_once_with(
-                f"No projects found for content type: {content_type}"
-            )
+            mock_show_error.assert_called_once_with(f"No projects found for content type: {content_type}")
 
             # Ensure no directory items were added
             mock_add_item.assert_not_called()
             mock_end_dir.assert_not_called()
 
     @parameterized_project_types
-    def test_projects_menu_exception(
-        self, ui_interface, mock_xbmc, mock_cache, content_type, expected_project_type
-    ):
+    def test_projects_menu_exception(self, ui_interface, mock_xbmc, mock_cache, content_type, expected_project_type):
         """Test projects_menu handles exceptions during project fetching."""
         ui, logger_mock, angel_interface_mock = ui_interface
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
-        angel_interface_mock.get_projects.side_effect = Exception(
-            f"Test exception for {content_type}"
-        )
+        angel_interface_mock.get_projects.side_effect = Exception(f"Test exception for {content_type}")
 
         # Set up exception on get_projects
-        angel_interface_mock.get_projects.side_effect = Exception(
-            f"Test exception for {content_type}"
-        )
+        angel_interface_mock.get_projects.side_effect = Exception(f"Test exception for {content_type}")
         ui.cache.get.return_value = None  # Cache miss
 
         with patch.object(ui, "show_error") as mock_show_error:
@@ -471,9 +441,7 @@ class TestProjectsMenu:
             ui.cache.get.assert_called_once()
 
             # Ensure get_projects was called
-            angel_interface_mock.get_projects.assert_called_once_with(
-                project_type=expected_project_type
-            )
+            angel_interface_mock.get_projects.assert_called_once_with(project_type=expected_project_type)
 
             # Ensure error was logged and shown
             mock_show_error.assert_called_once_with(
@@ -491,10 +459,9 @@ def seasons_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, pr
     angel_interface_mock.get_project.return_value = project_data if not cache_hit else None
     mock_list_item.return_value = MagicMock()
 
-
     with (
         patch.object(ui, "_process_attributes_to_infotags") as mock_process_attrs,
-        patch.object(ui, "episodes_menu") as mock_episodes_menu
+        patch.object(ui, "episodes_menu") as mock_episodes_menu,
     ):
 
         # Call method
@@ -505,18 +472,12 @@ def seasons_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, pr
             angel_interface_mock.get_project.assert_not_called()
             ui.cache.set.assert_not_called()
         else:
-            angel_interface_mock.get_project.assert_any_call(
-                project_data["slug"]
-            )
+            angel_interface_mock.get_project.assert_any_call(project_data["slug"])
             cache_key = f"project_{project_data['slug']}"
-            ui.cache.set.assert_any_call(
-                cache_key, project_data, expiration=timedelta(hours=12)
-            )
+            ui.cache.set.assert_any_call(cache_key, project_data, expiration=timedelta(hours=12))
 
         # Ensure cache was checked
-        ui.cache.get.assert_any_call(
-            f"project_{project_data['slug']}"
-        )
+        ui.cache.get.assert_any_call(f"project_{project_data['slug']}")
 
         seasons_data = project_data["seasons"]
 
@@ -549,19 +510,20 @@ def seasons_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, pr
             mock_add_item.assert_not_called()
             mock_end_dir.assert_not_called()
             mock_process_attrs.assert_not_called()
-            logger_mock.info.assert_called_with(
-                f"Single season found: {project_data['seasons'][0]['name']}"
-            )
+            logger_mock.info.assert_called_with(f"Single season found: {project_data['seasons'][0]['name']}")
+
 
 class TestSeasonsMenu:
     @pytest.mark.parametrize("cache_hit", [False, True])
-    @pytest.mark.parametrize("project_data", [
-        MOCK_PROJECT_DATA["single_season_project"],
-        MOCK_PROJECT_DATA["multi_season_project"],
-    ])
+    @pytest.mark.parametrize(
+        "project_data",
+        [
+            MOCK_PROJECT_DATA["single_season_project"],
+            MOCK_PROJECT_DATA["multi_season_project"],
+        ],
+    )
     def test_seasons_menu(self, ui_interface, mock_xbmc, mock_cache, cache_hit, project_data):
         seasons_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, project_data)
-
 
     @parameterized_project_types
     def test_seasons_menu_project_not_found(
@@ -580,35 +542,31 @@ class TestSeasonsMenu:
             patch("xbmcplugin.setContent") as mock_set_content,
         ):
 
-            result = ui.seasons_menu(
-                content_type=expected_project_type, project_slug="nonexistent-project"
-            )
+            result = ui.seasons_menu(content_type=expected_project_type, project_slug="nonexistent-project")
             assert result is None
 
             # Ensure cache was checked
-            ui.cache.get.assert_any_call(
-                f"project_nonexistent-project"
-            )
+            ui.cache.get.assert_any_call(f"project_nonexistent-project")
 
             # Ensure get_project was called
-            angel_interface_mock.get_project.assert_called_once_with(
-                "nonexistent-project"
-            )
+            angel_interface_mock.get_project.assert_called_once_with("nonexistent-project")
 
             # Ensure show_error was called
-            mock_show_error.assert_called_once_with(
-                "Project not found: nonexistent-project"
-            )
+            mock_show_error.assert_called_once_with("Project not found: nonexistent-project")
 
             # Ensure no directory items or content setting occurred
             mock_set_content.assert_not_called()
             mock_add_item.assert_not_called()
             mock_end_dir.assert_not_called()
 
-
     @parameterized_project_types
     def test_seasons_menu_exception(
-        self, ui_interface, mock_xbmc, mock_cache, content_type, expected_project_type,
+        self,
+        ui_interface,
+        mock_xbmc,
+        mock_cache,
+        content_type,
+        expected_project_type,
     ):
         """Test seasons_menu handles exceptions during project fetching."""
         ui, logger_mock, angel_interface_mock = ui_interface
@@ -622,9 +580,7 @@ class TestSeasonsMenu:
             patch.object(ui.cache, "get", return_value=None) as mock_cache_get,
         ):
 
-            result = ui.seasons_menu(
-                content_type=expected_project_type, project_slug="test-project"
-            )
+            result = ui.seasons_menu(content_type=expected_project_type, project_slug="test-project")
 
             # Ensure cache was checked
             mock_cache_get.assert_called_once()
@@ -633,14 +589,10 @@ class TestSeasonsMenu:
             angel_interface_mock.get_project.assert_called_once_with("test-project")
 
             # Ensure error was logged and shown
-            mock_show_error.assert_called_once_with(
-                "Error fetching project test-project: Test exception"
-            )
+            mock_show_error.assert_called_once_with("Error fetching project test-project: Test exception")
 
             # Ensure the method returns False on exception
             assert result is False
-
-
 
 
 def episodes_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, project_data, season_id):
@@ -674,7 +626,9 @@ def episodes_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, p
             ui.cache.set.assert_not_called()
         else:
             angel_interface_mock.get_project.assert_called_once_with(project_data["slug"])
-            ui.cache.set.assert_called_once_with(f"project_{project_data['slug']}", project_data, expiration=timedelta(hours=12))
+            ui.cache.set.assert_called_once_with(
+                f"project_{project_data['slug']}", project_data, expiration=timedelta(hours=12)
+            )
 
         # Content and sorting assertions
         mock_set_content.assert_called_once_with(1, "tvshows")
@@ -816,6 +770,7 @@ class TestEpisodesMenu:
             # Sorting still applied safely
             mock_add_sort.assert_any_call(1, mock_label_sort)
             mock_end_dir.assert_called_once_with(1)
+
     def test_episodes_menu_applies_progress_bars(self, ui_interface, mock_xbmc, mock_cache):
         """Test episodes_menu applies progress bars to episodes with watch position."""
         ui, logger_mock, angel_interface_mock = ui_interface
@@ -862,29 +817,29 @@ class TestContinueWatchingMenu:
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
         resume_data = {
-            'guids': ['resume-guid-1', 'resume-guid-2'],
-            'positions': {'resume-guid-1': 1200, 'resume-guid-2': 600},
-            'pageInfo': {'hasNextPage': True, 'endCursor': 'cursor-2'}
+            "guids": ["resume-guid-1", "resume-guid-2"],
+            "positions": {"resume-guid-1": 1200, "resume-guid-2": 600},
+            "pageInfo": {"hasNextPage": True, "endCursor": "cursor-2"},
         }
 
         episodes_data = {
-            'episode_resume-guid-1': {
-                'guid': 'resume-guid-1',
-                'name': 'Episode 1',
-                'projectSlug': 'project-1',
-                'duration': 3600,
+            "episode_resume-guid-1": {
+                "guid": "resume-guid-1",
+                "name": "Episode 1",
+                "projectSlug": "project-1",
+                "duration": 3600,
             },
-            'episode_resume-guid-2': {
-                'guid': 'resume-guid-2',
-                'name': 'Episode 2',
-                'projectSlug': 'project-2',
-                'duration': 2400,
-            }
+            "episode_resume-guid-2": {
+                "guid": "resume-guid-2",
+                "name": "Episode 2",
+                "projectSlug": "project-2",
+                "duration": 2400,
+            },
         }
 
         projects_data = {
-            'project-1': {'name': 'Test Show 1', 'id': 'proj-1'},
-            'project-2': {'name': 'Test Show 2', 'id': 'proj-2'},
+            "project-1": {"name": "Test Show 1", "id": "proj-1"},
+            "project-2": {"name": "Test Show 2", "id": "proj-2"},
         }
 
         angel_interface_mock.get_resume_watching.return_value = resume_data
@@ -899,10 +854,10 @@ class TestContinueWatchingMenu:
 
             # Verify API called correctly
             angel_interface_mock.get_resume_watching.assert_called_once_with(first=10, after=None)
-            angel_interface_mock.get_episodes_for_guids.assert_called_once_with(['resume-guid-1', 'resume-guid-2'])
+            angel_interface_mock.get_episodes_for_guids.assert_called_once_with(["resume-guid-1", "resume-guid-2"])
             # Verify projects batch called with both project slugs
             projects_call = angel_interface_mock.get_projects_by_slugs.call_args[0][0]
-            assert set(projects_call) == {'project-1', 'project-2'}
+            assert set(projects_call) == {"project-1", "project-2"}
 
             # Verify items created (2 episodes + 1 load more)
             assert mock_add_item.call_count == 3
@@ -922,11 +877,7 @@ class TestContinueWatchingMenu:
         ui, logger_mock, angel_interface_mock = ui_interface
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
-        resume_data = {
-            'guids': [],
-            'positions': {},
-            'pageInfo': {'hasNextPage': False, 'endCursor': None}
-        }
+        resume_data = {"guids": [], "positions": {}, "pageInfo": {"hasNextPage": False, "endCursor": None}}
         angel_interface_mock.get_resume_watching.return_value = resume_data
 
         with patch.object(ui, "show_notification") as mock_notify:
@@ -941,9 +892,9 @@ class TestContinueWatchingMenu:
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
         angel_interface_mock.get_resume_watching.return_value = {
-            'guids': [],
-            'positions': {},
-            'pageInfo': {'hasNextPage': False}
+            "guids": [],
+            "positions": {},
+            "pageInfo": {"hasNextPage": False},
         }
 
         with patch.object(ui, "show_notification") as mock_notify:
@@ -959,22 +910,22 @@ class TestContinueWatchingMenu:
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
         resume_data = {
-            'guids': ['resume-guid-1'],
-            'positions': {'resume-guid-1': 1200},
-            'pageInfo': {'hasNextPage': False, 'endCursor': None}
+            "guids": ["resume-guid-1"],
+            "positions": {"resume-guid-1": 1200},
+            "pageInfo": {"hasNextPage": False, "endCursor": None},
         }
 
         episodes_data = {
-            'episode_resume-guid-1': {
-                'guid': 'resume-guid-1',
-                'name': 'Episode 1',
-                'projectSlug': 'project-1',
-                'duration': 3600,
+            "episode_resume-guid-1": {
+                "guid": "resume-guid-1",
+                "name": "Episode 1",
+                "projectSlug": "project-1",
+                "duration": 3600,
             }
         }
 
         projects_data = {
-            'project-1': {'name': 'Test Show 1', 'id': 'proj-1'},
+            "project-1": {"name": "Test Show 1", "id": "proj-1"},
         }
 
         angel_interface_mock.get_resume_watching.return_value = resume_data
@@ -1023,22 +974,22 @@ class TestContinueWatchingMenu:
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
         resume_data = {
-            'guids': ['resume-guid-1'],
-            'positions': {'resume-guid-1': 1200},
-            'pageInfo': {'hasNextPage': False}
+            "guids": ["resume-guid-1"],
+            "positions": {"resume-guid-1": 1200},
+            "pageInfo": {"hasNextPage": False},
         }
 
         episodes_data = {
-            'episode_resume-guid-1': {
-                'guid': 'resume-guid-1',
-                'name': 'Episode 1',
-                'projectSlug': 'project-1',
-                'duration': 3600,
+            "episode_resume-guid-1": {
+                "guid": "resume-guid-1",
+                "name": "Episode 1",
+                "projectSlug": "project-1",
+                "duration": 3600,
             }
         }
 
         projects_data = {
-            'project-1': {'name': 'Test Show 1', 'id': 'proj-1'},
+            "project-1": {"name": "Test Show 1", "id": "proj-1"},
         }
 
         angel_interface_mock.get_resume_watching.return_value = resume_data
@@ -1062,22 +1013,22 @@ class TestContinueWatchingMenu:
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
         resume_data = {
-            'guids': ['guid-1'],
-            'positions': {},  # No position for guid-1
-            'pageInfo': {'hasNextPage': False}
+            "guids": ["guid-1"],
+            "positions": {},  # No position for guid-1
+            "pageInfo": {"hasNextPage": False},
         }
 
         episodes_data = {
-            'episode_guid-1': {
-                'guid': 'guid-1',
-                'name': 'Episode 1',
-                'projectSlug': 'project-1',
-                'duration': 3600,
+            "episode_guid-1": {
+                "guid": "guid-1",
+                "name": "Episode 1",
+                "projectSlug": "project-1",
+                "duration": 3600,
             }
         }
 
         projects_data = {
-            'project-1': {'name': 'Test Show', 'id': 'proj-1'},
+            "project-1": {"name": "Test Show", "id": "proj-1"},
         }
 
         angel_interface_mock.get_resume_watching.return_value = resume_data
@@ -1099,19 +1050,19 @@ class TestContinueWatchingMenu:
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
         resume_data = {
-            'guids': ['guid-1', 'guid-2', 'guid-3'],
-            'positions': {'guid-1': 100, 'guid-2': 200, 'guid-3': 300},
-            'pageInfo': {'hasNextPage': False}
+            "guids": ["guid-1", "guid-2", "guid-3"],
+            "positions": {"guid-1": 100, "guid-2": 200, "guid-3": 300},
+            "pageInfo": {"hasNextPage": False},
         }
 
         # Only 2 of 3 episodes returned from batch (guid-3 missing)
         episodes_data = {
-            'episode_guid-1': {'guid': 'guid-1', 'name': 'Episode 1', 'projectSlug': 'project-1'},
-            'episode_guid-2': {'guid': 'guid-2', 'name': 'Episode 2', 'projectSlug': 'project-1'},
+            "episode_guid-1": {"guid": "guid-1", "name": "Episode 1", "projectSlug": "project-1"},
+            "episode_guid-2": {"guid": "guid-2", "name": "Episode 2", "projectSlug": "project-1"},
         }
 
         projects_data = {
-            'project-1': {'name': 'Test Show', 'id': 'proj-1'},
+            "project-1": {"name": "Test Show", "id": "proj-1"},
         }
 
         angel_interface_mock.get_resume_watching.return_value = resume_data
@@ -1136,9 +1087,9 @@ class TestContinueWatchingMenu:
 
         # Resume watching returns data, but batch episodes returns empty
         angel_interface_mock.get_resume_watching.return_value = {
-            'guids': ['guid-1', 'guid-2'],
-            'positions': {'guid-1': 0.5, 'guid-2': 0.3},
-            'pageInfo': {'endCursor': None, 'hasNextPage': False}
+            "guids": ["guid-1", "guid-2"],
+            "positions": {"guid-1": 0.5, "guid-2": 0.3},
+            "pageInfo": {"endCursor": None, "hasNextPage": False},
         }
         angel_interface_mock.get_episodes_for_guids.return_value = {}
 

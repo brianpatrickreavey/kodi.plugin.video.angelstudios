@@ -108,6 +108,7 @@ class TestEpisodePlayback:
             # Verify error handling
             mock_show_error.assert_called_once_with("Failed to play episode: Test exception")
 
+
 class TestVideoPlayback:
     def test_play_video_with_stream(self, ui_interface, mock_xbmc, mock_cache):
         """Test play_video with stream URL."""
@@ -116,7 +117,7 @@ class TestVideoPlayback:
 
         stream_url = "http://example.com/stream"
 
-        with patch('xbmcplugin.setResolvedUrl') as mock_set_resolved_url:
+        with patch("xbmcplugin.setResolvedUrl") as mock_set_resolved_url:
             ui.play_video(stream_url=stream_url)
 
             # Assertions: setResolvedUrl called
@@ -129,7 +130,7 @@ class TestVideoPlayback:
 
         episode_data = MOCK_EPISODE_DATA
 
-        with patch('xbmcplugin.setResolvedUrl') as mock_set_resolved_url:
+        with patch("xbmcplugin.setResolvedUrl") as mock_set_resolved_url:
             ui.play_video(episode_data=episode_data)
 
             # Assertions: setResolvedUrl called
@@ -162,7 +163,7 @@ class TestVideoPlayback:
         stream_url = "http://example.com/stream"
 
         with (
-            patch('xbmcplugin.setResolvedUrl', side_effect=Exception("Test exception")),
+            patch("xbmcplugin.setResolvedUrl", side_effect=Exception("Test exception")),
             patch.object(ui, "show_error") as mock_show_error,
         ):
             ui.play_video(stream_url=stream_url)
@@ -182,18 +183,18 @@ class TestVideoPlayback:
         addon.getSettingBool.return_value = True
 
         with (
-            patch('xbmcaddon.Addon', return_value=addon),
-            patch.object(ui, '_ensure_isa_available', return_value=True),
-            patch('xbmcgui.ListItem', return_value=list_item),
-            patch('xbmcplugin.setResolvedUrl'),
-            patch('xbmc.Player'),
+            patch("xbmcaddon.Addon", return_value=addon),
+            patch.object(ui, "_ensure_isa_available", return_value=True),
+            patch("xbmcgui.ListItem", return_value=list_item),
+            patch("xbmcplugin.setResolvedUrl"),
+            patch("xbmc.Player"),
         ):
             ui.play_video(episode_data=MOCK_EPISODE_DATA)
 
-        list_item.setProperty.assert_any_call('inputstream', 'inputstream.adaptive')
-        list_item.setProperty.assert_any_call('inputstream.adaptive.manifest_type', 'hls')
-        list_item.setProperty.assert_any_call('inputstream.adaptive.stream_selection_type', 'adaptive')
-        list_item.setMimeType.assert_called_once_with('application/vnd.apple.mpegurl')
+        list_item.setProperty.assert_any_call("inputstream", "inputstream.adaptive")
+        list_item.setProperty.assert_any_call("inputstream.adaptive.manifest_type", "hls")
+        list_item.setProperty.assert_any_call("inputstream.adaptive.stream_selection_type", "adaptive")
+        list_item.setMimeType.assert_called_once_with("application/vnd.apple.mpegurl")
         list_item.setContentLookup.assert_called_once_with(False)
 
     def test_play_video_quality_exact_match_no_isa(self, ui_interface, monkeypatch):
@@ -202,18 +203,18 @@ class TestVideoPlayback:
         manifest_url = "http://example.com/master.m3u8"
         addon = MagicMock()
         addon.getSettingBool.return_value = False
-        addon.getSettingString.return_value = '1080p'
+        addon.getSettingString.return_value = "1080p"
 
         list_item = MagicMock()
         info_tag = MagicMock()
         list_item.getVideoInfoTag.return_value = info_tag
 
         with (
-            patch('xbmcaddon.Addon', return_value=addon),
-            patch('xbmcgui.ListItem', return_value=list_item),
-            patch('xbmcplugin.setResolvedUrl'),
+            patch("xbmcaddon.Addon", return_value=addon),
+            patch("xbmcgui.ListItem", return_value=list_item),
+            patch("xbmcplugin.setResolvedUrl"),
         ):
-            ui.play_video(episode_data={'episode': {'source': {'url': manifest_url}}, 'project': {}})
+            ui.play_video(episode_data={"episode": {"source": {"url": manifest_url}}, "project": {}})
 
         list_item.setPath.assert_called_once_with(manifest_url)
 
@@ -224,23 +225,22 @@ class TestVideoPlayback:
         addon = MagicMock()
         # Make getSettingString attribute exist but not be callable
         addon.getSettingString = None
-        addon.getSetting.return_value = '720p'
+        addon.getSetting.return_value = "720p"
 
-        with patch('xbmcaddon.Addon', return_value=addon):
+        with patch("xbmcaddon.Addon", return_value=addon):
             result = ui._get_quality_pref()
 
-        assert result == {'mode': 'fixed', 'target_height': 720}
-        addon.getSetting.assert_called_once_with('video_quality')
+        assert result == {"mode": "fixed", "target_height": 720}
+        addon.getSetting.assert_called_once_with("video_quality")
 
     def test_get_quality_pref_exception_defaults_to_auto(self, ui_interface):
         """Test _get_quality_pref returns auto when an exception occurs."""
         ui, _, _ = ui_interface
 
-        with patch('xbmcaddon.Addon', side_effect=Exception("Addon initialization failed")):
+        with patch("xbmcaddon.Addon", side_effect=Exception("Addon initialization failed")):
             result = ui._get_quality_pref()
 
-        assert result == {'mode': 'auto', 'target_height': None}
-
+        assert result == {"mode": "auto", "target_height": None}
 
     def test_play_video_no_manifest_logs_warning(self, ui_interface):
         ui, logger_mock, _ = ui_interface
@@ -253,11 +253,11 @@ class TestVideoPlayback:
         list_item.getVideoInfoTag.return_value = info_tag
 
         with (
-            patch('xbmcaddon.Addon', return_value=addon),
-            patch('xbmcgui.ListItem', return_value=list_item),
-            patch('xbmcplugin.setResolvedUrl'),
+            patch("xbmcaddon.Addon", return_value=addon),
+            patch("xbmcgui.ListItem", return_value=list_item),
+            patch("xbmcplugin.setResolvedUrl"),
         ):
-            ui.play_video(episode_data={'episode': {'source': {}}, 'project': {}})
+            ui.play_video(episode_data={"episode": {"source": {}}, "project": {}})
 
         logger_mock.warning.assert_any_call("No manifest URL available; skipping quality selection")
 
@@ -266,7 +266,7 @@ class TestVideoPlayback:
 
         addon = MagicMock()
         addon.getSettingBool.return_value = True
-        addon.getSettingString.return_value = '720p'
+        addon.getSettingString.return_value = "720p"
 
         list_item = MagicMock()
         info_tag = MagicMock()
@@ -275,23 +275,23 @@ class TestVideoPlayback:
         manifest_url = "http://example.com/master.m3u8"
 
         with (
-            patch('xbmcaddon.Addon', return_value=addon),
-            patch.object(ui, '_ensure_isa_available', return_value=True),
-            patch('xbmcgui.ListItem', return_value=list_item),
-            patch('xbmcplugin.setResolvedUrl'),
+            patch("xbmcaddon.Addon", return_value=addon),
+            patch.object(ui, "_ensure_isa_available", return_value=True),
+            patch("xbmcgui.ListItem", return_value=list_item),
+            patch("xbmcplugin.setResolvedUrl"),
         ):
-            ui.play_video(episode_data={'episode': {'source': {'url': manifest_url}}, 'project': {}})
+            ui.play_video(episode_data={"episode": {"source": {"url": manifest_url}}, "project": {}})
 
-        list_item.setProperty.assert_any_call('inputstream.adaptive.chooser_resolution_max', '720p')
-        list_item.setProperty.assert_any_call('inputstream.adaptive.chooser_resolution_secure_max', '720p')
-        list_item.setProperty.assert_any_call('inputstream.adaptive.stream_selection_type', 'fixed-res')
+        list_item.setProperty.assert_any_call("inputstream.adaptive.chooser_resolution_max", "720p")
+        list_item.setProperty.assert_any_call("inputstream.adaptive.chooser_resolution_secure_max", "720p")
+        list_item.setProperty.assert_any_call("inputstream.adaptive.stream_selection_type", "fixed-res")
 
     def test_play_video_sets_isa_stream_selection_manual(self, ui_interface):
         ui, _, _ = ui_interface
 
         addon = MagicMock()
         addon.getSettingBool.return_value = True
-        addon.getSettingString.return_value = 'manual'
+        addon.getSettingString.return_value = "manual"
 
         list_item = MagicMock()
         info_tag = MagicMock()
@@ -300,16 +300,16 @@ class TestVideoPlayback:
         manifest_url = "http://example.com/master.m3u8"
 
         with (
-            patch('xbmcaddon.Addon', return_value=addon),
-            patch.object(ui, '_ensure_isa_available', return_value=True),
-            patch('xbmcgui.ListItem', return_value=list_item),
-            patch('xbmcplugin.setResolvedUrl'),
+            patch("xbmcaddon.Addon", return_value=addon),
+            patch.object(ui, "_ensure_isa_available", return_value=True),
+            patch("xbmcgui.ListItem", return_value=list_item),
+            patch("xbmcplugin.setResolvedUrl"),
         ):
-            ui.play_video(episode_data={'episode': {'source': {'url': manifest_url}}, 'project': {}})
+            ui.play_video(episode_data={"episode": {"source": {"url": manifest_url}}, "project": {}})
 
-        list_item.setProperty.assert_any_call('inputstream.adaptive.stream_selection_type', 'ask-quality')
+        list_item.setProperty.assert_any_call("inputstream.adaptive.stream_selection_type", "ask-quality")
         assert not any(
-            call_args.args[0] == 'inputstream.adaptive.chooser_resolution_max'
+            call_args.args[0] == "inputstream.adaptive.chooser_resolution_max"
             for call_args in list_item.setProperty.call_args_list
         )
 
@@ -318,7 +318,7 @@ class TestVideoPlayback:
 
         addon = MagicMock()
         addon.getSettingBool.return_value = True
-        addon.getSettingString.return_value = '1080p'
+        addon.getSettingString.return_value = "1080p"
 
         list_item = MagicMock()
         info_tag = MagicMock()
@@ -327,13 +327,13 @@ class TestVideoPlayback:
         manifest_url = "http://example.com/master.m3u8"
 
         with (
-            patch('xbmcaddon.Addon', return_value=addon),
-            patch.object(ui, '_ensure_isa_available', return_value=False),
-            patch('kodi_ui_interface.xbmc.getCondVisibility', return_value=False),
-            patch('xbmcgui.ListItem', return_value=list_item),
-            patch('xbmcplugin.setResolvedUrl'),
+            patch("xbmcaddon.Addon", return_value=addon),
+            patch.object(ui, "_ensure_isa_available", return_value=False),
+            patch("kodi_ui_interface.xbmc.getCondVisibility", return_value=False),
+            patch("xbmcgui.ListItem", return_value=list_item),
+            patch("xbmcplugin.setResolvedUrl"),
         ):
-            ui.play_video(episode_data={'episode': {'source': {'url': manifest_url}}, 'project': {}})
+            ui.play_video(episode_data={"episode": {"source": {"url": manifest_url}}, "project": {}})
 
         logger_mock.info.assert_any_call("ISA requested but unavailable; falling back to native playback")
 
@@ -342,7 +342,7 @@ class TestVideoPlayback:
 
         addon = MagicMock()
         addon.getSettingBool.return_value = True
-        addon.getSettingString.return_value = '1080p'
+        addon.getSettingString.return_value = "1080p"
 
         list_item = MagicMock()
         info_tag = MagicMock()
@@ -351,12 +351,12 @@ class TestVideoPlayback:
         manifest_url = "http://example.com/master.m3u8"
 
         with (
-            patch('xbmcaddon.Addon', return_value=addon),
-            patch.object(ui, '_ensure_isa_available', return_value=False),
-            patch('kodi_ui_interface.xbmc.getCondVisibility', return_value=True),
-            patch('xbmcgui.ListItem', return_value=list_item),
-            patch('xbmcplugin.setResolvedUrl'),
+            patch("xbmcaddon.Addon", return_value=addon),
+            patch.object(ui, "_ensure_isa_available", return_value=False),
+            patch("kodi_ui_interface.xbmc.getCondVisibility", return_value=True),
+            patch("xbmcgui.ListItem", return_value=list_item),
+            patch("xbmcplugin.setResolvedUrl"),
         ):
-            ui.play_video(episode_data={'episode': {'source': {'url': manifest_url}}, 'project': {}})
+            ui.play_video(episode_data={"episode": {"source": {"url": manifest_url}}, "project": {}})
 
-        list_item.setProperty.assert_any_call('inputstream', 'inputstream.adaptive')
+        list_item.setProperty.assert_any_call("inputstream", "inputstream.adaptive")

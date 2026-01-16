@@ -17,7 +17,9 @@ This is a Kodi addon (`plugin.video.angelstudios`) for streaming Angel Studios c
 - Be truthful and factual; avoid anthropomorphism (e.g., do not claim to "misread" files or "forget" actions).
 - Prioritize accurate, concise, and direct communication.
 - Prioritize correct, robust code; avoid workarounds, shortcuts, or bad patterns.
-- Target 100% unit test coverage; do not skip testing any code portions.
+- Project MUST achieve 100% unit test coverage, per `make unittest-with-coverage`
+  - This exact command is preapproved.  Do not add any redirection or piping to the command above.
+  - Any use of `# pragma: no cover` must be explicitly approved.
 - Adhere to best practices; justify any deviations clearly.
 - Use test data and parameterization extensively in tests.
 - Favor verbose, readable code over clever or obscure implementations.
@@ -35,7 +37,7 @@ This is a Kodi addon (`plugin.video.angelstudios`) for streaming Angel Studios c
   - **File Loading**: GraphQL queries/fragments loaded from `resources/graphql/` with caching in `_query_cache`/`_fragment_cache`.
 
 ### Developer Workflows
-- **Testing**: Run `pytest --cov=kodi_ui_interface --cov-report=html` from project root. Tests use fixtures in `tests/unit/conftest.py` for mocking Kodi (`xbmcplugin`, `xbmcgui`) and sessions.
+- **Testing**: Run `make unittest-with-coverage` from project root. Tests use fixtures in `tests/unit/conftest.py` for mocking Kodi (`xbmcplugin`, `xbmcgui`) and sessions.
 - **Debugging**: Use Kodi's log viewer for addon logs. Mock external calls in tests to isolate issues.
 - **Build/Deploy**: No custom build; install as Kodi addon. Use `addon.xml` for metadata.
 

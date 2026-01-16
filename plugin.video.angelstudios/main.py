@@ -28,7 +28,7 @@ import xbmcvfs  # type: ignore
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "resources/lib"))
 
 from angel_interface import AngelStudiosInterface  # noqa: E402
-from helpers import KodiLogger, get_session_file  # noqa: E402
+from kodi_utils import KodiLogger, get_session_file  # noqa: E402
 from kodi_ui_interface import KodiUIInterface  # noqa: E402
 
 # Plugin constants
@@ -44,8 +44,8 @@ logger = KodiLogger(debug_promotion=debug_promotion)
 ui_interface = KodiUIInterface(HANDLE, URL, logger=logger, angel_interface=None)
 
 # Get credentials from addon settings once at module load
-USERNAME = ADDON.getSetting("username")
-PASSWORD = ADDON.getSetting("password")
+USERNAME = ADDON.getSettingString("username")
+PASSWORD = ADDON.getSettingString("password")
 
 
 def router(paramstring):
@@ -124,28 +124,13 @@ def router(paramstring):
                 ADDON.openSettings()
             elif params["action"] == "clear_cache":
                 logger.info("Settings: clear_cache button pressed")
-                success = ui_interface.clear_cache()
-                if success:
-                    ui_interface.show_notification("Cache cleared.")
-                else:
-                    ui_interface.show_notification("Cache clear failed; please try again.")
+                ui_interface.clear_cache_with_notification()
             elif params["action"] == "force_logout":
                 logger.info("Settings: force_logout button pressed")
-                if not ui_interface.angel_interface:
-                    raise ValueError("Angel interface not initialized")
-
-                success = ui_interface.angel_interface.force_logout()
-                if success:
-                    ui_interface.show_notification("Logged out locally.")
-                else:
-                    ui_interface.show_notification("Logout failed; please try again.")
+                ui_interface.force_logout_with_notification()
             elif params["action"] == "clear_debug_data":
                 logger.info("Settings: clear_debug_data button pressed")
-                success = ui_interface.clear_debug_data()
-                if success:
-                    ui_interface.show_notification("Debug data cleared.")
-                else:
-                    ui_interface.show_notification("Debug data clear failed; please try again.")
+                ui_interface.clear_debug_data_with_notification()
             elif params["action"] == "show_information":
                 ui_interface.show_auth_details_dialog()
             else:
@@ -167,7 +152,7 @@ if __name__ == "__main__":
         if not USERNAME or not PASSWORD:
             # Show error if credentials are not set
             xbmcgui.Dialog().ok(
-                "Configuration Error",
+                "Angel Studios",
                 "Please configure your Angel.com username and password in the addon settings.",
             )
         else:

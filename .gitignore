@@ -185,5 +185,4 @@ temp
 addon_development.xml
 credentials.json
 .vscode
-archive
 *.pkl

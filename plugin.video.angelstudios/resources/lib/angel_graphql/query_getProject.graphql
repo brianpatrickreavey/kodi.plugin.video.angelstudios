@@ -2,7 +2,7 @@
 # This query retrieves detailed information about a project, including its title,
 # seasons, episodes, and various metadata. It also includes early access information
 # for episodes if applicable.
-# 
+#
 # Captured from https://www.angel.com/watch/{slug}.
 
 query getProject($slug: String!, $includePrerelease: Boolean = false, $includeSeasons: Boolean = true) {

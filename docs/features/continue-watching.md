@@ -1,4 +1,4 @@
-# Continue Watching Feature
+ # Continue Watching Feature
 
 ## Overview
 Add a new "Continue Watching" menu item that displays in-progress episodes from the Angel API using cursor-based pagination with a deliberate "Load More" button. As part of this work, apply native Kodi progress indicators to all episode/content list items across the plugin.

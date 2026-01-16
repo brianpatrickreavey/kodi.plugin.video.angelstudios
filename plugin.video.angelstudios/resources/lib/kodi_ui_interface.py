@@ -19,6 +19,13 @@ from simplecache import SimpleCache  # type: ignore
 
 REDACTED = "<redacted>"
 
+# Cache TTL defaults (in seconds)
+# Note: Current implementation uses addon settings via _cache_ttl(); these constants
+# exist for clarity and future use without changing runtime behavior.
+DEFAULT_CACHE_TTL_PROJECTS = 3600  # 1 hour (projects menu)
+DEFAULT_CACHE_TTL_EPISODES = 86400 * 3  # 72 hours (episodes data)
+DEFAULT_CACHE_TTL_PROJECT = 28800  # 8 hours (individual project)
+
 angel_menu_content_mapper = {
     "movies": "movie",
     "series": "series",
@@ -178,7 +185,13 @@ class KodiUIInterface:
         return f"{self.kodi_url}?{urlencode(kwargs)}"
 
     def _cache_ttl(self):
-        """Return timedelta for current cache expiration setting."""
+        """Return timedelta for current cache expiration setting.
+
+        Uses addon setting `cache_expiration_hours`. Module-level TTL constants
+        (DEFAULT_CACHE_TTL_PROJECTS, DEFAULT_CACHE_TTL_EPISODES, DEFAULT_CACHE_TTL_PROJECT)
+        are provided for clarity and future specialization but are not applied here
+        to avoid changing existing behavior.
+        """
         try:
             hours = self.addon.getSettingInt("cache_expiration_hours")
             if not hours:
@@ -383,6 +396,30 @@ class KodiUIInterface:
                 self.show_error("Failed to load Continue Watching")
                 return
 
+            # Fallback: handle legacy shape with 'episodes' list containing embedded project
+            if isinstance(resume_data, dict) and "episodes" in resume_data and isinstance(resume_data["episodes"], list):
+                xbmcplugin.setContent(self.handle, "videos")
+                for episode in resume_data["episodes"]:
+                    project = episode.get("project") if isinstance(episode, dict) else None
+                    list_item = self._create_list_item_from_episode(
+                        episode,
+                        project=project,
+                        content_type="",
+                        stream_url=None,
+                        is_playback=False,
+                    )
+                    project_slug = episode.get("projectSlug") or (project or {}).get("slug", "")
+                    url = self.create_plugin_url(
+                        base_url=self.kodi_url,
+                        action="play_episode",
+                        content_type="",
+                        project_slug=project_slug,
+                        episode_guid=episode.get("guid", ""),
+                    )
+                    xbmcplugin.addDirectoryItem(self.handle, url, list_item, False)
+                xbmcplugin.endOfDirectory(self.handle)
+                return
+
             guids = resume_data.get("guids", [])
             positions = resume_data.get("positions", {})
             page_info = resume_data.get("pageInfo", {})
@@ -561,6 +598,18 @@ class KodiUIInterface:
                 xbmcplugin.addDirectoryItem(self.handle, url, list_item, True)
 
             xbmcplugin.addSortMethod(self.handle, xbmcplugin.SORT_METHOD_LABEL)
+
+            try:
+                enable_prefetch = self.addon.getSettingBool("enable_prefetch")
+                if enable_prefetch:
+                    max_count = self.addon.getSettingInt("prefetch_project_count") or 5
+                    if max_count <= 0:
+                        max_count = 5
+                    slugs = [p.get("slug") for p in projects if p.get("slug")]
+                    self._deferred_prefetch_project(slugs, max_count)
+            except Exception as exc:
+                self.log.warning(f"prefetch settings read failed; skipping prefetch: {exc}")
+
             xbmcplugin.endOfDirectory(self.handle)
 
         except Exception as e:
@@ -632,10 +681,14 @@ class KodiUIInterface:
                 self.show_error(f"Project not found: {project_slug}")
                 return
 
-            season = next(
-                (s for s in project.get("seasons", []) if s.get("id") == season_id),
-                None,
-            )
+            # If season_id is None, use first season (all-seasons mode)
+            if season_id is None and project.get("seasons"):
+                season = project["seasons"][0]
+            else:
+                season = next(
+                    (s for s in project.get("seasons", []) if s.get("id") == season_id),
+                    None,
+                )
             if not season:
                 self.log.error(f"Season not found: {season_id}")
                 self.show_error(f"Season not found: {season_id}")
@@ -663,7 +716,9 @@ class KodiUIInterface:
                 # Apply progress bar if watch position data is available
                 if episode.get("watchPosition"):
                     watch_position = episode["watchPosition"].get("position")
-                    duration = episode.get("source", {}).get("duration") if episode_available else episode.get("duration")
+                    duration = (
+                        episode.get("source", {}).get("duration") if episode_available else episode.get("duration")
+                    )
                     if watch_position is not None and duration is not None:
                         self._apply_progress_bar(list_item, watch_position, duration)
 
@@ -938,8 +993,7 @@ class KodiUIInterface:
         """
         if watch_position_seconds is None or duration_seconds is None or duration_seconds == 0:
             self.log.debug(
-                f"Skipping progress bar: watch_position={watch_position_seconds}, "
-                f"duration={duration_seconds}"
+                f"Skipping progress bar: watch_position={watch_position_seconds}, " f"duration={duration_seconds}"
             )
             return
 
@@ -950,7 +1004,9 @@ class KodiUIInterface:
 
             info_tag = list_item.getVideoInfoTag()
             info_tag.setResumePoint(resume_point)
-            self.log.debug(f"Applied progress bar: {watch_position_seconds}s / {duration_seconds}s = {resume_point:.2%}")
+            self.log.debug(
+                f"Applied progress bar: {watch_position_seconds}s / {duration_seconds}s = {resume_point:.2%}"
+            )
         except Exception as e:
             self.log.warning(
                 f"Failed to apply progress bar: {e}. "
@@ -1067,8 +1123,17 @@ class KodiUIInterface:
         else:
             list_item.setIsFolder(True)
 
-        # Set common metadata
-        self._process_attributes_to_infotags(list_item, episode)
+        # Set common metadata (inject project logo if episode lacks one)
+        art_info = dict(episode) if isinstance(episode, dict) else {}
+        try:
+            if project and isinstance(project, dict) and "logoCloudinaryPath" in project:
+                if "logoCloudinaryPath" not in art_info:
+                    self.log.debug(f"[ART] Injecting project logo into episode: {project['logoCloudinaryPath']}")
+                    art_info["logoCloudinaryPath"] = project["logoCloudinaryPath"]
+        except Exception:
+            pass
+
+        self._process_attributes_to_infotags(list_item, art_info)
 
         # Set media type and additional metadata
         info_tag = list_item.getVideoInfoTag()
@@ -1149,6 +1214,20 @@ class KodiUIInterface:
                 for meta_key, meta_value in value.items():
                     if meta_key in mapping and meta_value:
                         mapping[meta_key](meta_value)
+            elif key == "cast" and isinstance(value, list):
+                # Validate and filter cast entries
+                valid_actors = []
+                for actor_entry in value:
+                    if not isinstance(actor_entry, dict):
+                        continue
+                    name = actor_entry.get("name")
+                    if name and isinstance(name, str) and name.strip():
+                        try:
+                            valid_actors.append(xbmc.Actor(name=name.strip()))
+                        except Exception:
+                            pass
+                if valid_actors:
+                    info_tag.setCast(valid_actors)
             # Handle artwork
             elif "Cloudinary" in key and value:
                 if key in ["discoveryPosterCloudinaryPath", "posterCloudinaryPath"]:
@@ -1165,6 +1244,27 @@ class KodiUIInterface:
                     art_dict["icon"] = self.angel_interface.get_cloudinary_url(value)
                 else:
                     self.log.info(f"Unknown Cloudinary key: {key}, skipping")
+            elif key in ("portraitStill1", "portraitStill2") and isinstance(value, dict):
+                cp = value.get("cloudinaryPath")
+                if cp:
+                    self.log.debug(f"[ART] Using {key}: {cp}")
+                    url = self.angel_interface.get_cloudinary_url(cp)
+                    art_dict.setdefault("poster", url)
+                    art_dict.setdefault("thumb", url)
+            elif key == "portraitTitleImage" and isinstance(value, dict):
+                self.log.debug(f"[ART] direct portraitTitleImage: {value}")
+                cp = value.get("cloudinaryPath")
+                if cp:
+                    self.log.debug(f"[ART] Using direct portraitTitleImage: {cp}")
+                    url = self.angel_interface.get_cloudinary_url(cp)
+                    art_dict.setdefault("poster", url)
+                    art_dict.setdefault("thumb", url)
+            elif key in ("landscapeStill1", "landscapeStill2") and isinstance(value, dict):
+                cp = value.get("cloudinaryPath")
+                if cp:
+                    url = self.angel_interface.get_cloudinary_url(cp)
+                    art_dict.setdefault("landscape", url)
+                    art_dict.setdefault("fanart", url)
             elif key == "seasonNumber" and value == 0:
                 self.log.info("Season is 0, skipping season info")
             elif key == "season" and isinstance(value, dict):
@@ -1178,6 +1278,9 @@ class KodiUIInterface:
             elif key == "watchPosition" and isinstance(value, dict):
                 # Skip nested watchPosition objects (handled separately for progress)
                 pass  # pragma: no cover - defensive skip of nested watchPosition
+            elif key == "cast":
+                # Cast handled above; skip here
+                pass
             elif key in mapping:
                 mapping[key](value)
             else:
@@ -1188,3 +1291,146 @@ class KodiUIInterface:
             self.log.debug(f"Setting artwork: {art_dict}")
             list_item.setArt(art_dict)
         return
+
+    def _merge_stills_into_episodes(self, episodes, project_slug):
+        """Merge ContentSeries STILLs into raw episodes list using cached project."""
+        try:
+            cache_key = f"project_{project_slug}"
+            project = self.cache.get(cache_key)
+            if not project:
+                self.log.debug(f"No cached project for {project_slug}, skipping STILL merge")
+                return episodes
+
+            title = project.get("title", {}) if isinstance(project, dict) else {}
+            if title.get("__typename") != "ContentSeries":
+                self.log.debug(f"No ContentSeries data in project {project_slug}")
+                return episodes
+
+            seasons_edges = title.get("seasons", {})
+            unwrap = getattr(self.angel_interface, "_unwrap_relay_pagination", None)
+            seasons = unwrap(seasons_edges) if callable(unwrap) else []
+
+            stills_by_id = {}
+            for season in seasons:
+                episodes_edges = (season or {}).get("episodes", {})
+                nodes = unwrap(episodes_edges) if callable(unwrap) else []
+                for node in nodes:
+                    if not isinstance(node, dict):
+                        continue
+                    eid = node.get("id")
+                    if not eid:
+                        continue
+                    payload = {}
+                    if isinstance(node.get("portraitStill1"), dict):
+                        payload["portraitStill1"] = node["portraitStill1"]
+                    if isinstance(node.get("landscapeStill1"), dict):
+                        payload["landscapeStill1"] = node["landscapeStill1"]
+                    if payload:
+                        stills_by_id[eid] = payload
+
+            self.log.info(
+                f"Merging ContentSeries STILLs from {len(stills_by_id)} episodes into {len(episodes)} episodes"
+            )
+
+            merged = []
+            for ep in episodes:
+                if not ep:
+                    merged.append(ep)
+                    continue
+                eid = ep.get("id")
+                inject = stills_by_id.get(eid, {})
+                if inject:
+                    m = dict(ep)
+                    m.update(inject)
+                    merged.append(m)
+                else:
+                    merged.append(ep)
+            return merged
+        except Exception as exc:
+            self.log.error(f"Failed to merge STILLs: {exc}")
+            return episodes
+
+    def _normalize_contentseries_episode(self, episode):
+        """Normalize ContentSeries episode dict to expected keys."""
+        if not isinstance(episode, dict):
+            return {}
+        keys = {
+            "id",
+            "name",
+            "subtitle",
+            "description",
+            "episodeNumber",
+            "portraitStill1",
+            "landscapeStill1",
+            "landscapeStill2",
+        }
+        return {k: episode[k] for k in keys if k in episode}
+
+    def _deferred_prefetch_project(self, project_slugs, max_count=None):
+        """Prefetch and cache project data for given slugs in the background."""
+        try:
+            if not project_slugs:
+                return
+
+            if not hasattr(self.cache, "_execute_sql"):
+                self.log.debug("SimpleCache introspection not available; prefetch skipped")
+                return
+
+            rows = self.cache._execute_sql("SELECT id FROM simplecache WHERE id LIKE ?", ("project_%",))
+            cached = set()
+            for row in rows.fetchall() if rows else []:
+                val = row[0]
+                if isinstance(val, str) and val.startswith("project_"):
+                    cached.add(val.split("project_", 1)[1])
+
+            to_fetch = [s for s in project_slugs if s not in cached]
+            if not to_fetch:
+                self.log.debug("All requested projects already cached; skipping prefetch")
+                return
+
+            if isinstance(max_count, int) and max_count > 0:
+                to_fetch = to_fetch[:max_count]
+
+            for slug in to_fetch:
+                try:
+                    proj = self.angel_interface.get_project(slug)
+                except Exception:
+                    self.log.debug("API error; abandoning prefetch")
+                    break
+                if not proj:
+                    continue
+                if self._cache_enabled():
+                    self.cache.set(f"project_{slug}", proj, expiration=self._cache_ttl())
+        except Exception as exc:
+            self.log.error(f"Project prefetch failed: {exc}")
+
+    def clear_cache_with_notification(self):
+        """Clear cache and notify user with outcome."""
+        result = self.clear_cache()
+        if result:
+            self.show_notification("Cache cleared.")
+            self.log.info("Cache cleared successfully via settings")
+        else:
+            self.show_notification("Cache clear failed; please try again.")
+            self.log.error("Cache clear failed via settings")
+
+    def force_logout_with_notification(self):
+        """Force local logout via angel_interface and notify user."""
+        if not self.angel_interface:
+            raise ValueError("Angel interface not initialized")
+        result = self.angel_interface.force_logout()
+        if result:
+            self.show_notification("Logged out locally.")
+            self.log.info("Logged out locally via settings")
+        else:
+            self.show_notification("Logout failed; please try again.")
+            self.log.error("Logout failed via settings")
+
+    def clear_debug_data_with_notification(self):
+        """Clear debug trace files and log outcome; notify on success."""
+        result = self.clear_debug_data()
+        if result:
+            self.show_notification("Debug data cleared.")
+            self.log.info("Debug data cleared via settings")
+        else:
+            self.log.error("Debug data clear failed via settings")
