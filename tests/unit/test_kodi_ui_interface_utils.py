@@ -34,7 +34,7 @@ class TestUtils:
         mock_info_tag = MagicMock()
         mock_list_item.getVideoInfoTag.return_value = mock_info_tag
 
-        ui._apply_progress_bar(mock_list_item, watch_position, duration)
+        ui.menu_handler._apply_progress_bar(mock_list_item, watch_position, duration)
 
         mock_list_item.getVideoInfoTag.assert_called_once()
         # Allow small floating point difference
@@ -60,7 +60,7 @@ class TestUtils:
         mock_list_item.getVideoInfoTag.return_value = mock_info_tag
 
         # Should not raise exception
-        ui._apply_progress_bar(mock_list_item, watch_position, duration)
+        ui.menu_handler._apply_progress_bar(mock_list_item, watch_position, duration)
 
         # Should not call setResumePoint for invalid input
         mock_info_tag.setResumePoint.assert_not_called()
@@ -74,13 +74,13 @@ class TestUtils:
         mock_list_item.getVideoInfoTag.return_value = mock_info_tag
 
         # Test watch position > duration (clamped to 1.0)
-        ui._apply_progress_bar(mock_list_item, 150.0, 100.0)
+        ui.menu_handler._apply_progress_bar(mock_list_item, 150.0, 100.0)
         actual_resume = mock_info_tag.setResumePoint.call_args[0][0]
         assert actual_resume == 1.0
 
         # Test negative watch position (clamped to 0.0)
         mock_info_tag.reset_mock()
-        ui._apply_progress_bar(mock_list_item, -10.0, 100.0)
+        ui.menu_handler._apply_progress_bar(mock_list_item, -10.0, 100.0)
         actual_resume = mock_info_tag.setResumePoint.call_args[0][0]
         assert actual_resume == 0.0
 
@@ -93,7 +93,7 @@ class TestUtils:
         mock_list_item.getVideoInfoTag.return_value = mock_info_tag
 
         # String inputs that are valid floats
-        ui._apply_progress_bar(mock_list_item, "50.0", "100.0")
+        ui.menu_handler._apply_progress_bar(mock_list_item, "50.0", "100.0")
 
         mock_info_tag.setResumePoint.assert_called_once()
         actual_resume = mock_info_tag.setResumePoint.call_args[0][0]
@@ -108,7 +108,7 @@ class TestUtils:
         mock_list_item.getVideoInfoTag.return_value = mock_info_tag
 
         # String that cannot be converted to float should raise ValueError
-        ui._apply_progress_bar(mock_list_item, "not-a-number", "100.0")
+        ui.menu_handler._apply_progress_bar(mock_list_item, "not-a-number", "100.0")
 
         # Should not call setResumePoint on error
         mock_info_tag.setResumePoint.assert_not_called()
@@ -124,7 +124,7 @@ class TestUtils:
         mock_list_item.getVideoInfoTag.return_value = mock_info_tag
 
         # Object that cannot be converted to float should raise TypeError
-        ui._apply_progress_bar(mock_list_item, {"nested": "dict"}, 100.0)
+        ui.menu_handler._apply_progress_bar(mock_list_item, {"nested": "dict"}, 100.0)
 
         # Should not call setResumePoint on error
         mock_info_tag.setResumePoint.assert_not_called()
@@ -140,7 +140,7 @@ class TestUtils:
         mock_list_item.getVideoInfoTag.side_effect = RuntimeError("Kodi error")
 
         # Should not raise exception, but catch it
-        ui._apply_progress_bar(mock_list_item, 50.0, 100.0)
+        ui.menu_handler._apply_progress_bar(mock_list_item, 50.0, 100.0)
 
         # Should log warning
         logger_mock.warning.assert_called()
@@ -162,12 +162,12 @@ class TestUtils:
         with (
             patch("xbmcgui.ListItem") as mock_list_item,
             patch("xbmc.VideoStreamDetail") as mock_video_stream_detail,
-            patch.object(ui, "_process_attributes_to_infotags") as mock_process_attrs,
+            patch.object(ui.menu_handler, "_process_attributes_to_infotags") as mock_process_attrs,
         ):
 
             mock_list_item.return_value = MagicMock()
 
-            result = ui._create_list_item_from_episode(
+            result = ui.menu_handler._create_list_item_from_episode(
                 episode=episode, project=project, content_type="series", stream_url=stream_url, is_playback=is_playback
             )
 
@@ -209,7 +209,7 @@ class TestUtils:
         # Mock Cloudinary URL calls
         angel_interface_mock.get_cloudinary_url.return_value = "http://example.com/poster.jpg"
 
-        ui._process_attributes_to_infotags(mock_list_item, episode)
+        ui.menu_handler._process_attributes_to_infotags(mock_list_item, episode)
 
         # Ensure getVideoInfoTag was called
         mock_list_item.getVideoInfoTag.assert_called_once()
@@ -248,7 +248,7 @@ class TestUtils:
         mock_list_item.getVideoInfoTag.return_value = mock_info_tag
         mock_list_item.getLabel.return_value = "Test Episode"
 
-        ui._process_attributes_to_infotags(mock_list_item, episode)
+        ui.menu_handler._process_attributes_to_infotags(mock_list_item, episode)
 
         # Verify title and media_type were set
         mock_info_tag.setTitle.assert_called_with("Test Episode")
@@ -272,7 +272,7 @@ class TestUtils:
         mock_list_item.getVideoInfoTag.return_value = mock_info_tag
         mock_list_item.getLabel.return_value = "Test Episode"
 
-        ui._process_attributes_to_infotags(mock_list_item, episode)
+        ui.menu_handler._process_attributes_to_infotags(mock_list_item, episode)
 
         # Verify title and media_type were set
         mock_info_tag.setTitle.assert_called_with("Test Episode")
@@ -296,7 +296,7 @@ class TestUtils:
         mock_list_item.getVideoInfoTag.return_value = mock_info_tag
         mock_list_item.getLabel.return_value = "Test Episode"
 
-        ui._process_attributes_to_infotags(mock_list_item, episode)
+        ui.menu_handler._process_attributes_to_infotags(mock_list_item, episode)
 
         # Verify title and media_type were set
         mock_info_tag.setTitle.assert_called_with("Test Episode")

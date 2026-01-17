@@ -214,7 +214,7 @@ class TestPrefetchIntegration:
 
         # Mock prefetch
         with (
-            patch.object(ui, "_process_attributes_to_infotags", return_value=None),
+            patch.object(ui.menu_handler, "_process_attributes_to_infotags", return_value=None),
             patch.object(ui, "_deferred_prefetch_project") as mock_prefetch,
         ):
             ui.projects_menu("series")
@@ -239,7 +239,7 @@ class TestPrefetchIntegration:
 
         # Mock prefetch
         with (
-            patch.object(ui, "_process_attributes_to_infotags", return_value=None),
+            patch.object(ui.menu_handler, "_process_attributes_to_infotags", return_value=None),
             patch.object(ui, "_deferred_prefetch_project") as mock_prefetch,
         ):
             ui.projects_menu("series")
@@ -260,7 +260,7 @@ class TestPrefetchIntegration:
         ui.cache.get.return_value = None
 
         # Execute (should not raise)
-        with patch.object(ui, "_process_attributes_to_infotags", return_value=None):
+        with patch.object(ui.menu_handler, "_process_attributes_to_infotags", return_value=None):
             ui.projects_menu("series")
 
         # Verify warning logged
@@ -284,7 +284,7 @@ class TestPrefetchIntegration:
 
         # Mock prefetch
         with (
-            patch.object(ui, "_process_attributes_to_infotags", return_value=None),
+            patch.object(ui.menu_handler, "_process_attributes_to_infotags", return_value=None),
             patch.object(ui, "_deferred_prefetch_project") as mock_prefetch,
         ):
             ui.projects_menu("series")

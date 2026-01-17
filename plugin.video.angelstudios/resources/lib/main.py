@@ -37,7 +37,10 @@ debug_mode = (ADDON.getSettingString("debug_mode") or "off").lower()
 debug_promotion = debug_mode in {"debug", "trace"}
 logger = KodiLogger(debug_promotion=debug_promotion)
 
-ui_interface = KodiUIInterface(HANDLE, URL, logger=logger, angel_interface=None)
+# Create Angel Studios interface
+angel_interface = None
+
+ui_interface = KodiUIInterface(HANDLE, URL, logger=logger, angel_interface=angel_interface)
 
 # Get credentials from addon settings once at module load
 USERNAME = ADDON.getSettingString("username")

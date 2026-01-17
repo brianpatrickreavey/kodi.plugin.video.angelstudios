@@ -49,7 +49,7 @@ class TestKodiUIInterfaceLines1399_1400:
 
             with patch.object(ui.log, "debug") as mock_debug:
                 # This calls the code path at lines 1399-1400
-                ui._create_list_item_from_episode(episode, project=project, content_type="series")
+                ui.menu_handler._create_list_item_from_episode(episode, project=project, content_type="series")
 
             # Verify logo injection was logged
             mock_debug.assert_any_call("[ART] Injecting project logo into episode: project_logo.png")
@@ -87,7 +87,7 @@ class TestKodiUIInterfaceLines1583_1587:
             info_dict = {"portraitStill1": {"cloudinaryPath": "portrait_still_1.jpg"}}
 
             with patch.object(ui.log, "debug") as mock_debug:
-                ui._process_attributes_to_infotags(list_item, info_dict)
+                ui.menu_handler._process_attributes_to_infotags(list_item, info_dict)
 
             # Verify the debug log at line 1587
             mock_debug.assert_any_call("[ART] Using portraitStill1: portrait_still_1.jpg")
@@ -125,7 +125,7 @@ class TestKodiUIInterfaceLines1589_1597:
             info_dict = {"portraitTitleImage": {"cloudinaryPath": "direct_portrait.jpg"}}
 
             with patch.object(ui.log, "debug") as mock_debug:
-                ui._process_attributes_to_infotags(list_item, info_dict)
+                ui.menu_handler._process_attributes_to_infotags(list_item, info_dict)
 
             # Verify the debug log at lines 1583-1587
             mock_debug.assert_any_call("[ART] direct portraitTitleImage: {'cloudinaryPath': 'direct_portrait.jpg'}")
@@ -163,7 +163,7 @@ class TestKodiUIInterfaceLines1622_1624:
             # landscapeStill1 (episode still) - should trigger lines 1622-1624
             info_dict = {"landscapeStill1": {"cloudinaryPath": "landscape_still_1.jpg"}}
 
-            ui._process_attributes_to_infotags(list_item, info_dict)
+            ui.menu_handler._process_attributes_to_infotags(list_item, info_dict)
 
             # Verify cloudinary URL was called for the landscape still
             angel_interface_mock.get_cloudinary_url.assert_any_call("landscape_still_1.jpg")

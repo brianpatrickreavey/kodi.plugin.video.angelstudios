@@ -632,22 +632,4 @@ class AngelStudiosInterface:
             self.log.error(f"Logout failed: {e}")
             return False
 
-    def _unwrap_relay_pagination(self, edges_structure):
-        """Unwrap GraphQL relay pagination edges to a list of nodes."""
-        if not isinstance(edges_structure, dict):
-            return []
-        edges = edges_structure.get("edges", [])
-        return [edge.get("node") for edge in edges if isinstance(edge, dict) and edge.get("node")]
-
-    def _merge_episode_data(self, display_ep, playback_ep):
-        """Merge display episode data (STILLs) into playback episode data."""
-        if not isinstance(display_ep, dict):
-            return playback_ep.copy() if isinstance(playback_ep, dict) else {}
-        if playback_ep is None:
-            return display_ep.copy()
-        if not isinstance(playback_ep, dict):
-            return display_ep.copy()
-        
-        merged = playback_ep.copy()
-        merged.update(display_ep)  # Add STILL fields from display
-        return merged
+    # Interface remains KODI-agnostic and does not manage cache internally

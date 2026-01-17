@@ -8,150 +8,6 @@ class TestMergeStillsIntoEpisodesUI:
     """Tests for _merge_stills_into_episodes in KodiUIInterface."""
 
     @pytest.mark.parametrize(
-        "cache_return, expected_log_call",
-        [
-            (None, ("debug", "No cached project for test-slug, skipping STILL merge")),
-            ({"title": {"__typename": "NotContentSeries"}}, ("debug", "No ContentSeries data in project test-slug")),
-        ],
-    )
-    def test_merge_stills_edge_cases(self, ui_interface, cache_return, expected_log_call):
-        """Test _merge_stills_into_episodes edge cases. (Coverage for cache miss and invalid data)."""
-        ui, logger_mock, _ = ui_interface
-        episodes = [{"id": "ep1", "guid": "g1"}]
-
-        if cache_return is None:
-            ui.cache.get.return_value = None
-        else:
-            ui.cache.get.return_value = cache_return
-
-        result = ui._merge_stills_into_episodes(episodes, "test-slug")
-
-        assert result == episodes
-        log_level, log_msg = expected_log_call
-        getattr(logger_mock, log_level).assert_any_call(log_msg)
-
-    def test_merge_handles_exception(self, ui_interface):
-        """Test _merge_stills_into_episodes exception handling. (Coverage for error path in STILL merge)."""
-        ui, logger_mock, _ = ui_interface
-        episodes = [{"id": "ep1"}]
-
-        ui.cache.get.side_effect = Exception("Cache error")
-
-        result = ui._merge_stills_into_episodes(episodes, "test-slug")
-
-        assert result == episodes
-        logger_mock.error.assert_called()
-
-    def test_merge_stills_success(self, ui_interface):
-        ui, logger_mock, angel_interface_mock = ui_interface
-        episodes = [{"id": "ep1", "guid": "g1"}, {"id": "ep2", "guid": "g2"}]
-        project = {
-            "title": {
-                "__typename": "ContentSeries",
-                "seasons": {
-                    "edges": [
-                        {
-                            "node": {
-                                "episodes": {
-                                    "edges": [
-                                        {
-                                            "node": {
-                                                "id": "ep1",
-                                                "portraitStill1": {"cloudinaryPath": "/p1"},
-                                                "landscapeStill1": {"cloudinaryPath": "/l1"},
-                                            }
-                                        }
-                                    ]
-                                }
-                            }
-                        }
-                    ]
-                },
-            }
-        }
-
-        def unwrap_relay_mock(edges_structure):
-            """Mock that properly unwraps relay pagination structure."""
-            if not edges_structure or not isinstance(edges_structure, dict):
-                return []
-            edges = edges_structure.get("edges", [])
-            if not isinstance(edges, list):
-                return []
-            nodes = []
-            for edge in edges:
-                if edge and isinstance(edge, dict) and "node" in edge:
-                    node = edge["node"]
-                    if node:
-                        nodes.append(node)
-            return nodes
-
-        ui.cache.get.return_value = project
-
-        # Mock _unwrap_relay_pagination properly
-        ui.angel_interface._unwrap_relay_pagination = MagicMock(side_effect=unwrap_relay_mock)
-
-        result = ui._merge_stills_into_episodes(episodes, "test-slug")
-
-        assert "portraitStill1" in result[0]
-        assert "landscapeStill1" in result[0]
-        assert "portraitStill1" not in result[1]
-        logger_mock.info.assert_any_call("Merging ContentSeries STILLs from 1 episodes into 2 episodes")
-
-    def test_merge_skips_none_episode(self, ui_interface):
-        ui, logger_mock, angel_interface_mock = ui_interface
-        episodes = [None, {"id": "ep1", "displayName": "Episode 1"}]
-        project = {
-            "title": {
-                "__typename": "ContentSeries",
-                "seasons": {
-                    "edges": [
-                        {
-                            "node": {
-                                "episodes": {
-                                    "edges": [
-                                        {
-                                            "node": {
-                                                "id": "ep1",
-                                                "portraitStill1": {"cloudinaryPath": "portrait1.jpg"},
-                                                "landscapeStill1": {"cloudinaryPath": "landscape1.jpg"},
-                                            }
-                                        }
-                                    ]
-                                }
-                            }
-                        }
-                    ]
-                },
-            }
-        }
-
-        def unwrap_relay_mock(edges_structure):
-            """Mock that properly unwraps relay pagination structure."""
-            if not edges_structure or not isinstance(edges_structure, dict):
-                return []
-            edges = edges_structure.get("edges", [])
-            if not isinstance(edges, list):
-                return []
-            nodes = []
-            for edge in edges:
-                if edge and isinstance(edge, dict) and "node" in edge:
-                    node = edge["node"]
-                    if node:
-                        nodes.append(node)
-            return nodes
-
-        ui.cache.get.return_value = project
-
-        # Mock _unwrap_relay_pagination properly
-        ui.angel_interface._unwrap_relay_pagination = MagicMock(side_effect=unwrap_relay_mock)
-
-        result = ui._merge_stills_into_episodes(episodes, "test-slug")
-
-        assert result[0] is None
-        assert result[1]["portraitStill1"] == {"cloudinaryPath": "portrait1.jpg"}
-        assert result[1]["landscapeStill1"] == {"cloudinaryPath": "landscape1.jpg"}
-
-    @pytest.mark.parametrize(
         "input_data, expected",
         [
             (None, {}),
@@ -208,12 +64,12 @@ class TestContinueWatchingCoverage:
 
         with (
             patch.object(angel_interface_mock, "get_resume_watching", return_value=resume_data),
-            patch.object(ui, "_create_list_item_from_episode", return_value=MagicMock()),
+            patch.object(ui.menu_handler, "_create_list_item_from_episode", return_value=MagicMock()),
         ):
             ui.continue_watching_menu()
 
             # Should extract slug from embedded project
-            ui._create_list_item_from_episode.assert_called_once()
+            ui.menu_handler._create_list_item_from_episode.assert_called_once()
 
 
 class TestProcessAttributesCoverage:
@@ -248,7 +104,7 @@ class TestProcessAttributesCoverage:
             return actor
 
         with patch("xbmc.Actor", side_effect=create_actor):
-            ui._process_attributes_to_infotags(list_item, info_dict)
+            ui.menu_handler._process_attributes_to_infotags(list_item, info_dict)
 
             # Should create 2 actors (Actor 1 and Actor 2)
             info_tag.setCast.assert_called_once()
@@ -269,7 +125,7 @@ class TestProcessAttributesCoverage:
         # Mock Actor to raise exception
         with patch("xbmc.Actor", side_effect=Exception("Actor creation failed")):
             # Should not raise, just skip cast
-            ui._process_attributes_to_infotags(list_item, info_dict)
+            ui.menu_handler._process_attributes_to_infotags(list_item, info_dict)
 
             # setCast should not be called due to exception
             info_tag.setCast.assert_not_called()
@@ -299,7 +155,7 @@ class TestEpisodesMenuEdgeCases:
 
         with (
             patch.object(ui, "_get_project", return_value=project_data),
-            patch.object(ui, "_create_list_item_from_episode", return_value=mock_list_item),
+            patch.object(ui.menu_handler, "_create_list_item_from_episode", return_value=mock_list_item),
             patch("xbmcplugin.setContent"),
             patch("xbmcplugin.addSortMethod"),
         ):

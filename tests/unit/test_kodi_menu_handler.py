@@ -419,19 +419,22 @@ class TestProjectsMenu:
         """Test projects_menu handles exceptions during project fetching."""
         ui, logger_mock, angel_interface_mock = ui_interface
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
-        angel_interface_mock.get_projects.side_effect = Exception(f"{TEST_EXCEPTION_MESSAGE} for {content_type}")
 
         # Set up exception on get_projects
         angel_interface_mock.get_projects.side_effect = Exception(f"{TEST_EXCEPTION_MESSAGE} for {content_type}")
         ui.cache.get.return_value = None  # Cache miss
 
         with patch.object(ui, "show_error") as mock_show_error:
-            # Expect the exception to be raised
-            with pytest.raises(Exception, match=f"{TEST_EXCEPTION_MESSAGE} for {content_type}"):
-                ui.projects_menu(content_type=content_type)
+            ui.projects_menu(content_type=content_type)
 
             # Ensure cache was checked
             ui.cache.get.assert_called_once()
+            # Ensure get_projects was called
+            angel_interface_mock.get_projects.assert_called_once_with(project_type=expected_project_type)
+            # Ensure show_error was called with the exception message
+            mock_show_error.assert_called_once()
+            args = mock_show_error.call_args[0]
+            assert TEST_EXCEPTION_MESSAGE in args[0]
 
             # Ensure get_projects was called
             angel_interface_mock.get_projects.assert_called_once_with(project_type=expected_project_type)
@@ -453,8 +456,8 @@ def seasons_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, pr
     mock_list_item.return_value = MagicMock()
 
     with (
-        patch.object(ui, "_process_attributes_to_infotags") as mock_process_attrs,
-        patch.object(ui, "episodes_menu") as mock_episodes_menu,
+        patch.object(ui.menu_handler, "_process_attributes_to_infotags") as mock_process_attrs,
+        patch.object(ui.menu_handler, "episodes_menu") as mock_episodes_menu,
     ):
 
         # Call method
@@ -628,7 +631,7 @@ def episodes_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, p
         sort_episodic = episodes_data and episodes_data[0].get("seasonNumber", 0) > 0
 
     with (
-        patch.object(ui, "_create_list_item_from_episode") as mock_create_item,
+        patch.object(ui.menu_handler, "_create_list_item_from_episode") as mock_create_item,
         patch("xbmcplugin.setContent") as mock_set_content,
         patch("xbmcplugin.addSortMethod") as mock_add_sort,
         patch("xbmcplugin.SORT_METHOD_EPISODE") as mock_episode_sort,
@@ -764,7 +767,7 @@ class TestEpisodesMenu:
         angel_interface_mock.get_project.return_value = project_data
 
         with (
-            patch.object(ui, "_create_list_item_from_episode") as mock_create_item,  # noqa: F841
+            patch.object(ui.menu_handler, "_create_list_item_from_episode") as mock_create_item,  # noqa: F841
             patch("xbmcplugin.setContent") as mock_set_content,  # noqa: F841
             patch("xbmcplugin.addSortMethod") as mock_add_sort,
             patch("xbmcplugin.SORT_METHOD_EPISODE") as mock_episode_sort,  # noqa: F841
@@ -808,8 +811,8 @@ class TestEpisodesMenu:
         angel_interface_mock.get_project.return_value = None
 
         with (
-            patch.object(ui, "_create_list_item_from_episode") as mock_create_item,
-            patch.object(ui, "_apply_progress_bar") as mock_progress_bar,
+            patch.object(ui.menu_handler, "_create_list_item_from_episode") as mock_create_item,
+            patch.object(ui.menu_handler, "_apply_progress_bar") as mock_progress_bar,
             patch("xbmcplugin.setContent"),
             patch("xbmcplugin.addSortMethod"),
         ):
@@ -866,8 +869,8 @@ class TestContinueWatchingMenu:
         angel_interface_mock.get_projects_by_slugs.return_value = projects_data
 
         with (
-            patch.object(ui, "_create_list_item_from_episode", return_value=mock_list_item) as mock_create,
-            patch.object(ui, "_apply_progress_bar") as mock_progress,
+            patch.object(ui.menu_handler, "_create_list_item_from_episode", return_value=mock_list_item) as mock_create,
+            patch.object(ui.menu_handler, "_apply_progress_bar") as mock_progress,
         ):
             ui.continue_watching_menu(after=None)
 
@@ -952,8 +955,8 @@ class TestContinueWatchingMenu:
         angel_interface_mock.get_projects_by_slugs.return_value = projects_data
 
         with (
-            patch.object(ui, "_create_list_item_from_episode", return_value=mock_list_item),
-            patch.object(ui, "_apply_progress_bar"),
+            patch.object(ui.menu_handler, "_create_list_item_from_episode", return_value=mock_list_item),
+            patch.object(ui.menu_handler, "_apply_progress_bar"),
         ):
             ui.continue_watching_menu()
 
@@ -1018,8 +1021,8 @@ class TestContinueWatchingMenu:
         mock_created_item = MagicMock()
 
         with (
-            patch.object(ui, "_create_list_item_from_episode", return_value=mock_created_item),
-            patch.object(ui, "_apply_progress_bar") as mock_progress,
+            patch.object(ui.menu_handler, "_create_list_item_from_episode", return_value=mock_created_item),
+            patch.object(ui.menu_handler, "_apply_progress_bar") as mock_progress,
         ):
             ui.continue_watching_menu()
 
@@ -1055,8 +1058,8 @@ class TestContinueWatchingMenu:
         angel_interface_mock.get_projects_by_slugs.return_value = projects_data
 
         with (
-            patch.object(ui, "_create_list_item_from_episode", return_value=mock_list_item),
-            patch.object(ui, "_apply_progress_bar") as mock_progress,
+            patch.object(ui.menu_handler, "_create_list_item_from_episode", return_value=mock_list_item),
+            patch.object(ui.menu_handler, "_apply_progress_bar") as mock_progress,
         ):
             ui.continue_watching_menu()
 
@@ -1089,8 +1092,8 @@ class TestContinueWatchingMenu:
         angel_interface_mock.get_projects_by_slugs.return_value = projects_data
 
         with (
-            patch.object(ui, "_create_list_item_from_episode", return_value=mock_list_item) as mock_create,
-            patch.object(ui, "_apply_progress_bar"),
+            patch.object(ui.menu_handler, "_create_list_item_from_episode", return_value=mock_list_item) as mock_create,
+            patch.object(ui.menu_handler, "_apply_progress_bar"),
         ):
             ui.continue_watching_menu()
 
