@@ -20,30 +20,7 @@ from simplecache import SimpleCache  # type: ignore
 import kodi_menu_handler
 import kodi_playback_handler
 import kodi_cache_manager
-
-REDACTED = "<redacted>"
-
-# Cache TTL defaults (in seconds)
-# Note: Current implementation uses addon settings via _cache_ttl(); these constants
-# exist for clarity and future use without changing runtime behavior.
-DEFAULT_CACHE_TTL_PROJECTS_MENU = 3600  # 1 hour (projects menu)
-DEFAULT_CACHE_TTL_EPISODES = 86400 * 3  # 72 hours (episodes data)
-DEFAULT_CACHE_TTL_INDIVIDUAL_PROJECT = 28800  # 8 hours (individual project)
-
-angel_menu_content_mapper = {
-    "movies": "movie",
-    "series": "series",
-    "specials": "special",
-}
-
-# Map Angel Studios content types to Kodi content types
-kodi_content_mapper = {
-    "movies": "movies",
-    "series": "tvshows",
-    "special": "videos",  # Specials are treated as generic videos
-    "podcast": "videos",  # Podcasts are also generic videos
-    "livestream": "videos",  # Livestreams are generic videos
-}
+import kodi_ui_helpers
 
 
 class KodiUIInterface:
@@ -67,10 +44,7 @@ class KodiUIInterface:
         self.menu_handler = kodi_menu_handler.KodiMenuHandler(self)
         self.playback_handler = kodi_playback_handler.KodiPlaybackHandler(self)
         self.cache_manager = kodi_cache_manager.KodiCacheManager(self)
-
-        # Trace directory setup
-        profile_path = xbmcvfs.translatePath(self.addon.getAddonInfo("profile"))
-        self.trace_dir = os.path.join(profile_path, "temp")
+        self.ui_helpers = kodi_ui_helpers.KodiUIHelpers(self)
 
         # Log initialization
         self.log.info("KodiUIInterface initialized")
@@ -221,11 +195,11 @@ class KodiUIInterface:
 
     def setAngelInterface(self, angel_interface):
         """Set the Angel Studios interface for this UI helper"""
-        self.angel_interface = angel_interface
+        return self.ui_helpers.setAngelInterface(angel_interface)
 
     def create_plugin_url(self, **kwargs):
         """Create a URL for calling the plugin recursively"""
-        return f"{self.kodi_url}?{urlencode(kwargs)}"
+        return self.ui_helpers.create_plugin_url(**kwargs)
 
     def _cache_ttl(self):
         """Return timedelta for current cache expiration setting."""
@@ -241,31 +215,23 @@ class KodiUIInterface:
 
     def _get_angel_project_type(self, menu_content_type):
         """Map menu content type to Angel Studios project type for API calls."""
-        return angel_menu_content_mapper.get(menu_content_type, "videos")
+        return self.ui_helpers._get_angel_project_type(menu_content_type)
 
     def _get_kodi_content_type(self, content_type):
         """Map content type to Kodi media type for info tags."""
-        return kodi_content_mapper.get(content_type, "video")
+        return self.ui_helpers._get_kodi_content_type(content_type)
 
     def _get_debug_mode(self):
         """Return debug mode string in {'off','debug','trace'}"""
-        try:
-            value = self.addon.getSettingString("debug_mode")
-        except Exception as exc:
-            self.log.warning(f"debug_mode read failed; defaulting to off: {exc}")
-            value = "off"
-
-        value = (value or "off").lower()
-        return value if value in {"off", "debug", "trace"} else "off"
+        return self.ui_helpers._get_debug_mode()
 
     def _is_debug(self):
         """Return True if debug or trace mode is enabled."""
-        mode = self._get_debug_mode()
-        return mode in {"debug", "trace"}
+        return self.ui_helpers._is_debug()
 
     def _is_trace(self):
         """Return True only when trace mode is enabled."""
-        return self._get_debug_mode() == "trace"
+        return self.ui_helpers._is_trace()
 
     def _cache_enabled(self):
         """Return True if cache is enabled based on addon settings.
@@ -290,51 +256,18 @@ class KodiUIInterface:
         Returns True when the directory is present or created successfully,
         else False. No-op when trace mode is off.
         """
-        if not self._is_trace():
-            return False
-        try:
-            os.makedirs(self.trace_dir, exist_ok=True)
-            return True
-        except Exception as exc:
-            self.log.error(f"Failed to ensure trace directory {self.trace_dir}: {exc}")
-            return False
+        return self.ui_helpers._ensure_trace_dir()
 
     def _redact_sensitive(self, data):
         """Recursively redact sensitive keys in dicts/lists."""
-        if isinstance(data, dict):
-            redacted = {}
-            for key, val in data.items():
-                key_lower = str(key).lower()
-                if any(secret in key_lower for secret in ("password", "authorization", "cookie", "token")):
-                    redacted[key] = REDACTED
-                else:
-                    redacted[key] = self._redact_sensitive(val)
-            return redacted
-        if isinstance(data, list):
-            return [self._redact_sensitive(item) for item in data]
-        return data
+        return self.ui_helpers._redact_sensitive(data)
 
     def _trim_trace_files(self, max_files=50):
         """Trim old trace files, keeping only the most recent `max_files`.
 
         Safe to call even if the directory does not exist or file operations fail.
         """
-        try:
-            files = [
-                os.path.join(self.trace_dir, f)
-                for f in os.listdir(self.trace_dir)
-                if os.path.isfile(os.path.join(self.trace_dir, f))
-            ]
-            if len(files) <= max_files:
-                return
-            files.sort(key=lambda p: os.path.getmtime(p))
-            for path in files[: len(files) - max_files]:
-                try:
-                    os.remove(path)
-                except Exception:
-                    pass
-        except Exception as exc:
-            self.log.error(f"Failed to trim trace files: {exc}")
+        return self.ui_helpers._trim_trace_files(max_files)
 
     def _trace_callback(self, payload):
         """Trace callback to persist a redacted payload when in trace mode.
@@ -342,25 +275,11 @@ class KodiUIInterface:
         Redacts sensitive fields, writes JSON to the trace directory, and
         trims older entries. No-ops when trace mode or directory setup is off.
         """
-        if not self._is_trace():
-            return
-        if not self._ensure_trace_dir():
-            return
-
-        safe_payload = self._redact_sensitive(payload)
-        ts = time.strftime("%Y%m%dT%H%M%S")
-        fname = f"trace_{ts}_{int(time.time()*1000) % 1000}.json"
-        path = os.path.join(self.trace_dir, fname)
-        try:
-            with open(path, "w", encoding="utf-8") as fp:
-                json.dump(safe_payload, fp, indent=2)
-            self._trim_trace_files()
-        except Exception as exc:
-            self.log.error(f"Failed to write trace file {path}: {exc}")
+        return self.ui_helpers._trace_callback(payload)
 
     def get_trace_callback(self):
         """Expose tracer for API layer; safe to use even when trace is off."""
-        return self._trace_callback
+        return self.ui_helpers.get_trace_callback()
 
     def _load_menu_items(self):
         """Load menu items using current settings each time the main menu is rendered."""
@@ -393,68 +312,15 @@ class KodiUIInterface:
 
     def show_error(self, message, title="Angel Studios"):
         """Show error dialog to user"""
-        xbmcgui.Dialog().ok(title, message)
-        xbmc.log(f"Error shown to user: {message}", xbmc.LOGERROR)
+        return self.ui_helpers.show_error(message, title)
 
     def show_notification(self, message, title="Angel Studios", time=5000):
         """Show notification to user"""
-        xbmcgui.Dialog().notification(title, message, time=time)
-        xbmc.log(f"Notification: {message}", xbmc.LOGINFO)
+        return self.ui_helpers.show_notification(message, title, time)
 
     def show_auth_details_dialog(self):
         """Show authentication/session details in a dialog."""
-        if not self.angel_interface or not getattr(self.angel_interface, "angel_studios_session", None):
-            xbmcgui.Dialog().ok("Angel Studios Session Details", "No session available.")
-            return
-
-        try:
-            details = self.angel_interface.angel_studios_session.get_session_details()
-        except Exception:
-            xbmcgui.Dialog().ok("Angel Studios Session Details", "Unable to read session details.")
-            return
-
-        login_email = details.get("login_email", "Unknown")
-        account_id = details.get("account_id", "Unknown")
-        lines = [f"{'Login email:':<18} {login_email}"]
-        if account_id:
-            lines.append(f"{'Account ID:':<18} {account_id}")
-
-        lines.append(f"{'Authenticated:':<18} {details.get('authenticated', False)}")
-
-        expires_at_local = details.get("expires_at_local", "Unknown")
-        expires_at_utc = details.get("expires_at_utc", "Unknown")
-        expires_in_td = details.get("expires_in_human", "Unknown")
-        expires_in_seconds = details.get("expires_in_seconds")
-        issued_at_local = details.get("issued_at_local", "Unknown")
-        issued_at_utc = details.get("issued_at_utc", "Unknown")
-
-        lines.append(f"{'Session Issued:':<18} {issued_at_local} ({issued_at_utc})")
-        lines.append(f"{'Session Expires:':<18} {expires_at_local} ({expires_at_utc})")
-
-        if isinstance(expires_in_seconds, int):
-            days, rem = divmod(expires_in_seconds, 86400)
-            hours, rem = divmod(rem, 3600)
-            minutes, seconds = divmod(rem, 60)
-            parts = []
-            if days:
-                parts.append(f"{days}d")
-            if hours:
-                parts.append(f"{hours}h")
-            if minutes:
-                parts.append(f"{minutes}m")
-            if seconds or not parts:
-                parts.append(f"{seconds}s")
-            human_remaining = " ".join(parts)
-            lines.append(f"{'Session Remaining:':<18} {human_remaining} ({expires_in_td})")
-        else:
-            lines.append(f"{'Session Remaining:':<18} {expires_in_td}")
-
-        if details.get("cookie_names"):
-            lines.append("Cookies:")
-            for cookie_name in details["cookie_names"]:
-                lines.append(f"  - {cookie_name}")
-
-        xbmcgui.Dialog().textviewer("Angel Studios Session Details", "\n".join(lines), usemono=True)
+        return self.ui_helpers.show_auth_details_dialog()
 
     def clear_cache(self):
         """Clear addon SimpleCache entries."""
@@ -462,24 +328,7 @@ class KodiUIInterface:
 
     def clear_debug_data(self):
         """Remove trace files from the temp directory."""
-        try:
-            if not os.path.isdir(self.trace_dir):
-                self.log.info("Trace directory does not exist; nothing to clear")
-                return True
-            files = [os.path.join(self.trace_dir, f) for f in os.listdir(self.trace_dir)]
-            removed = 0
-            for path in files:
-                try:
-                    if os.path.isfile(path):
-                        os.remove(path)
-                        removed += 1
-                except Exception:
-                    pass
-            self.log.info(f"Cleared {removed} trace files from {self.trace_dir}")
-            return True
-        except Exception as e:
-            self.log.error(f"Failed to clear debug data: {e}")
-            return False
+        return self.ui_helpers.clear_debug_data()
 
     def _get_project(self, project_slug):
         """Helper function to handle fetching and caching project data."""
@@ -507,19 +356,7 @@ class KodiUIInterface:
 
     def _normalize_contentseries_episode(self, episode):
         """Normalize ContentSeries episode dict to expected keys."""
-        if not isinstance(episode, dict):
-            return {}
-        keys = {
-            "id",
-            "name",
-            "subtitle",
-            "description",
-            "episodeNumber",
-            "portraitStill1",
-            "landscapeStill1",
-            "landscapeStill2",
-        }
-        return {k: episode[k] for k in keys if k in episode}
+        return self.ui_helpers._normalize_contentseries_episode(episode)
 
     def _deferred_prefetch_project(self, project_slugs, max_count=None):
         """Prefetch and cache project data for given slugs in the background."""
@@ -531,21 +368,8 @@ class KodiUIInterface:
 
     def force_logout_with_notification(self):
         """Force local logout via angel_interface and notify user."""
-        if not self.angel_interface:
-            raise ValueError("Angel interface not initialized")
-        result = self.angel_interface.force_logout()
-        if result:
-            self.show_notification("Logged out locally.")
-            self.log.info("Logged out locally via settings")
-        else:
-            self.show_notification("Logout failed; please try again.")
-            self.log.error("Logout failed via settings")
+        return self.ui_helpers.force_logout_with_notification()
 
     def clear_debug_data_with_notification(self):
         """Clear debug trace files and log outcome; notify on success."""
-        result = self.clear_debug_data()
-        if result:
-            self.show_notification("Debug data cleared.")
-            self.log.info("Debug data cleared via settings")
-        else:
-            self.log.error("Debug data clear failed via settings")
+        return self.ui_helpers.clear_debug_data_with_notification()

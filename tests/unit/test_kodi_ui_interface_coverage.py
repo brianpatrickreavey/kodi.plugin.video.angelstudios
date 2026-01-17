@@ -201,7 +201,7 @@ class TestSettingsCallbacks:
 
         angel_interface_mock.force_logout.return_value = True
 
-        with patch.object(ui, "show_notification") as mock_notify:
+        with patch.object(ui.ui_helpers, "show_notification") as mock_notify:
             ui.force_logout_with_notification()
 
             angel_interface_mock.force_logout.assert_called_once()
@@ -214,7 +214,7 @@ class TestSettingsCallbacks:
 
         angel_interface_mock.force_logout.return_value = False
 
-        with patch.object(ui, "show_notification") as mock_notify:
+        with patch.object(ui.ui_helpers, "show_notification") as mock_notify:
             ui.force_logout_with_notification()
 
             angel_interface_mock.force_logout.assert_called_once()
@@ -235,8 +235,8 @@ class TestSettingsCallbacks:
         ui, logger_mock, angel_interface_mock = ui_interface
 
         with (
-            patch.object(ui, "clear_debug_data", return_value=True),
-            patch.object(ui, "show_notification") as mock_notify,
+            patch.object(ui.ui_helpers, "clear_debug_data", return_value=True),
+            patch.object(ui.ui_helpers, "show_notification") as mock_notify,
         ):
             ui.clear_debug_data_with_notification()
 
@@ -259,8 +259,8 @@ class TestSettingsCallbacks:
         ui, logger_mock, angel_interface_mock = ui_interface
 
         with (
-            patch.object(ui, "clear_debug_data", return_value=False),
-            patch.object(ui, "show_notification"),
+            patch.object(ui.ui_helpers, "clear_debug_data", return_value=False),
+            patch.object(ui.ui_helpers, "show_notification"),
         ):
             ui.clear_debug_data_with_notification()
 
