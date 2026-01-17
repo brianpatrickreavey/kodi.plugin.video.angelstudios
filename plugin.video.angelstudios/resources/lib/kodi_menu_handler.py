@@ -85,7 +85,7 @@ class KodiMenuHandler:
             cache_enabled = self.parent._cache_enabled()
             projects = None
             if cache_enabled:
-                projects = self.parent.cache.get(cache_key)
+                projects = self.parent.cache_manager.cache.get(cache_key)
                 if projects:
                     self.log.debug(f"Cache hit for {cache_key}")
                 else:
@@ -99,7 +99,7 @@ class KodiMenuHandler:
                 self.log.info(f"Fetching projects from AngelStudiosInterface for content type: {content_type}")
                 projects = self.parent.angel_interface.get_projects(project_type=self.parent._get_angel_project_type(content_type))
                 if cache_enabled:
-                    self.parent.cache.set(cache_key, projects, expiration=self.parent._cache_ttl())
+                    self.parent.cache_manager.cache.set(cache_key, projects, expiration=self.parent._cache_ttl())
             try:
                 self.log.info(f"Projects: {json.dumps(projects, indent=2)}")
             except TypeError:

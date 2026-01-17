@@ -138,13 +138,29 @@ Incremental extraction to minimize regressions. After each step, run `make unitt
 - ✅ All tests pass with 94% overall coverage (75% for `kodi_menu_handler.py` as expected).
 - ✅ No regressions; ART regression fixed by ensuring consistent `_process_attributes_to_infotags` usage.
 
+### Step 2: Extract KodiPlaybackHandler - COMPLETED ✅
+- ✅ Created `kodi_playback_handler.py` with `KodiPlaybackHandler` class.
+- ✅ Moved playback methods (`play_episode`, `play_video`, etc.) and helpers (`_ensure_isa_available`, `_get_quality_pref`).
+- ✅ Updated `kodi_ui_interface.py` to import and instantiate `KodiPlaybackHandler`, delegate public methods.
+- ✅ Renamed `test_kodi_ui_interface_playback.py` to `test_kodi_playback_handler.py`, updated imports and mocks.
+- ✅ All tests pass with 100% coverage maintained.
+- ✅ No regressions; playback functionality preserved.
+
+### Step 3: Extract KodiCacheManager - COMPLETED ✅
+- ✅ Created `kodi_cache_manager.py` with `KodiCacheManager` class.
+- ✅ Moved caching methods (`_cache_enabled`, `_cache_ttl`, `clear_cache`, `_get_project`, `_deferred_prefetch_project`).
+- ✅ Updated `kodi_ui_interface.py` to import and instantiate `KodiCacheManager`, delegate public methods.
+- ✅ Renamed `test_kodi_ui_interface_prefetch.py` to `test_kodi_cache_manager.py`, updated imports and mocks. Merged relevant parts from `test_kodi_ui_interface_utils.py`.
+- ✅ All tests pass with 100% coverage maintained.
+- ✅ No regressions; cache miss issues resolved.
+
 ## Risks and Mitigations
 - **Regressions**: Test thoroughly; maintain 100% coverage.
 - **Performance**: No impact (same logic, just reorganized).
 - **Compatibility**: Public API unchanged.
 
 ## Next Steps
-Review this plan. If approved, proceed to implementation. Questions: Any adjustments to classes or structure?
+Proceed to Step 4: Extract KodiUIHelpers. Create `kodi_ui_helpers.py` with `KodiUIHelpers` class, move UI utility methods (`show_error`, `show_notification`, `show_auth_details_dialog`, trace methods, settings helpers), update `kodi_ui_interface.py` to import and instantiate `KodiUIHelpers`, delegate public methods, rename/move remaining parts of `test_kodi_ui_interface_utils.py` to `test_kodi_ui_helpers.py`, update imports and mocks. Run tests; fix regressions. Update progress in this PLAN file. Commit the changes (review and approve before committing).
 
 ## Out-of-Scope
 Changes to `angel_interface.py` and `angel_graphql/` are deferred to future phases. Only modifications directly related to the `kodi_ui_interface.py` refactor (e.g., updating imports or method calls) are in scope for this phase.

@@ -187,7 +187,7 @@ class TestSettingsCallbacks:
         ui, logger_mock, angel_interface_mock = ui_interface
 
         with (
-            patch.object(ui, "clear_cache", return_value=False),
+            patch.object(ui.cache_manager, "clear_cache", return_value=False),
             patch.object(ui, "show_notification") as mock_notify,
         ):
             ui.clear_cache_with_notification()

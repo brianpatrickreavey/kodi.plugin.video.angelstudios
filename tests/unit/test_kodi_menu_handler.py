@@ -278,8 +278,8 @@ class TestMainMenu:
         fresh_addon.getSettingInt.return_value = 12
 
         ui.addon = fresh_addon
-        ui.cache.get.reset_mock()
-        ui.cache.set.reset_mock()
+        ui.cache_manager.cache.get.reset_mock()
+        ui.cache_manager.cache.set.reset_mock()
         angel_interface_mock.get_projects.return_value = []
 
         with (
@@ -288,8 +288,8 @@ class TestMainMenu:
         ):
             ui.projects_menu(content_type="movies")
 
-        ui.cache.get.assert_not_called()
-        ui.cache.set.assert_not_called()
+        ui.cache_manager.cache.get.assert_not_called()
+        ui.cache_manager.cache.set.assert_not_called()
 
     def test_trace_writer_redacts_and_stores(self):
         import xbmcaddon
@@ -335,21 +335,21 @@ def projects_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, c
     projects_data = MOCK_PROJECTS_DATA[content_type]
 
     # Set up the mock cache behavior
-    ui.cache.get.return_value = projects_data if cache_hit else None
+    ui.cache_manager.cache.get.return_value = projects_data if cache_hit else None
     angel_interface_mock.get_projects.return_value = projects_data
 
     # Call the method
     ui.projects_menu(content_type=content_type)
 
     # Assertions
-    ui.cache.get.assert_called_once()
+    ui.cache_manager.cache.get.assert_called_once()
     if cache_hit:
         angel_interface_mock.get_projects.assert_not_called()
-        ui.cache.set.assert_not_called()
+        ui.cache_manager.cache.set.assert_not_called()
     else:
         angel_interface_mock.get_projects.assert_called_once_with(project_type=expected_project_type)
         cache_key = f"projects_{content_type}"
-        ui.cache.set.assert_called_once_with(cache_key, projects_data, expiration=timedelta(hours=12))
+        ui.cache_manager.cache.set.assert_called_once_with(cache_key, projects_data, expiration=timedelta(hours=12))
 
     # Directory item assertions
     assert mock_add_item.call_count == len(projects_data)
@@ -395,14 +395,14 @@ class TestProjectsMenu:
         ui, logger_mock, angel_interface_mock = ui_interface
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
-        ui.cache.get.return_value = None
+        ui.cache_manager.cache.get.return_value = None
         angel_interface_mock.get_projects.return_value = []  # No projects
 
         with patch.object(ui, "show_error") as mock_show_error:
             ui.projects_menu(content_type=content_type)
 
             # Ensure cache was checked
-            ui.cache.get.assert_called_once()
+            ui.cache_manager.cache.get.assert_called_once()
 
             # Ensure get_projects was called
             angel_interface_mock.get_projects.assert_called_once_with(project_type=expected_project_type)
@@ -422,13 +422,13 @@ class TestProjectsMenu:
 
         # Set up exception on get_projects
         angel_interface_mock.get_projects.side_effect = Exception(f"{TEST_EXCEPTION_MESSAGE} for {content_type}")
-        ui.cache.get.return_value = None  # Cache miss
+        ui.cache_manager.cache.get.return_value = None  # Cache miss
 
         with patch.object(ui, "show_error") as mock_show_error:
             ui.projects_menu(content_type=content_type)
 
             # Ensure cache was checked
-            ui.cache.get.assert_called_once()
+            ui.cache_manager.cache.get.assert_called_once()
             # Ensure get_projects was called
             angel_interface_mock.get_projects.assert_called_once_with(project_type=expected_project_type)
             # Ensure show_error was called with the exception message
@@ -451,7 +451,7 @@ def seasons_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, pr
     mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
     # Set up mocks
-    ui.cache.get.return_value = project_data if cache_hit else None
+    ui.cache_manager.cache.get.return_value = project_data if cache_hit else None
     angel_interface_mock.get_project.return_value = project_data if not cache_hit else None
     mock_list_item.return_value = MagicMock()
 
@@ -466,14 +466,14 @@ def seasons_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, pr
 
         if cache_hit:
             angel_interface_mock.get_project.assert_not_called()
-            ui.cache.set.assert_not_called()
+            ui.cache_manager.cache.set.assert_not_called()
         else:
             angel_interface_mock.get_project.assert_any_call(project_data["slug"])
             cache_key = f"project_{project_data['slug']}"
-            ui.cache.set.assert_any_call(cache_key, project_data, expiration=timedelta(hours=12))
+            ui.cache_manager.cache.set.assert_any_call(cache_key, project_data, expiration=timedelta(hours=12))
 
         # Ensure cache was checked
-        ui.cache.get.assert_any_call(f"project_{project_data['slug']}")
+        ui.cache_manager.cache.get.assert_any_call(f"project_{project_data['slug']}")
 
         seasons_data = project_data["seasons"]
 
@@ -545,7 +545,7 @@ class TestSeasonsMenu:
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
         # Set up mocks for project not found
-        ui.cache.get.return_value = None  # Cache miss
+        ui.cache_manager.cache.get.return_value = None  # Cache miss
         angel_interface_mock.get_project.return_value = None  # Project not found
 
         with (
@@ -557,7 +557,7 @@ class TestSeasonsMenu:
             assert result is None
 
             # Ensure cache was checked
-            ui.cache.get.assert_any_call("project_nonexistent-project")
+            ui.cache_manager.cache.get.assert_any_call("project_nonexistent-project")
 
             # Ensure get_project was called
             angel_interface_mock.get_project.assert_called_once_with("nonexistent-project")
@@ -588,7 +588,7 @@ class TestSeasonsMenu:
 
         with (
             patch.object(ui, "show_error") as mock_show_error,
-            patch.object(ui.cache, "get", return_value=None) as mock_cache_get,
+            patch.object(ui.cache_manager.cache, "get", return_value=None) as mock_cache_get,
         ):
 
             result = ui.seasons_menu(content_type=expected_project_type, project_slug="test-project")
@@ -612,7 +612,7 @@ def episodes_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, p
     mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
     # Set up mocks
-    ui.cache.get.return_value = project_data if cache_hit else None
+    ui.cache_manager.cache.get.return_value = project_data if cache_hit else None
     angel_interface_mock.get_project.return_value = project_data if not cache_hit else None
 
     # Find the season for assertions or aggregate for all-episodes
@@ -642,13 +642,13 @@ def episodes_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, p
         ui.episodes_menu(content_type="series", project_slug=project_data["slug"], season_id=season_id)
 
         # Conditional assertions for cache behavior
-        ui.cache.get.assert_called_once_with(f"project_{project_data['slug']}")
+        ui.cache_manager.cache.get.assert_called_once_with(f"project_{project_data['slug']}")
         if cache_hit:
             angel_interface_mock.get_project.assert_not_called()
-            ui.cache.set.assert_not_called()
+            ui.cache_manager.cache.set.assert_not_called()
         else:
             angel_interface_mock.get_project.assert_called_once_with(project_data["slug"])
-            ui.cache.set.assert_called_once_with(
+            ui.cache_manager.cache.set.assert_called_once_with(
                 f"project_{project_data['slug']}", project_data, expiration=timedelta(hours=12)
             )
 
@@ -700,13 +700,13 @@ class TestEpisodesMenu:
         ui, logger_mock, angel_interface_mock = ui_interface
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
-        ui.cache.get.return_value = None
+        ui.cache_manager.cache.get.return_value = None
         angel_interface_mock.get_project.return_value = None
 
         with patch.object(ui, "show_error") as mock_show_error:
             ui.episodes_menu(content_type="series", project_slug="nonexistent-project", season_id=1)
 
-            ui.cache.get.assert_called_once_with("project_nonexistent-project")
+            ui.cache_manager.cache.get.assert_called_once_with("project_nonexistent-project")
             angel_interface_mock.get_project.assert_called_once_with("nonexistent-project")
             mock_show_error.assert_called_once_with("Project not found: nonexistent-project")
             mock_add_item.assert_not_called()
@@ -718,13 +718,13 @@ class TestEpisodesMenu:
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
         project_data = MOCK_PROJECT_DATA["multi_season_project"]
-        ui.cache.get.return_value = project_data
+        ui.cache_manager.cache.get.return_value = project_data
         angel_interface_mock.get_project.return_value = project_data
 
         with patch.object(ui, "show_error") as mock_show_error:
             ui.episodes_menu(content_type="series", project_slug=project_data["slug"], season_id=999)
 
-            ui.cache.get.assert_called_once_with(f"project_{project_data['slug']}")
+            ui.cache_manager.cache.get.assert_called_once_with(f"project_{project_data['slug']}")
             angel_interface_mock.get_project.assert_not_called()
             mock_show_error.assert_called_once_with("Season not found: 999")
             mock_add_item.assert_not_called()
@@ -736,12 +736,12 @@ class TestEpisodesMenu:
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
         angel_interface_mock.get_project.side_effect = Exception(TEST_EXCEPTION_MESSAGE)
-        ui.cache.get.return_value = None
+        ui.cache_manager.cache.get.return_value = None
 
         with patch.object(ui, "show_error") as mock_show_error:
             result = ui.episodes_menu(content_type="series", project_slug="test-project", season_id=1)
 
-            ui.cache.get.assert_called_once_with("project_test-project")
+            ui.cache_manager.cache.get.assert_called_once_with("project_test-project")
             angel_interface_mock.get_project.assert_called_once_with("test-project")
             mock_show_error.assert_called_once_with(f"Error fetching season 1: {TEST_EXCEPTION_MESSAGE}")
             assert result is None
@@ -763,7 +763,7 @@ class TestEpisodesMenu:
 
         season["episodes"] = [unavailable_episode, available_episode]
 
-        ui.cache.get.return_value = project_data
+        ui.cache_manager.cache.get.return_value = project_data
         angel_interface_mock.get_project.return_value = project_data
 
         with (
@@ -807,7 +807,7 @@ class TestEpisodesMenu:
             episode["watchPosition"] = {"position": 30.0}  # 30 seconds watched
             episode["source"] = {"url": "http://example.com/video.mp4", "duration": 3600}  # 1 hour
 
-        ui.cache.get.return_value = project_data
+        ui.cache_manager.cache.get.return_value = project_data
         angel_interface_mock.get_project.return_value = None
 
         with (

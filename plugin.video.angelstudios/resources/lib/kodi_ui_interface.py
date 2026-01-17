@@ -19,6 +19,7 @@ from simplecache import SimpleCache  # type: ignore
 
 import kodi_menu_handler
 import kodi_playback_handler
+import kodi_cache_manager
 
 REDACTED = "<redacted>"
 
@@ -56,12 +57,16 @@ class KodiUIInterface:
         self.kodi_url = url
         self.log = logger
         self.angel_interface = angel_interface
-        self.cache = SimpleCache()  # Initialize cache
 
         self.addon = xbmcaddon.Addon()
         addon_path = xbmcvfs.translatePath(self.addon.getAddonInfo("path"))
         self.default_icon = os.path.join(addon_path, "resources", "images", "icons", "Angel_Studios_Logo.png")
         self.default_settings_icon = "DefaultAddonService.png"
+
+        # Initialize handlers
+        self.menu_handler = kodi_menu_handler.KodiMenuHandler(self)
+        self.playback_handler = kodi_playback_handler.KodiPlaybackHandler(self)
+        self.cache_manager = kodi_cache_manager.KodiCacheManager(self)
 
         # Trace directory setup
         profile_path = xbmcvfs.translatePath(self.addon.getAddonInfo("profile"))
@@ -223,39 +228,16 @@ class KodiUIInterface:
         return f"{self.kodi_url}?{urlencode(kwargs)}"
 
     def _cache_ttl(self):
-        """Return timedelta for current cache expiration setting.
-
-        Uses addon setting `cache_expiration_hours`. Module-level TTL constants
-        (DEFAULT_CACHE_TTL_PROJECTS_MENU, DEFAULT_CACHE_TTL_EPISODES, DEFAULT_CACHE_TTL_INDIVIDUAL_PROJECT)
-        are provided for clarity and future specialization but are not applied here
-        to avoid changing existing behavior.
-        """
-        try:
-            hours = self.addon.getSettingInt("cache_expiration_hours")
-            if not hours:
-                self.log.warning(f"cache_expiration_hours was falsy ({hours!r}); defaulting to 12")
-                hours = 12
-        except Exception as exc:
-            self.log.warning(f"Failed to read cache_expiration_hours; defaulting to 12: {exc}")
-            hours = 12
-
-        return timedelta(hours=hours)
+        """Return timedelta for current cache expiration setting."""
+        return self.cache_manager._cache_ttl()
 
     def _project_cache_ttl(self):
-        """Return timedelta for project cache expiration.
-
-        Currently uses the same global cache_expiration_hours setting.
-        Future: may use separate project_cache_hours setting.
-        """
-        return self._cache_ttl()
+        """Return timedelta for project cache expiration."""
+        return self.cache_manager._project_cache_ttl()
 
     def _episode_cache_ttl(self):
-        """Return timedelta for episode cache expiration.
-
-        Currently uses the same global cache_expiration_hours setting.
-        Future: may use separate episode_cache_hours setting.
-        """
-        return self._cache_ttl()
+        """Return timedelta for episode cache expiration."""
+        return self.cache_manager._episode_cache_ttl()
 
     def _get_angel_project_type(self, menu_content_type):
         """Map menu content type to Angel Studios project type for API calls."""
@@ -299,7 +281,7 @@ class KodiUIInterface:
             self.log.warning(f"disable_cache returned non-bool {disabled_val!r}; assuming cache enabled")
             return True
         except Exception as exc:
-            self.log.warning(f"disable_cache read failed; assuming cache enabled: {exc}")
+            self.log.warning(f"disable_cache returned non-bool; assuming cache enabled: {exc}")
             return True
 
     def _ensure_trace_dir(self):
@@ -476,39 +458,7 @@ class KodiUIInterface:
 
     def clear_cache(self):
         """Clear addon SimpleCache entries."""
-        try:
-            # SimpleCache has no public clear-all; rely on its private SQL handle and window cache.
-            if not hasattr(self.cache, "_execute_sql"):
-                self.log.info("SimpleCache before clear: introspection not available")
-                return False
-
-            # Query existing ids once
-            rows = self.cache._execute_sql("SELECT id FROM simplecache")
-            ids = rows.fetchall() if rows else []
-            self.log.info(f"SimpleCache before clear: {[row[0] for row in ids]}")
-
-            if len(ids) == 0:
-                self.log.info("SimpleCache empty; nothing to clear")
-                self.log.info("SimpleCache after clear: []")
-                return True
-
-            for (cache_id,) in ids:
-                self.cache._execute_sql("DELETE FROM simplecache WHERE id = ?", (cache_id,))
-
-            if hasattr(self.cache, "_win"):
-                for (cache_id,) in ids:
-                    try:
-                        self.cache._win.clearProperty(cache_id)
-                    except Exception:
-                        pass
-
-            rows_after = self.cache._execute_sql("SELECT id FROM simplecache")
-            ids_after = rows_after.fetchall() if rows_after else []
-            self.log.info(f"SimpleCache after clear: {[row[0] for row in ids_after]}")
-            return True
-        except Exception as e:
-            self.log.error(f"Failed to clear cache: {e}")
-            return False
+        return self.cache_manager.clear_cache()
 
     def clear_debug_data(self):
         """Remove trace files from the temp directory."""
@@ -532,29 +482,8 @@ class KodiUIInterface:
             return False
 
     def _get_project(self, project_slug):
-        """
-        Helper function to handle fetching and caching project data.
-        """
-        cache_key = f"project_{project_slug}"
-        cache_enabled = self._cache_enabled()
-        project = None
-        if cache_enabled:
-            project = self.cache.get(cache_key)
-            if project:
-                self.log.debug(f"Cache hit for {cache_key}")
-            else:
-                self.log.debug(f"Cache miss for {cache_key}")
-        else:
-            self.log.debug("Cache disabled; bypassing project cache")
-
-        if project is None:
-            self.log.info(f"Fetching project data from AngelStudiosInterface for: {project_slug}")
-            project = self.angel_interface.get_project(project_slug)
-            if project and cache_enabled:
-                self.cache.set(cache_key, project, expiration=self._cache_ttl())
-        else:
-            self.log.info(f"Using cached project data for: {project_slug}")
-        return project
+        """Helper function to handle fetching and caching project data."""
+        return self.cache_manager._get_project(project_slug)
 
     def _get_quality_pref(self):
         """Return dict with 'mode' and 'target_height'. mode in {'auto','fixed','manual'}."""
@@ -594,51 +523,11 @@ class KodiUIInterface:
 
     def _deferred_prefetch_project(self, project_slugs, max_count=None):
         """Prefetch and cache project data for given slugs in the background."""
-        try:
-            if not project_slugs:
-                return
-
-            if not hasattr(self.cache, "_execute_sql"):
-                self.log.debug("SimpleCache introspection not available; prefetch skipped")
-                return
-
-            rows = self.cache._execute_sql("SELECT id FROM simplecache WHERE id LIKE ?", ("project_%",))
-            cached = set()
-            for row in rows.fetchall() if rows else []:
-                val = row[0]
-                if isinstance(val, str) and val.startswith("project_"):
-                    cached.add(val.split("project_", 1)[1])
-
-            to_fetch = [s for s in project_slugs if s not in cached]
-            if not to_fetch:
-                self.log.debug("All requested projects already cached; skipping prefetch")
-                return
-
-            if isinstance(max_count, int) and max_count > 0:
-                to_fetch = to_fetch[:max_count]
-
-            for slug in to_fetch:
-                try:
-                    proj = self.angel_interface.get_project(slug)
-                except Exception:
-                    self.log.debug("API error; abandoning prefetch")
-                    break
-                if not proj:
-                    continue
-                if self._cache_enabled():
-                    self.cache.set(f"project_{slug}", proj, expiration=self._cache_ttl())
-        except Exception as exc:
-            self.log.error(f"Project prefetch failed: {exc}")
+        return self.cache_manager._deferred_prefetch_project(project_slugs, max_count)
 
     def clear_cache_with_notification(self):
         """Clear cache and notify user with outcome."""
-        result = self.clear_cache()
-        if result:
-            self.show_notification("Cache cleared.")
-            self.log.info("Cache cleared successfully via settings")
-        else:
-            self.show_notification("Cache clear failed; please try again.")
-            self.log.error("Cache clear failed via settings")
+        return self.cache_manager.clear_cache_with_notification()
 
     def force_logout_with_notification(self):
         """Force local logout via angel_interface and notify user."""

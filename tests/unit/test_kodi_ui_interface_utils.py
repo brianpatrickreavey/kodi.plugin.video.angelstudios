@@ -341,7 +341,7 @@ class TestUtils:
         """clear_cache deletes all SQL rows and window properties, returns True."""
         ui, logger_mock, angel_interface_mock = ui_interface
         cache_mock = MagicMock()
-        ui.cache = cache_mock
+        ui.cache_manager.cache = cache_mock
 
         cache_mock._execute_sql = MagicMock()
         cache_mock._execute_sql.side_effect = [
@@ -360,7 +360,7 @@ class TestUtils:
         """clear_cache returns True on empty cache."""
         ui, logger_mock, angel_interface_mock = ui_interface
         cache_mock = MagicMock()
-        ui.cache = cache_mock
+        ui.cache_manager.cache = cache_mock
 
         cache_mock._execute_sql = MagicMock()
         cache_mock._execute_sql.side_effect = [
@@ -376,7 +376,7 @@ class TestUtils:
         """clear_cache returns False on SQL failures."""
         ui, logger_mock, angel_interface_mock = ui_interface
         cache_mock = MagicMock()
-        ui.cache = cache_mock
+        ui.cache_manager.cache = cache_mock
 
         cache_mock._execute_sql = MagicMock(side_effect=Exception("boom"))
         cache_mock._win = MagicMock()
@@ -385,7 +385,7 @@ class TestUtils:
     def test_clear_cache_no_introspection(self, ui_interface):
         """clear_cache returns False and logs when cache lacks SQL helpers."""
         ui, logger_mock, angel_interface_mock = ui_interface
-        ui.cache = object()
+        ui.cache_manager.cache = object()
 
         assert ui.clear_cache() is False
         logger_mock.info.assert_any_call("SimpleCache before clear: introspection not available")
@@ -394,7 +394,7 @@ class TestUtils:
         """clear_cache swallows window clear exceptions and still returns True."""
         ui, logger_mock, angel_interface_mock = ui_interface
         cache_mock = MagicMock()
-        ui.cache = cache_mock
+        ui.cache_manager.cache = cache_mock
 
         cache_mock._execute_sql = MagicMock()
         cache_mock._execute_sql.side_effect = [
@@ -419,7 +419,7 @@ class TestAdditionalCoverage:
 
         # Fresh addon scoped to this test only to avoid leaking disable_cache state
         fresh_addon = MagicMock()
-        fresh_addon.getSettingBool.side_effect = lambda key: True if key == "disable_cache" else False
+        fresh_addon.getSettingBool.return_value = True
         fresh_addon.getSettingString.return_value = "off"
         fresh_addon.getSettingInt.return_value = 12
 
@@ -678,7 +678,7 @@ class TestAdditionalCoverage:
 
     def test_get_project_cache_disabled(self, ui_interface, monkeypatch):
         ui, logger_mock, angel_interface_mock = ui_interface
-        monkeypatch.setattr(ui, "_cache_enabled", lambda: False)
+        monkeypatch.setattr(ui.cache_manager, "_cache_enabled", lambda: False)
         angel_interface_mock.get_project.return_value = {"slug": "s"}
 
         ui._get_project("slug")

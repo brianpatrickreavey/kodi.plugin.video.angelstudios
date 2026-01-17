@@ -15,7 +15,7 @@ class TestDeferredPrefetchProject:
         # Mock cache query - no cached projects
         mock_cursor = MagicMock()
         mock_cursor.fetchall.return_value = []
-        ui.cache._execute_sql.return_value = mock_cursor
+        ui.cache_manager.cache._execute_sql.return_value = mock_cursor
 
         # Mock project fetch
         project_slugs = ["proj1", "proj2", "proj3"]
@@ -26,8 +26,8 @@ class TestDeferredPrefetchProject:
         ui._deferred_prefetch_project(project_slugs, max_count=2)
 
         # Verify cache query
-        ui.cache._execute_sql.assert_called_once()
-        assert ui.cache._execute_sql.call_args[0][1][0] == "project_%"
+        ui.cache_manager.cache._execute_sql.assert_called_once()
+        assert ui.cache_manager.cache._execute_sql.call_args[0][1][0] == "project_%"
 
         # Verify only max_count projects fetched
         assert angel_interface_mock.get_project.call_count == 2
@@ -35,7 +35,7 @@ class TestDeferredPrefetchProject:
         angel_interface_mock.get_project.assert_any_call("proj2")
 
         # Verify cache writes
-        assert ui.cache.set.call_count == 2
+        assert ui.cache_manager.cache.set.call_count == 2
 
     def test_prefetch_project_with_cached_projects(self, ui_interface, mock_xbmc):
         """Test prefetch skips already-cached projects."""
@@ -44,7 +44,7 @@ class TestDeferredPrefetchProject:
         # Mock cache query - proj1 and proj2 already cached
         mock_cursor = MagicMock()
         mock_cursor.fetchall.return_value = [("project_proj1",), ("project_proj2",)]
-        ui.cache._execute_sql.return_value = mock_cursor
+        ui.cache_manager.cache._execute_sql.return_value = mock_cursor
 
         mock_project = {"slug": "proj3", "name": "Project 3"}
         angel_interface_mock.get_project.return_value = mock_project
@@ -65,7 +65,7 @@ class TestDeferredPrefetchProject:
         # Mock cache query - all projects cached
         mock_cursor = MagicMock()
         mock_cursor.fetchall.return_value = [("project_proj1",), ("project_proj2",)]
-        ui.cache._execute_sql.return_value = mock_cursor
+        ui.cache_manager.cache._execute_sql.return_value = mock_cursor
 
         # Execute prefetch
         project_slugs = ["proj1", "proj2"]
@@ -85,7 +85,7 @@ class TestDeferredPrefetchProject:
         ui._deferred_prefetch_project([])
 
         # Verify no cache queries or fetches
-        ui.cache._execute_sql.assert_not_called()
+        ui.cache_manager.cache._execute_sql.assert_not_called()
         angel_interface_mock.get_project.assert_not_called()
 
     def test_prefetch_project_no_max_count(self, ui_interface, mock_xbmc):
@@ -95,7 +95,7 @@ class TestDeferredPrefetchProject:
         # Mock cache query - no cached projects
         mock_cursor = MagicMock()
         mock_cursor.fetchall.return_value = []
-        ui.cache._execute_sql.return_value = mock_cursor
+        ui.cache_manager.cache._execute_sql.return_value = mock_cursor
 
         mock_project = {"slug": "proj", "name": "Project"}
         angel_interface_mock.get_project.return_value = mock_project
@@ -114,7 +114,7 @@ class TestDeferredPrefetchProject:
         # Mock cache query - no cached projects
         mock_cursor = MagicMock()
         mock_cursor.fetchall.return_value = []
-        ui.cache._execute_sql.return_value = mock_cursor
+        ui.cache_manager.cache._execute_sql.return_value = mock_cursor
 
         # Mock API error on first fetch
         angel_interface_mock.get_project.side_effect = Exception("API error")
@@ -136,7 +136,7 @@ class TestDeferredPrefetchProject:
         # Mock cache query - no cached projects
         mock_cursor = MagicMock()
         mock_cursor.fetchall.return_value = []
-        ui.cache._execute_sql.return_value = mock_cursor
+        ui.cache_manager.cache._execute_sql.return_value = mock_cursor
 
         # Mock empty response
         angel_interface_mock.get_project.return_value = None
@@ -147,7 +147,7 @@ class TestDeferredPrefetchProject:
 
         # Verify fetches attempted but no cache writes
         assert angel_interface_mock.get_project.call_count == 2
-        ui.cache.set.assert_not_called()
+        ui.cache_manager.cache.set.assert_not_called()
 
     def test_prefetch_project_cache_disabled(self, ui_interface, mock_xbmc):
         """Test prefetch skips cache writes when cache disabled."""
@@ -156,28 +156,28 @@ class TestDeferredPrefetchProject:
         # Mock cache query
         mock_cursor = MagicMock()
         mock_cursor.fetchall.return_value = []
-        ui.cache._execute_sql.return_value = mock_cursor
+        ui.cache_manager.cache._execute_sql.return_value = mock_cursor
 
         # Mock project fetch
         mock_project = {"slug": "proj1", "name": "Project 1"}
         angel_interface_mock.get_project.return_value = mock_project
 
         # Disable cache via _cache_enabled()
-        with patch.object(ui, "_cache_enabled", return_value=False):
+        with patch.object(ui.cache_manager, "_cache_enabled", return_value=False):
             # Execute prefetch
             project_slugs = ["proj1"]
             ui._deferred_prefetch_project(project_slugs)
 
             # Verify fetch occurred but no cache write
             angel_interface_mock.get_project.assert_called_once_with("proj1")
-            ui.cache.set.assert_not_called()
+            ui.cache_manager.cache.set.assert_not_called()
 
     def test_prefetch_project_no_introspection(self, ui_interface, mock_xbmc):
         """Test prefetch skips when SimpleCache introspection unavailable."""
         ui, logger_mock, angel_interface_mock = ui_interface
 
         # Remove _execute_sql attribute
-        delattr(ui.cache, "_execute_sql")
+        delattr(ui.cache_manager.cache, "_execute_sql")
 
         # Execute prefetch
         project_slugs = ["proj1", "proj2"]
@@ -210,7 +210,7 @@ class TestPrefetchIntegration:
             {"name": "Proj2", "projectType": "series", "slug": "proj2"},
         ]
         angel_interface_mock.get_projects.return_value = projects
-        ui.cache.get.return_value = None
+        ui.cache_manager.cache.get.return_value = None
 
         # Mock prefetch
         with (
@@ -235,7 +235,7 @@ class TestPrefetchIntegration:
         # Mock projects
         projects = [{"name": "Proj1", "projectType": "series", "slug": "proj1"}]
         angel_interface_mock.get_projects.return_value = projects
-        ui.cache.get.return_value = None
+        ui.cache_manager.cache.get.return_value = None
 
         # Mock prefetch
         with (
@@ -257,7 +257,7 @@ class TestPrefetchIntegration:
         # Mock projects
         projects = [{"name": "Proj1", "projectType": "series", "slug": "proj1"}]
         angel_interface_mock.get_projects.return_value = projects
-        ui.cache.get.return_value = None
+        ui.cache_manager.cache.get.return_value = None
 
         # Execute (should not raise)
         with patch.object(ui.menu_handler, "_process_attributes_to_infotags", return_value=None):
@@ -280,7 +280,7 @@ class TestPrefetchIntegration:
         # Mock projects
         projects = [{"name": f"Proj{i}", "projectType": "series", "slug": f"proj{i}"} for i in range(10)]
         angel_interface_mock.get_projects.return_value = projects
-        ui.cache.get.return_value = None
+        ui.cache_manager.cache.get.return_value = None
 
         # Mock prefetch
         with (
@@ -299,7 +299,7 @@ class TestPrefetchIntegration:
         ui, logger_mock, angel_interface_mock = ui_interface
 
         # Mock cache query to raise exception
-        ui.cache._execute_sql.side_effect = Exception("Cache query error")
+        ui.cache_manager.cache._execute_sql.side_effect = Exception("Cache query error")
 
         # Execute prefetch (should not raise)
         ui._deferred_prefetch_project(["proj1"])

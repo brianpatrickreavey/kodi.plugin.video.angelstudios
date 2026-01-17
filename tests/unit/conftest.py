@@ -272,7 +272,7 @@ def ui_interface(mock_kodi_addon, mock_logger, mock_angel_interface, mock_simple
 
     # Override with test-scoped addon and cache (fresh per test)
     ui.addon = mock_kodi_addon
-    ui.cache = mock_simplecache_instance
+    ui.cache_manager.cache = mock_simplecache_instance
 
     yield ui, mock_logger, mock_angel_interface
 
