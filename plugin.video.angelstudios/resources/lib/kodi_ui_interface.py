@@ -50,85 +50,6 @@ class KodiUIInterface:
         self.log.info("KodiUIInterface initialized")
         self.log.debug(f"{self.handle=}, {self.kodi_url=}")
 
-        # Default state for menu toggles
-        self.default_menu_enabled = {
-            "show_movies": True,
-            "show_series": True,
-            "show_specials": True,
-            "show_podcasts": False,
-            "show_livestreams": False,
-            "show_continue_watching": False,
-            "show_top_picks": False,
-        }
-
-        # Static menu definitions (settings are applied when rendering)
-        self.menu_defs = {
-            "show_movies": {
-                "label": "Movies",
-                "content_type": "movie",
-                "action": "movies_menu",
-                "description": "Browse standalone movies and films",
-                "icon": "DefaultMovies.png",
-            },
-            "show_series": {
-                "label": "Series",
-                "content_type": "tvshow",
-                "action": "series_menu",
-                "description": "Browse series with multiple episodes",
-                "icon": "DefaultTVShows.png",
-            },
-            # Kodi uses 'specials' for Dry Bar Comedy Specials
-            # If this changes in the future, update accordingly
-            "show_specials": {
-                "label": "Dry Bar Comedy Specials",
-                "content_type": "video",
-                "action": "specials_menu",
-                "description": "Browse Dry Bar Comedy Specials",
-                "icon": "DefaultAddonLyrics.png",  # Microphone icon, best we could do
-            },
-            "show_podcasts": {
-                "label": "Podcasts",
-                "content_type": "video",
-                "action": "podcast_menu",
-                "description": "Browse Podcast content",
-                "icon": "DefaultMusicSources.png",
-            },
-            "show_livestreams": {
-                "label": "Livestreams",
-                "content_type": "video",
-                "action": "livestream_menu",
-                "description": "Browse Livestream content",
-                "icon": "DefaultPVRGuide.png",
-            },
-            "show_continue_watching": {
-                "label": "Continue Watching",
-                "content_type": "video",
-                "action": "continue_watching_menu",
-                "description": "Continue watching your in-progress content",
-                "icon": "DefaultInProgressShows.png",
-            },
-            "show_watchlist": {
-                "label": "Watchlist",
-                "content_type": "video",
-                "action": "watchlist_menu",
-                "description": "Browse your saved watchlist items",
-                "icon": "DefaultVideoPlaylists.png",
-            },
-            "show_top_picks": {
-                "label": "Top Picks For You",
-                "content_type": "video",
-                "action": "top_picks_menu",
-                "description": "Browse top picks for you",
-                "icon": "DefaultMusicTop100.png",
-            },
-        }
-
-        self.menu_items = []
-
-        # Initialize handlers
-        self.menu_handler = kodi_menu_handler.KodiMenuHandler(self)
-        self.playback_handler = kodi_playback_handler.KodiPlaybackHandler(self)
-
     def main_menu(self):
         """Show the main menu with content type options"""
         return self.menu_handler.main_menu()
@@ -167,31 +88,7 @@ class KodiUIInterface:
 
     def _ensure_isa_available(self, manifest_type: str = "hls") -> bool:
         """Check if InputStream Adaptive is available (and installed/enabled)."""
-        has_helper = xbmc.getCondVisibility("System.HasAddon(script.module.inputstreamhelper)")
-        has_isa = xbmc.getCondVisibility("System.HasAddon(inputstream.adaptive)")
-
-        if not has_helper:
-            if has_isa:
-                self.log.info("inputstreamhelper not installed; inputstream.adaptive present via System.HasAddon")
-            else:
-                self.log.info("inputstreamhelper not installed; inputstream.adaptive not detected; skipping ISA setup")
-            return has_isa
-
-        try:
-            from inputstreamhelper import Helper  # type: ignore
-        except Exception as exc:  # pragma: no cover - defensive
-            self.log.warning(f"inputstreamhelper present but import failed: {exc}")
-            return has_isa
-
-        try:
-            is_helper = Helper(manifest_type)
-            result = bool(is_helper.check_inputstream())
-            if not result:
-                self.log.info("inputstreamhelper check_inputstream returned False; ISA unavailable")
-            return result
-        except Exception as exc:  # pragma: no cover - defensive
-            self.log.warning(f"inputstreamhelper check failed: {exc}")
-            return has_isa
+        return self.playback_handler._ensure_isa_available(manifest_type)
 
     def setAngelInterface(self, angel_interface):
         """Set the Angel Studios interface for this UI helper"""
@@ -239,16 +136,7 @@ class KodiUIInterface:
         Interprets `disable_cache` as a boolean; defaults to enabled when
         the setting is missing, unreadable, or a non-bool value.
         """
-        try:
-            disabled_val = self.addon.getSettingBool("disable_cache")
-            if isinstance(disabled_val, bool):
-                return not disabled_val
-
-            self.log.warning(f"disable_cache returned non-bool {disabled_val!r}; assuming cache enabled")
-            return True
-        except Exception as exc:
-            self.log.warning(f"disable_cache returned non-bool; assuming cache enabled: {exc}")
-            return True
+        return self.cache_manager._cache_enabled()
 
     def _ensure_trace_dir(self):
         """Ensure the trace directory exists if trace mode is active.
@@ -281,35 +169,6 @@ class KodiUIInterface:
         """Expose tracer for API layer; safe to use even when trace is off."""
         return self.ui_helpers.get_trace_callback()
 
-    def _load_menu_items(self):
-        """Load menu items using current settings each time the main menu is rendered."""
-        self.menu_items = []
-        addon = self.addon
-
-        for setting_id, item in self.menu_defs.items():
-            try:
-                enabled = addon.getSettingBool(setting_id)
-            except Exception as exc:
-                self.log.warning(f"Failed to read setting {setting_id}: {exc}; using default")
-                enabled = self.default_menu_enabled.get(setting_id, False)
-
-            if not isinstance(enabled, bool):
-                enabled = self.default_menu_enabled.get(setting_id, False)
-
-            if enabled:
-                self.menu_items.append(item)
-
-        # Settings is always shown
-        self.menu_items.append(
-            {
-                "label": "Settings",
-                "content_type": "video",
-                "action": "settings",
-                "description": "Open addon settings",
-                "icon": self.default_settings_icon,
-            }
-        )
-
     def show_error(self, message, title="Angel Studios"):
         """Show error dialog to user"""
         return self.ui_helpers.show_error(message, title)
@@ -336,23 +195,7 @@ class KodiUIInterface:
 
     def _get_quality_pref(self):
         """Return dict with 'mode' and 'target_height'. mode in {'auto','fixed','manual'}."""
-        try:
-            addon = self.addon
-            getter = getattr(addon, "getSettingString", None)
-            quality_value = getter("video_quality") if callable(getter) else addon.getSetting("video_quality")
-        except Exception:
-            quality_value = "auto"
-
-        quality_value = (quality_value or "auto").lower() if isinstance(quality_value, str) else "auto"
-        mapping = {
-            "1080p": {"mode": "fixed", "target_height": 1080},
-            "720p": {"mode": "fixed", "target_height": 720},
-            "480p": {"mode": "fixed", "target_height": 480},
-            "360p": {"mode": "fixed", "target_height": 360},
-            "manual": {"mode": "manual", "target_height": None},
-            "auto": {"mode": "auto", "target_height": None},
-        }
-        return mapping.get(quality_value, {"mode": "auto", "target_height": None})
+        return self.playback_handler._get_quality_pref()
 
     def _normalize_contentseries_episode(self, episode):
         """Normalize ContentSeries episode dict to expected keys."""

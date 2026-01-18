@@ -44,14 +44,89 @@ class KodiMenuHandler:
         self.kodi_url = parent.kodi_url
         self.log = parent.log
 
+        # Default state for menu toggles
+        self.default_menu_enabled = {
+            "show_movies": True,
+            "show_series": True,
+            "show_specials": True,
+            "show_podcasts": False,
+            "show_livestreams": False,
+            "show_continue_watching": False,
+            "show_top_picks": False,
+        }
+
+        # Static menu definitions (settings are applied when rendering)
+        self.menu_defs = {
+            "show_movies": {
+                "label": "Movies",
+                "content_type": "movie",
+                "action": "movies_menu",
+                "description": "Browse standalone movies and films",
+                "icon": "DefaultMovies.png",
+            },
+            "show_series": {
+                "label": "Series",
+                "content_type": "tvshow",
+                "action": "series_menu",
+                "description": "Browse series with multiple episodes",
+                "icon": "DefaultTVShows.png",
+            },
+            # Kodi uses 'specials' for Dry Bar Comedy Specials
+            # If this changes in the future, update accordingly
+            "show_specials": {
+                "label": "Dry Bar Comedy Specials",
+                "content_type": "video",
+                "action": "specials_menu",
+                "description": "Browse Dry Bar Comedy Specials",
+                "icon": "DefaultAddonLyrics.png",  # Microphone icon, best we could do
+            },
+            "show_podcasts": {
+                "label": "Podcasts",
+                "content_type": "video",
+                "action": "podcast_menu",
+                "description": "Browse Podcast content",
+                "icon": "DefaultMusicSources.png",
+            },
+            "show_livestreams": {
+                "label": "Livestreams",
+                "content_type": "video",
+                "action": "livestream_menu",
+                "description": "Browse Livestream content",
+                "icon": "DefaultPVRGuide.png",
+            },
+            "show_continue_watching": {
+                "label": "Continue Watching",
+                "content_type": "video",
+                "action": "continue_watching_menu",
+                "description": "Continue watching your in-progress content",
+                "icon": "DefaultInProgressShows.png",
+            },
+            "show_watchlist": {
+                "label": "Watchlist",
+                "content_type": "video",
+                "action": "watchlist_menu",
+                "description": "Browse your saved watchlist items",
+                "icon": "DefaultVideoPlaylists.png",
+            },
+            "show_top_picks": {
+                "label": "Top Picks For You",
+                "content_type": "video",
+                "action": "top_picks_menu",
+                "description": "Browse top picks for you",
+                "icon": "DefaultMusicTop100.png",
+            },
+        }
+
+        self.menu_items = []
+
     def main_menu(self):
         """Show the main menu with content type options"""
 
         # Rebuild menu items to reflect current settings
-        self.parent._load_menu_items()
+        self._load_menu_items()
 
         # Create directory items for each menu option
-        for item in self.parent.menu_items:
+        for item in self.menu_items:
             # Create list item
             list_item = xbmcgui.ListItem(label=item["label"])
 
@@ -75,6 +150,35 @@ class KodiMenuHandler:
 
         # Finish directory
         xbmcplugin.endOfDirectory(self.handle)
+
+    def _load_menu_items(self):
+        """Load menu items using current settings each time the main menu is rendered."""
+        self.menu_items = []
+        addon = self.parent.addon
+
+        for setting_id, item in self.menu_defs.items():
+            try:
+                enabled = addon.getSettingBool(setting_id)
+            except Exception as exc:
+                self.log.warning(f"Failed to read setting {setting_id}: {exc}; using default")
+                enabled = self.default_menu_enabled.get(setting_id, False)
+
+            if not isinstance(enabled, bool):
+                enabled = self.default_menu_enabled.get(setting_id, False)
+
+            if enabled:
+                self.menu_items.append(item)
+
+        # Settings is always shown
+        self.menu_items.append(
+            {
+                "label": "Settings",
+                "content_type": "video",
+                "action": "settings",
+                "description": "Open addon settings",
+                "icon": self.parent.default_settings_icon,
+            }
+        )
 
     def projects_menu(self, content_type=""):
         """Display a menu of projects based on content type, with persistent caching."""

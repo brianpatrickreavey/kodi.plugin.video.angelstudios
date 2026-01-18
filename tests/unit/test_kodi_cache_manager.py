@@ -12,10 +12,6 @@ class TestDeferredPrefetchProject:
         """Test basic project prefetch with cache misses."""
         ui, logger_mock, angel_interface_mock = ui_interface
 
-        # Use real cache manager for this test
-        from kodi_cache_manager import KodiCacheManager
-        ui.cache_manager = KodiCacheManager(ui)
-
         # Mock cache query - no cached projects
         mock_cursor = MagicMock()
         mock_cursor.fetchall.return_value = []
@@ -310,3 +306,142 @@ class TestPrefetchIntegration:
 
         # Verify error logged
         assert any("Project prefetch failed" in str(call.args[0]) for call in logger_mock.error.call_args_list)
+
+
+class TestCacheUtils:
+    def test_clear_cache_sql_path_non_empty(self, ui_interface):
+        """clear_cache deletes all SQL rows and window properties, returns True."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        cache_mock = MagicMock()
+        ui.cache_manager.cache = cache_mock
+
+        cache_mock._execute_sql = MagicMock()
+        cache_mock._execute_sql.side_effect = [
+            MagicMock(fetchall=MagicMock(return_value=[("id1",), ("id2",)])),  # initial ids
+            None,  # delete id1
+            None,  # delete id2
+            MagicMock(fetchall=MagicMock(return_value=[])),  # after ids
+        ]
+        cache_mock._win = MagicMock()
+
+        assert ui.cache_manager.clear_cache() is True
+        assert cache_mock._execute_sql.call_count == 4
+        assert cache_mock._win.clearProperty.call_count == 2
+
+    def test_clear_cache_sql_path_empty(self, ui_interface):
+        """clear_cache returns True on empty cache."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        cache_mock = MagicMock()
+        ui.cache_manager.cache = cache_mock
+
+        cache_mock._execute_sql = MagicMock()
+        cache_mock._execute_sql.side_effect = [
+            MagicMock(fetchall=MagicMock(return_value=[])),  # initial ids
+        ]
+        cache_mock._win = MagicMock()
+
+        assert ui.cache_manager.clear_cache() is True
+        assert cache_mock._execute_sql.call_count == 1
+        cache_mock._win.clearProperty.assert_not_called()
+
+    def test_clear_cache_sql_exception(self, ui_interface):
+        """clear_cache returns False on SQL failures."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        cache_mock = MagicMock()
+        ui.cache_manager.cache = cache_mock
+
+        cache_mock._execute_sql = MagicMock(side_effect=Exception("boom"))
+        cache_mock._win = MagicMock()
+        assert ui.cache_manager.clear_cache() is False
+
+    def test_clear_cache_no_introspection(self, ui_interface):
+        """clear_cache returns False and logs when cache lacks SQL helpers."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        ui.cache_manager.cache = object()
+
+        assert ui.cache_manager.clear_cache() is False
+        logger_mock.info.assert_any_call("SimpleCache before clear: introspection not available")
+
+    def test_clear_cache_clear_property_exception(self, ui_interface):
+        """clear_cache swallows window clear exceptions and still returns True."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        cache_mock = MagicMock()
+        ui.cache_manager.cache = cache_mock
+
+        cache_mock._execute_sql = MagicMock()
+        cache_mock._execute_sql.side_effect = [
+            MagicMock(fetchall=MagicMock(return_value=[("id1",), ("id2",)])),  # initial ids
+            None,  # delete id1
+            None,  # delete id2
+            MagicMock(fetchall=MagicMock(return_value=[])),  # after ids
+        ]
+        cache_mock._win = MagicMock()
+        cache_mock._win.clearProperty.side_effect = [Exception("win boom"), Exception("win boom 2")]
+
+        assert ui.cache_manager.clear_cache() is True
+        assert cache_mock._execute_sql.call_count == 4
+        assert cache_mock._win.clearProperty.call_count == 2
+
+    def test_cache_enabled_disable_cache_true_probe_false(self, ui_interface):
+        from unittest.mock import MagicMock, patch
+
+        ui, logger_mock, angel_interface_mock = ui_interface
+
+        # Fresh addon scoped to this test only to avoid leaking disable_cache state
+        fresh_addon = MagicMock()
+        fresh_addon.getSettingBool.return_value = True
+        fresh_addon.getSettingString.return_value = "off"
+        fresh_addon.getSettingInt.return_value = 12
+
+        ui.addon = fresh_addon
+        ui.cache_manager.addon = fresh_addon
+
+        assert ui.cache_manager._cache_enabled() is False
+
+    def test_cache_enabled_not_callable(self, ui_interface):
+        ui, _, _ = ui_interface
+        ui.addon.getSettingBool = None
+
+        assert ui.cache_manager._cache_enabled() is True
+
+        ui.addon.getSettingBool = MagicMock(return_value=False)
+
+    def test_cache_enabled_disabled_false_returns_true(self, ui_interface):
+        ui, _, _ = ui_interface
+        ui.addon.getSettingBool = MagicMock(return_value=False)
+
+        assert ui.cache_manager._cache_enabled() is True
+
+    def test_cache_enabled_exception_returns_true(self, ui_interface):
+        ui, _, _ = ui_interface
+        ui.addon.getSettingBool = MagicMock(side_effect=RuntimeError("boom"))
+
+        assert ui.cache_manager._cache_enabled() is True
+
+    def test_cache_enabled_non_bool_disable_value(self, ui_interface):
+        ui, _, _ = ui_interface
+
+        def fake_get(key):
+            if key == "disable_cache":
+                return "y"
+            if key == "__cache_probe__":
+                return False
+            return False
+
+        ui.addon.getSettingBool = MagicMock(side_effect=fake_get)
+
+        assert ui.cache_manager._cache_enabled() is True
+
+    def test_cache_enabled_probe_not_bool(self, ui_interface):
+        ui, _, _ = ui_interface
+
+        def fake_get(key):
+            if key == "disable_cache":
+                return True
+            if key == "__cache_probe__":
+                return "maybe"
+            return False
+
+        ui.cache_manager.addon.getSettingBool.side_effect = fake_get
+
+        assert ui.cache_manager._cache_enabled() is False
