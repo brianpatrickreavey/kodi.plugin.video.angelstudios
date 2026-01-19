@@ -17,7 +17,7 @@ Eliminated 85-90% overhead from iterating 25+ dict keys per episode, which inclu
 ## Implementation Details
 - **Direct dict access**: Explicit `if info_dict.get("key"):` checks instead of looping over all keys
 - **Cloudinary URL reuse**: Builds URLs once and reuses for multiple art keys (e.g., logo for logo/clearlogo/icon)
-- **Minimal logging**: Debug logs removed from hot path; timing traces available in trace mode
+- **Minimal logging**: Debug logs removed from hot path; performance timing available with "Enable performance logging" setting
 
 ## Constraints
 - Manual updates required for new API attributes
@@ -27,7 +27,7 @@ Eliminated 85-90% overhead from iterating 25+ dict keys per episode, which inclu
 - `kodi_menu_handler.py` (lines ~680–813)
 
 ## Metrics Source
-Timing traces with `[TIMING-TRACE]` logs (enable with trace mode).
+Performance timing with `[PERF]` logs (enable with "Enable performance logging" setting).
 
 ## For Agents/AI
 This is a performance-critical hot path. Avoid adding loops or per-key logging. If schema changes, update direct checks explicitly. Reuse URLs for art keys to avoid redundant API calls.

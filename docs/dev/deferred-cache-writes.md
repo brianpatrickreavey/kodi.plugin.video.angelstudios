@@ -39,7 +39,7 @@ def menu_with_caching(self, param):
 
     # Log total time before cache writes (reflects UI responsiveness)
     total_time = time.perf_counter() - start
-    self.log.info(f"[TIMING] menu COMPLETED in {total_time:.1f}ms (cache_write: deferred)")
+    self.log.info(f"[PERF] menu: {total_time:.1f}ms (cache_write: deferred)")
 
     # Signal directory complete (UI renders NOW)
     xbmcplugin.endOfDirectory(self.handle)
@@ -55,7 +55,7 @@ def _deferred_cache_write(self, data):
         self.cache.set(f"item_{item['id']}", item, expiration=self._cache_ttl())
 
     cache_time = (time.perf_counter() - cache_start) * 1000
-    self.log.debug(f"[TIMING] _deferred_cache_write completed in {cache_time:.1f}ms ({len(data)} items)")
+    self.log.debug(f"[PERF] _deferred_cache_write: {cache_time:.1f}ms ({len(data)} items)")
 ```
 
 ### Current Implementation
@@ -168,8 +168,8 @@ Track deferred cache performance:
 
 ```python
 # In kodi_ui_interface.py
-self.log.info(f"[TIMING] menu COMPLETED in {render_time:.1f}ms (cache_write: deferred)")
-self.log.debug(f"[TIMING] _deferred_cache_write completed in {cache_time:.1f}ms ({len(data)} items)")
+self.log.info(f"[PERF] menu: {render_time:.1f}ms (cache_write: deferred)")
+self.log.debug(f"[PERF] _deferred_cache_write: {cache_time:.1f}ms ({len(data)} items)")
 ```
 
 Examples from production:

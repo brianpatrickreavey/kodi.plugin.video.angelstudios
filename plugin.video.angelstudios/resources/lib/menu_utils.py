@@ -3,6 +3,8 @@ Menu Utilities for Angel Studios Kodi addon.
 Shared utilities and mappings used across menu handlers.
 """
 
+from kodi_utils import TimedBlock
+
 # Map menu content types to Angel Studios project types for API calls
 angel_menu_content_mapper = {
     "movies": "movie",
@@ -75,9 +77,9 @@ class MenuUtils:
         Note: For agents/AI: This is a performance-critical hot path. Avoid adding loops or
         per-key logging. If schema changes, update direct checks explicitly.
         """
-        timing_start = __import__('time').perf_counter()
-        self.log.info(f"Processing attributes for list item: {list_item.getLabel()}")
-        info_tag = list_item.getVideoInfoTag()
+        with TimedBlock('_process_attributes_to_infotags'):
+            self.log.info(f"Processing attributes for list item: {list_item.getLabel()}")
+            info_tag = list_item.getVideoInfoTag()
 
         # Direct attribute setting (no loop, no per-key logging)
         if info_dict.get("name"):
@@ -180,8 +182,6 @@ class MenuUtils:
         if art_dict:
             list_item.setArt(art_dict)
 
-        timing_end = (__import__('time').perf_counter() - timing_start) * 1000
-        self.log.debug(f"_process_attributes_to_infotags completed in {timing_end:.1f}ms", category="timing")
         return
 
     def _create_list_item_from_episode(

@@ -664,10 +664,10 @@ class KodiMenuHandler:
         Note: For agents/AI: This is a performance-critical hot path. Avoid adding loops or
         per-key logging. If schema changes, update direct checks explicitly.
         """
-        timing_start = time.perf_counter()
-        self.log.info(f"Processing attributes for list item: {list_item.getLabel()}")
-        self.log.debug(f"Attribute dict: {info_dict}")
-        info_tag = list_item.getVideoInfoTag()
+        with TimedBlock('_process_attributes_to_infotags'):
+            self.log.info(f"Processing attributes for list item: {list_item.getLabel()}")
+            self.log.debug(f"Attribute dict: {info_dict}")
+            info_tag = list_item.getVideoInfoTag()
 
         # Direct attribute setting (no loop, no per-key logging)
         if info_dict.get("name"):
@@ -783,9 +783,6 @@ class KodiMenuHandler:
             self.log.debug(f"Setting artwork: {art_dict}", category="art")
             list_item.setArt(art_dict)
 
-        timing_end = (time.perf_counter() - timing_start) * 1000
-        if self.parent._is_trace():
-            self.log.debug(f"[TIMING-TRACE] _process_attributes_to_infotags completed in {timing_end:.1f}ms", category="timing")
         return
 
     def _apply_progress_bar(self, list_item, watch_position_seconds, duration_seconds):

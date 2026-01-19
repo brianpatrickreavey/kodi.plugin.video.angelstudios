@@ -6,7 +6,7 @@ The Kodi addon implements category-based debug logging to enable selective debug
 
 ## How It Works
 
-Debug messages can be assigned to categories (`art`, `timing`, `api`) and selectively promoted to INFO level through user settings. When a category toggle is disabled, those debug messages remain at DEBUG level and have zero performance impact.
+Debug messages can be assigned to categories (`art`, `api`) and selectively promoted to INFO level through user settings. When a category toggle is disabled, those debug messages remain at DEBUG level and have zero performance impact. Performance timing uses the dedicated `[PERF]` logging system.
 
 ## User Settings
 
@@ -14,7 +14,7 @@ Located in **Settings → Troubleshooting → Troubleshooting settings**:
 
 - **Debug mode**: Controls overall debug logging level (`off`, `debug`, `trace`)
 - **Promote artwork debug logs**: Shows artwork processing debug messages at INFO level
-- **Promote timing debug logs**: Shows performance timing debug messages at INFO level
+- **Promote timing debug logs** (deprecated): Previously controlled performance timing debug messages; now use "Enable performance logging" setting
 - **Promote API debug logs**: Shows GraphQL API debug messages at INFO level
 
 ## Categories
@@ -26,11 +26,8 @@ Debug logs related to artwork processing and resolution:
 - Logo injection from projects to episodes
 - Artwork dictionary construction
 
-### `timing` Category
-Performance timing measurements:
-- Episode processing completion times
-- Menu rendering durations
-- Cache operation timings
+### `timing` Category (Deprecated)
+**Note**: Performance timing now uses the dedicated `[PERF]` logging system controlled by the "Enable performance logging" setting. The `timing` category is no longer used in active code.
 
 ### `api` Category
 GraphQL API communication:
@@ -43,9 +40,6 @@ GraphQL API communication:
 ```python
 # Promote to INFO when art toggle enabled
 self.log.debug("Processing artwork still", category="art")
-
-# Promote to INFO when timing toggle enabled
-self.log.debug(f"Completed in {elapsed}ms", category="timing")
 
 # Promote to INFO when API toggle enabled
 self.log.debug("GraphQL query executed", category="api")
