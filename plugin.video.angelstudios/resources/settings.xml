@@ -109,18 +109,6 @@
                     <default>true</default>
                     <control type="toggle" />
                 </setting>
-                <setting id="debug_mode" type="string" label="30402" help="30403">
-                    <level>3</level>
-                    <default>off</default>
-                    <constraints>
-                        <options>
-                            <option label="30404">off</option>
-                            <option label="30405">debug</option>
-                            <option label="30406">trace</option>
-                        </options>
-                    </constraints>
-                    <control type="spinner" format="string" />
-                </setting>
                 <setting id="disable_cache" type="boolean" label="30407" help="30408">
                     <level>3</level>
                     <default>false</default>
@@ -141,10 +129,56 @@
                     <default>false</default>
                     <control type="toggle" />
                 </setting>
+                <setting id="enable_prefetch" type="boolean" label="30413" help="30414">
+                    <level>3</level>
+                    <default>false</default>
+                    <control type="toggle" />
+                </setting>
+                <setting id="prefetch_project_count" type="integer" label="30415" help="30416">
+                    <level>3</level>
+                    <default>5</default>
+                    <constraints>
+                        <minimum>0</minimum>
+                        <maximum>20</maximum>
+                        <step>1</step>
+                    </constraints>
+                    <control type="slider" format="integer" />
+                </setting>
             </group>
         </category>
 
         <category id="maintenance" label="30502" help="30501">
+            <group id="debug_group" label="30503" help="30503">
+                <setting id="debug_mode" type="string" label="30402" help="30403">
+                    <level>2</level>
+                    <default>off</default>
+                    <constraints>
+                        <options>
+                            <option label="30404">off</option>
+                            <option label="30405">debug</option>
+                            <option label="30406">trace</option>
+                        </options>
+                    </constraints>
+                    <control type="spinner" format="string" />
+                </setting>
+
+                <setting id="debug_art_promotion" type="boolean" label="30504" help="30505">
+                    <level>2</level>
+                    <default>false</default>
+                    <control type="toggle" />
+                </setting>
+                <setting id="debug_timing_promotion" type="boolean" label="30506" help="30507">
+                    <level>2</level>
+                    <default>false</default>
+                    <control type="toggle" />
+                </setting>
+                <setting id="debug_api_promotion" type="boolean" label="30508" help="30509">
+                    <level>2</level>
+                    <default>false</default>
+                    <control type="toggle" />
+                </setting>
+            </group>
+
             <group id="maintenance_group" label="30502" help="30501">
                 <setting id="clear_cache" type="action" label="30510" help="30511">
                     <level>3</level>

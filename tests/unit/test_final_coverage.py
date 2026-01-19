@@ -52,7 +52,7 @@ class TestKodiUIInterfaceLines1399_1400:
                 ui.menu_handler._create_list_item_from_episode(episode, project=project, content_type="series")
 
             # Verify logo injection was logged
-            mock_debug.assert_any_call("[ART] Injecting project logo into episode: project_logo.png")
+            mock_debug.assert_any_call("[ART] Injecting project logo into episode: project_logo.png", category="art")
 
 
 class TestKodiUIInterfaceLines1583_1587:
@@ -90,7 +90,7 @@ class TestKodiUIInterfaceLines1583_1587:
                 ui.menu_handler._process_attributes_to_infotags(list_item, info_dict)
 
             # Verify the debug log at line 1587
-            mock_debug.assert_any_call("[ART] Using portraitStill1: portrait_still_1.jpg")
+            mock_debug.assert_any_call("[ART] Using portraitStill1: portrait_still_1.jpg", category="art")
 
 
 class TestKodiUIInterfaceLines1589_1597:
@@ -128,8 +128,8 @@ class TestKodiUIInterfaceLines1589_1597:
                 ui.menu_handler._process_attributes_to_infotags(list_item, info_dict)
 
             # Verify the debug log at lines 1583-1587
-            mock_debug.assert_any_call("[ART] direct portraitTitleImage: {'cloudinaryPath': 'direct_portrait.jpg'}")
-            mock_debug.assert_any_call("[ART] Using direct portraitTitleImage: direct_portrait.jpg")
+            mock_debug.assert_any_call("[ART] direct portraitTitleImage: {'cloudinaryPath': 'direct_portrait.jpg'}", category="art")
+            mock_debug.assert_any_call("[ART] Using direct portraitTitleImage: direct_portrait.jpg", category="art")
 
 
 class TestKodiUIInterfaceLines1622_1624:

@@ -607,7 +607,7 @@ class KodiMenuHandler:
         try:
             if project and isinstance(project, dict) and "logoCloudinaryPath" in project:
                 if "logoCloudinaryPath" not in art_info:
-                    self.log.debug(f"[ART] Injecting project logo into episode: {project['logoCloudinaryPath']}")
+                    self.log.debug(f"[ART] Injecting project logo into episode: {project['logoCloudinaryPath']}", category="art")
                     art_info["logoCloudinaryPath"] = project["logoCloudinaryPath"]
         except Exception:
             pass
@@ -740,34 +740,34 @@ class KodiMenuHandler:
 
         # Handle stills
         for still_key in ("portraitStill1", "portraitStill2", "portraitTitleImage"):
-            self.log.debug(f"[ART] Processing still_key: {still_key}")
+            self.log.debug(f"[ART] Processing still_key: {still_key}", category="art")
             still_dict = info_dict.get(still_key)
-            self.log.debug(f"[ART] still_dict from info_dict: {still_dict}")
+            self.log.debug(f"[ART] still_dict from info_dict: {still_dict}", category="art")
             if not isinstance(still_dict, dict):
                 # Check nested in title for projects
                 title_dict = info_dict.get("title", {})
-                self.log.debug(f"[ART] title_dict: {title_dict}")
+                self.log.debug(f"[ART] title_dict: {title_dict}", category="art")
                 if isinstance(title_dict, dict):
                     still_dict = title_dict.get(still_key)
-                    self.log.debug(f"[ART] still_dict from title: {still_dict}")
+                    self.log.debug(f"[ART] still_dict from title: {still_dict}", category="art")
             if isinstance(still_dict, dict):
-                self.log.debug(f"[ART] Processing still_dict for {still_key}")
+                self.log.debug(f"[ART] Processing still_dict for {still_key}", category="art")
                 cp = still_dict.get("cloudinaryPath")
-                self.log.debug(f"[ART] cp: {cp}")
+                self.log.debug(f"[ART] cp: {cp}", category="art")
                 if cp:
                     url = self.parent.angel_interface.get_cloudinary_url(cp)
-                    self.log.debug(f"[ART] url: {url}")
+                    self.log.debug(f"[ART] url: {url}", category="art")
                     if still_key == "portraitTitleImage":
-                        self.log.debug(f"[ART] direct portraitTitleImage: {still_dict}")
-                        self.log.debug(f"[ART] Using direct portraitTitleImage: {cp}")
+                        self.log.debug(f"[ART] direct portraitTitleImage: {still_dict}", category="art")
+                        self.log.debug(f"[ART] Using direct portraitTitleImage: {cp}", category="art")
                         art_dict["poster"] = url
-                        self.log.debug(f"[ART] Set poster to portraitTitleImage: {url}")
+                        self.log.debug(f"[ART] Set poster to portraitTitleImage: {url}", category="art")
                     elif still_key == "portraitStill1":
-                        self.log.debug(f"[ART] Using {still_key}: {cp}")
+                        self.log.debug(f"[ART] Using {still_key}: {cp}", category="art")
                         art_dict["poster"] = url
-                        self.log.debug(f"[ART] Set poster to {still_key}: {url}")
+                        self.log.debug(f"[ART] Set poster to {still_key}: {url}", category="art")
                     else:
-                        self.log.debug(f"[ART] Using {still_key}: {cp}")
+                        self.log.debug(f"[ART] Using {still_key}: {cp}", category="art")
                     art_dict.setdefault("thumb", url)
 
         for still_key in ("landscapeStill1", "landscapeStill2"):
@@ -780,12 +780,12 @@ class KodiMenuHandler:
                     art_dict.setdefault("fanart", url)
 
         if art_dict:
-            self.log.debug(f"Setting artwork: {art_dict}")
+            self.log.debug(f"Setting artwork: {art_dict}", category="art")
             list_item.setArt(art_dict)
 
         timing_end = (time.perf_counter() - timing_start) * 1000
         if self.parent._is_trace():
-            self.log.debug(f"[TIMING-TRACE] _process_attributes_to_infotags completed in {timing_end:.1f}ms")
+            self.log.debug(f"[TIMING-TRACE] _process_attributes_to_infotags completed in {timing_end:.1f}ms", category="timing")
         return
 
     def _apply_progress_bar(self, list_item, watch_position_seconds, duration_seconds):

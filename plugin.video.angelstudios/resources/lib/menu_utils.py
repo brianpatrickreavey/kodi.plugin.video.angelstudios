@@ -77,7 +77,6 @@ class MenuUtils:
         """
         timing_start = __import__('time').perf_counter()
         self.log.info(f"Processing attributes for list item: {list_item.getLabel()}")
-        self.log.debug(f"Attribute dict: {info_dict}")
         info_tag = list_item.getVideoInfoTag()
 
         # Direct attribute setting (no loop, no per-key logging)
@@ -151,34 +150,21 @@ class MenuUtils:
 
         # Handle stills
         for still_key in ("portraitStill1", "portraitStill2", "portraitTitleImage"):
-            self.log.debug(f"[ART] Processing still_key: {still_key}")
             still_dict = info_dict.get(still_key)
-            self.log.debug(f"[ART] still_dict from info_dict: {still_dict}")
             if not isinstance(still_dict, dict):
                 # Check nested in title for projects
                 title_dict = info_dict.get("title", {})
-                self.log.debug(f"[ART] title_dict: {title_dict}")
                 if isinstance(title_dict, dict):
                     still_dict = title_dict.get(still_key)
-                    self.log.debug(f"[ART] still_dict from title: {still_dict}")
             if isinstance(still_dict, dict):
-                self.log.debug(f"[ART] Processing still_dict for {still_key}")
                 cp = still_dict.get("cloudinaryPath")
-                self.log.debug(f"[ART] cp: {cp}")
                 if cp:
                     url = self.parent.angel_interface.get_cloudinary_url(cp)
-                    self.log.debug(f"[ART] url: {url}")
+                    self.log.debug(f"Using {still_key} for poster: {cp}", category="art")
                     if still_key == "portraitTitleImage":
-                        self.log.debug(f"[ART] direct portraitTitleImage: {still_dict}")
-                        self.log.debug(f"[ART] Using direct portraitTitleImage: {cp}")
                         art_dict["poster"] = url
-                        self.log.debug(f"[ART] Set poster to portraitTitleImage: {url}")
                     elif still_key == "portraitStill1":
-                        self.log.debug(f"[ART] Using {still_key}: {cp}")
                         art_dict["poster"] = url
-                        self.log.debug(f"[ART] Set poster to {still_key}: {url}")
-                    else:
-                        self.log.debug(f"[ART] Using {still_key}: {cp}")
                     art_dict.setdefault("thumb", url)
 
         for still_key in ("landscapeStill1", "landscapeStill2"):
@@ -187,16 +173,15 @@ class MenuUtils:
                 cp = still_dict.get("cloudinaryPath")
                 if cp:
                     url = self.parent.angel_interface.get_cloudinary_url(cp)
+                    self.log.debug(f"Using {still_key} for landscape: {cp}", category="art")
                     art_dict.setdefault("landscape", url)
                     art_dict.setdefault("fanart", url)
 
         if art_dict:
-            self.log.debug(f"Setting artwork: {art_dict}")
             list_item.setArt(art_dict)
 
         timing_end = (__import__('time').perf_counter() - timing_start) * 1000
-        if self.parent._is_trace():
-            self.log.debug(f"[TIMING-TRACE] _process_attributes_to_infotags completed in {timing_end:.1f}ms")
+        self.log.debug(f"_process_attributes_to_infotags completed in {timing_end:.1f}ms", category="timing")
         return
 
     def _create_list_item_from_episode(
@@ -314,7 +299,7 @@ class MenuUtils:
         try:
             if project and isinstance(project, dict) and "logoCloudinaryPath" in project:
                 if "logoCloudinaryPath" not in art_info:
-                    self.log.debug(f"[ART] Injecting project logo into episode: {project['logoCloudinaryPath']}")
+                    self.log.debug(f"[ART] Injecting project logo into episode: {project['logoCloudinaryPath']}", category="art")
                     art_info["logoCloudinaryPath"] = project["logoCloudinaryPath"]
         except Exception:
             pass

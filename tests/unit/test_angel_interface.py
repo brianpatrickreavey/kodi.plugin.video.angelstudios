@@ -200,7 +200,7 @@ class TestAngelStudiosInterface:
             mock_load_query.assert_called_once_with(operation)
             mock_load_fragment.assert_not_called()
             mock_response.raise_for_status.assert_called_once()
-            angel_interface.log.debug.assert_any_call(f"Executing GraphQL query: {operation}")
+            angel_interface.log.debug.assert_any_call(f"Executing GraphQL query: {operation}", category="api")
 
     def test_graphql_query_with_fragment(self, angel_interface):
         """Ensure fragment references trigger fragment loading and still return data."""

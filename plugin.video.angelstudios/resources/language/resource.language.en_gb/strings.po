@@ -266,6 +266,22 @@ msgctxt "#30412"
 msgid "Enable logging of performance metrics for menu loading times"
 msgstr "Enable logging of performance metrics for menu loading times"
 
+msgctxt "#30413"
+msgid "Enable prefetch"
+msgstr "Enable prefetch"
+
+msgctxt "#30414"
+msgid "Enable prefetching of project data to improve navigation performance"
+msgstr "Enable prefetching of project data to improve navigation performance"
+
+msgctxt "#30415"
+msgid "Prefetch project count"
+msgstr "Prefetch project count"
+
+msgctxt "#30416"
+msgid "Number of projects to prefetch in the background"
+msgstr "Number of projects to prefetch in the background"
+
 # ============================================================================
 # 30500-30599: Maintenance & Troubleshooting
 # ============================================================================
@@ -281,6 +297,30 @@ msgstr "Troubleshooting"
 msgctxt "#30503"
 msgid "Troubleshooting settings"
 msgstr "Troubleshooting settings"
+
+msgctxt "#30504"
+msgid "Promote artwork debug logs"
+msgstr "Promote artwork debug logs"
+
+msgctxt "#30505"
+msgid "Show artwork processing debug messages in Kodi log when debug mode is off."
+msgstr "Show artwork processing debug messages in Kodi log when debug mode is off."
+
+msgctxt "#30506"
+msgid "Promote timing debug logs"
+msgstr "Promote timing debug logs"
+
+msgctxt "#30507"
+msgid "Show performance timing debug messages in Kodi log when debug mode is off."
+msgstr "Show performance timing debug messages in Kodi log when debug mode is off."
+
+msgctxt "#30508"
+msgid "Promote API debug logs"
+msgstr "Promote API debug logs"
+
+msgctxt "#30509"
+msgid "Show GraphQL API debug messages in Kodi log when debug mode is off."
+msgstr "Show GraphQL API debug messages in Kodi log when debug mode is off."
 
 msgctxt "#30510"
 msgid "Clear cache now"

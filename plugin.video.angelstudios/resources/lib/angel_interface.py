@@ -159,14 +159,14 @@ class AngelStudiosInterface:
             "query": query,
             "variables": variables,
         }
-        self.log.debug(f"Executing GraphQL query: {operation}")
-        self.log.debug(f"GraphQL query body:\n{query}")
-        self.log.debug(f"GraphQL variables: {variables}")
+        self.log.debug(f"Executing GraphQL query: {operation}", category="api")
+        self.log.debug(f"GraphQL query body:\n{query}", category="api")
+        self.log.debug(f"GraphQL variables: {variables}", category="api")
         try:
             response = self.session.post(angel_graphql_url, json=query_dict)
             response.raise_for_status()
             result = response.json()
-            self.log.debug(f"GraphQL response data: {json.dumps(result, indent=2)}")
+            self.log.debug(f"GraphQL response data: {json.dumps(result, indent=2)}", category="api")
             if "errors" in result:
                 self.log.error(f"GraphQL errors: {result['errors']}")
                 self.log.error(f"session headers: {self.session.headers}")
@@ -322,15 +322,15 @@ class AngelStudiosInterface:
                 "variables": {},
             }
 
-            self.log.debug(f"Batch projects query for {len(slugs)} slugs")
-            self.log.debug(f"Batch projects query:\n{query}")
+            self.log.debug(f"Batch projects query for {len(slugs)} slugs", category="api")
+            self.log.debug(f"Batch projects query:\n{query}", category="api")
 
             try:
                 response = self.session.post(angel_graphql_url, json=query_dict)
                 response.raise_for_status()
                 result = response.json()
 
-                self.log.debug(f"Batch projects response: {json.dumps(result, indent=2)}")
+                self.log.debug(f"Batch projects response: {json.dumps(result, indent=2)}", category="api")
 
                 if "errors" in result:
                     self.log.error(f"GraphQL errors: {result['errors']}")
@@ -606,9 +606,9 @@ class AngelStudiosInterface:
                 "variables": {},
             }
 
-            self.log.debug(f"Executing batch episodes query for {len(guids)} guids")
-            self.log.debug(f"Batch GraphQL query:\n{query}")
-            self.log.debug(f"Batch GraphQL variables: {query_dict['variables']}")
+            self.log.debug(f"Executing batch episodes query for {len(guids)} guids", category="api")
+            self.log.debug(f"Batch GraphQL query:\n{query}", category="api")
+            self.log.debug(f"Batch GraphQL variables: {query_dict['variables']}", category="api")
 
             try:
                 response = self.session.post(angel_graphql_url, json=query_dict)

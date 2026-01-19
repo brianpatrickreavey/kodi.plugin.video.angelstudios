@@ -7,15 +7,32 @@ import time
 
 
 class KodiLogger:
-    """Simple logger class to log messages to Kodi log"""
+    """Simple logger class to log messages to Kodi log with category-based debug promotion"""
 
-    def __init__(self, debug_promotion=False):
+    def __init__(self, debug_promotion=False, category_promotions=None):
         self.debug_promotion = debug_promotion
+        self.category_promotions = category_promotions or {}
 
-    def debug(self, message):
-        promoted_message = f"(debug) {message}" if self.debug_promotion else message
-        level = xbmc.LOGINFO if self.debug_promotion else xbmc.LOGDEBUG
-        self.xbmclog(promoted_message, level)
+    def debug(self, message, category=None):
+        """Log debug message with optional category-based promotion to INFO level."""
+        is_promoted = self.debug_promotion  # Default to general debug promotion
+        prefix = "(debug)"
+
+        if category:
+            if category in self.category_promotions:
+                is_promoted = self.category_promotions[category]
+                prefix = f"({category}-debug)"
+            else:
+                # Unknown category - warn and use unknown prefix
+                self.xbmclog(f"Unknown debug category '{category}' - consider adding setting", xbmc.LOGINFO)
+                prefix = "(unknown-debug)"
+                is_promoted = self.debug_promotion
+
+        if is_promoted:
+            promoted_message = f"{prefix} {message}"
+            self.xbmclog(promoted_message, xbmc.LOGINFO)
+        else:
+            self.xbmclog(message, xbmc.LOGDEBUG)
 
     def info(self, message):
         self.xbmclog(message, xbmc.LOGINFO)
