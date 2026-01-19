@@ -76,11 +76,11 @@ def get_session_file():
 
 def timed(context_func=None, metrics_func=None):
     """Decorator to time function execution and log if performance logging is enabled.
-    
+
     Args:
         context_func: Optional function that takes (args, kwargs) and returns a string
                      to append to the log message for additional context.
-        metrics_func: Optional function that takes (result, elapsed_ms, args, kwargs) 
+        metrics_func: Optional function that takes (result, elapsed_ms, args, kwargs)
                      and returns a dict of additional metrics to log.
     """
     def decorator(func):
@@ -90,14 +90,14 @@ def timed(context_func=None, metrics_func=None):
                 start = time.perf_counter()
                 result = func(*args, **kwargs)
                 elapsed = (time.perf_counter() - start) * 1000  # ms
-                
+
                 context = ""
                 if context_func:
                     try:
                         context = f" ({context_func(*args, **kwargs)})"
                     except Exception:
                         context = " (context_error)"
-                
+
                 metrics = ""
                 if metrics_func:
                     try:
@@ -112,7 +112,7 @@ def timed(context_func=None, metrics_func=None):
                             metrics = f" ({', '.join(metrics_parts)})"
                     except Exception as e:
                         metrics = f" (metrics_error: {e})"
-                
+
                 xbmc.log(f'[PERF] {func.__name__}{context}{metrics}: {elapsed:.2f}ms', xbmc.LOGINFO)
                 return result
             return func(*args, **kwargs)

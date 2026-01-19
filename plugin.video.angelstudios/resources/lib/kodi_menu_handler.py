@@ -193,7 +193,7 @@ class KodiMenuHandler:
         """Display a menu of projects based on content type, with persistent caching."""
         # Clear previous metrics
         self._perf_metrics.clear()
-        
+
         try:
             self.log.info("Fetching projects from AngelStudiosInterface...")
 
