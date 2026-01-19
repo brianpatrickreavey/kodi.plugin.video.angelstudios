@@ -81,7 +81,7 @@
                 </setting>
                 <setting id="show_continue_watching" type="boolean" label="30320" help="30321">
                     <level>0</level>
-                    <default>false</default>
+                    <default>true</default>
                     <control type="toggle" />
                 </setting>
                 <setting id="show_top_picks" type="boolean" label="30322" help="30323">

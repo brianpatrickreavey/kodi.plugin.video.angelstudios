@@ -9,9 +9,10 @@
     <import addon="script.module.inputstreamhelper" version="0.5.1"/>
     <import addon="inputstream.adaptive" version="19.0.0"/>
   </requires>
-  <extension point="xbmc.python.pluginsource" library="main.py">
+  <extension point="xbmc.python.pluginsource" library="resources/lib/main.py">
     <provides>video</provides>
   </extension>
+  <extension point="xbmc.python.module" library="resources/lib/"/>
   <extension point="xbmc.addon.metadata">
     <summary lang="en_GB">Angel Studios</summary>
     <description lang="en_GB">An app providing the Angel Studios content. CURENTLY IN DEVELOPMENT.</description>

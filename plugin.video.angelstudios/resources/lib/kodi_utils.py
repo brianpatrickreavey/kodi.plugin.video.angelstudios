@@ -1,14 +1,13 @@
-import xbmc # type: ignore
-import xbmcaddon # type: ignore
-import xbmcvfs # type: ignore
+import xbmc  # type: ignore
+import xbmcaddon  # type: ignore
+import xbmcvfs  # type: ignore
 import os
-import pickle
-from urllib.parse import urlencode
-
 import inspect
+
 
 class KodiLogger:
     """Simple logger class to log messages to Kodi log"""
+
     def __init__(self, debug_promotion=False):
         self.debug_promotion = debug_promotion
 
@@ -42,7 +41,7 @@ class KodiLogger:
             if module_name and module_name.startswith(__name__):
                 continue
 
-            self_obj = frame_info.frame.f_locals.get('self')
+            self_obj = frame_info.frame.f_locals.get("self")
             if not self_obj:
                 continue
 
@@ -65,29 +64,10 @@ class KodiLogger:
 
 
 def get_session_file():
-    ''' Load the session for Angel Studios authentication '''
+    """Load the session for Angel Studios authentication"""
     addon = xbmcaddon.Addon()
-    addon_id = addon.getAddonInfo('id')
-    cache_dir = xbmcvfs.translatePath(f'special://profile/addon_data/{addon_id}/')
+    addon_id = addon.getAddonInfo("id")
+    cache_dir = xbmcvfs.translatePath(f"special://profile/addon_data/{addon_id}/")
     if not xbmcvfs.exists(cache_dir):
         xbmcvfs.mkdirs(cache_dir)
-    return os.path.join(cache_dir, 'angel_session.pkl')
-
-def get_session_data():
-    ''' Load the session for Angel Studios authentication '''
-    session_file = get_session_file()
-    if not xbmcvfs.exists(session_file):
-        return None
-    with open(session_file, 'rb') as f:
-        return pickle.load(f)
-
-def save_session_data(session_data):
-    ''' Save the session for Angel Studios authentication '''
-    session_file = get_session_file()
-    with open(session_file, 'wb') as f:
-        pickle.dump(session_data, f)
-    xbmc.log(f"Session data saved to {session_file}", xbmc.LOGINFO)
-
-def create_plugin_url(base_url, **kwargs):
-    """Create a URL for calling the plugin recursively"""
-    return f'{base_url}?{urlencode(kwargs)}'
+    return os.path.join(cache_dir, "angel_session.pkl")

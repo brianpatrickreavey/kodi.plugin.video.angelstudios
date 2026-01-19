@@ -16,25 +16,15 @@
 Angel Studios Kodi addon - Clean, modular implementation
 """
 
-import json
-import os
-import pickle
 import sys
-from urllib.parse import parse_qsl, urlencode
+from urllib.parse import parse_qsl
 
-import requests
-
-# Add resources/lib to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'resources/lib'))
-
-import xbmc  # type: ignore
 import xbmcaddon  # type: ignore
-import xbmcplugin  # type: ignore
 import xbmcgui  # type: ignore
 import xbmcvfs  # type: ignore
 
 from angel_interface import AngelStudiosInterface
-from helpers import KodiLogger, create_plugin_url, get_session_file
+from kodi_utils import KodiLogger, get_session_file
 from kodi_ui_interface import KodiUIInterface
 
 # Plugin constants
@@ -43,15 +33,19 @@ HANDLE = int(sys.argv[1])
 ADDON = xbmcaddon.Addon()
 
 # Instantiate the logger in debug-promotion mode if debug_mode is either 'debug' or 'trace'
-debug_mode = (ADDON.getSettingString('debug_mode') or 'off').lower()
-debug_promotion = debug_mode in {'debug', 'trace'}
+debug_mode = (ADDON.getSettingString("debug_mode") or "off").lower()
+debug_promotion = debug_mode in {"debug", "trace"}
 logger = KodiLogger(debug_promotion=debug_promotion)
 
-ui_interface = KodiUIInterface(HANDLE, URL, logger=logger, angel_interface=None)
+# Create Angel Studios interface
+angel_interface = None
+
+ui_interface = KodiUIInterface(HANDLE, URL, logger=logger, angel_interface=angel_interface)
 
 # Get credentials from addon settings once at module load
-USERNAME = ADDON.getSetting('username')
-PASSWORD = ADDON.getSetting('password')
+USERNAME = ADDON.getSettingString("username")
+PASSWORD = ADDON.getSettingString("password")
+
 
 def router(paramstring):
     """
@@ -74,83 +68,64 @@ def router(paramstring):
         # Route to appropriate function
         if not params:
             # Main entry point - show main menu with fresh authentication
-            # xbmc.log("Fresh app load - forcing reauthentication", xbmc.LOGINFO) # TODO fix this
-            # angel_studios_authentication.clear_session_cache()
             ui_interface.main_menu()
         else:
             # Subsequent navigation - use existing session if available
-            if params['action'] == 'movies_menu':
+            if params["action"] == "movies_menu":
                 # Show movies
-                ui_interface.projects_menu(content_type='movies')
-            elif params['action'] == 'series_menu':
+                ui_interface.projects_menu(content_type="movies")
+            elif params["action"] == "series_menu":
                 # Show series
-                ui_interface.projects_menu(content_type='series')
-            elif params['action'] == 'specials_menu':
+                ui_interface.projects_menu(content_type="series")
+            elif params["action"] == "specials_menu":
                 # Show Dry Bar Comedy Specials
-                ui_interface.projects_menu(content_type='specials')
-            elif params['action'] == 'podcast_menu':
+                ui_interface.projects_menu(content_type="specials")
+            elif params["action"] == "podcast_menu":
                 # Show Podcasts
-                ui_interface.projects_menu(content_type='podcasts')
-            elif params['action'] == 'livestream_menu':
+                ui_interface.projects_menu(content_type="podcasts")
+            elif params["action"] == "livestream_menu":
                 # Show Livestreams
-                ui_interface.projects_menu(content_type='livestreams')
-            elif params['action'] == 'watchlist_menu':
+                ui_interface.projects_menu(content_type="livestreams")
+            elif params["action"] == "watchlist_menu":
                 # Show Watchlist (placeholder)
                 ui_interface.watchlist_menu()
-            elif params['action'] == 'continue_watching_menu':
-                # Show Continue Watching (placeholder)
-                ui_interface.continue_watching_menu()
-            elif params['action'] == 'top_picks_menu':
+            elif params["action"] == "continue_watching_menu":
+                # Show Continue Watching with optional pagination cursor
+                after = params.get("after")
+                ui_interface.continue_watching_menu(after=after)
+            elif params["action"] == "top_picks_menu":
                 # Show Top Picks (placeholder)
                 ui_interface.top_picks_menu()
-            elif params['action'] == 'other_content_menu':
-                # Show Other Content (placeholder)
-                ui_interface.other_content_menu()
-            elif params['action'] == 'all_content_menu':
+            elif params["action"] == "all_content_menu":
                 # Show all content (except podcasts & livestreams)
-                #all_content_menu()
+                # all_content_menu()
                 pass
-            elif params['action'] == 'seasons_menu':
+            elif params["action"] == "seasons_menu":
                 # Show seasons for a project
-                ui_interface.seasons_menu(params['content_type'], params['project_slug'])
-            elif params['action'] == 'episodes_menu':
+                ui_interface.seasons_menu(params["content_type"], params["project_slug"])
+            elif params["action"] == "episodes_menu":
                 # Show episodes for a season using individual parameters
-                ui_interface.episodes_menu(params['content_type'], params['project_slug'], params['season_id'])
-            elif params['action'] == 'play_episode':
+                ui_interface.episodes_menu(params["content_type"], params["project_slug"], params.get("season_id"))
+            elif params["action"] == "play_episode":
                 # Play an episode
-                ui_interface.play_episode(params['episode_guid'], params['project_slug'])
-            elif params['action'] == 'info':
+                ui_interface.play_episode(params["episode_guid"], params["project_slug"])
+            elif params["action"] == "info":
                 # Show info message for unavailable episodes
-                message = params.get('message', 'This content is not available.')
+                message = params.get("message", "This content is not available.")
                 ui_interface.show_error(message)
-            elif params['action'] == 'settings':
+            elif params["action"] == "settings":
                 # Open addon settings dialog
                 ADDON.openSettings()
-            elif params['action'] == 'clear_cache':
+            elif params["action"] == "clear_cache":
                 logger.info("Settings: clear_cache button pressed")
-                success = ui_interface.clear_cache()
-                if success:
-                    ui_interface.show_notification("Cache cleared.")
-                else:
-                    ui_interface.show_notification("Cache clear failed; please try again.")
-            elif params['action'] == 'force_logout':
+                ui_interface.clear_cache_with_notification()
+            elif params["action"] == "force_logout":
                 logger.info("Settings: force_logout button pressed")
-                if not ui_interface.angel_interface:
-                    raise ValueError("Angel interface not initialized")
-
-                success = ui_interface.angel_interface.force_logout()
-                if success:
-                    ui_interface.show_notification("Logged out locally.")
-                else:
-                    ui_interface.show_notification("Logout failed; please try again.")
-            elif params['action'] == 'clear_debug_data':
+                ui_interface.force_logout_with_notification()
+            elif params["action"] == "clear_debug_data":
                 logger.info("Settings: clear_debug_data button pressed")
-                success = ui_interface.clear_debug_data()
-                if success:
-                    ui_interface.show_notification("Debug data cleared.")
-                else:
-                    ui_interface.show_notification("Debug data clear failed; please try again.")
-            elif params['action'] == 'show_information':
+                ui_interface.clear_debug_data_with_notification()
+            elif params["action"] == "show_information":
                 ui_interface.show_auth_details_dialog()
             else:
                 # Unknown action
@@ -163,25 +138,23 @@ def router(paramstring):
         logger.error(f"Router error: {e}")
         ui_interface.show_error(f"Navigation error: {str(e)}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     try:
         logger.info(f"Addon invoked with argv: {sys.argv}")
 
         if not USERNAME or not PASSWORD:
             # Show error if credentials are not set
             xbmcgui.Dialog().ok(
-                "Configuration Error",
-                "Please configure your Angel.com username and password in the addon settings."
+                "Angel Studios",
+                "Please configure your Angel.com username and password in the addon settings.",
             )
         else:
             # Call the router function with plugin parameters
             # Initialize Angel Studios authentication with session management
 
             # Get the query path for GraphQL queries (relatvie to the addon path)
-            query_path = xbmcvfs.translatePath(
-                ADDON.getAddonInfo('path') +
-                '/resources/lib/angel_graphql/'
-            )
+            query_path = xbmcvfs.translatePath(ADDON.getAddonInfo("path") + "/resources/lib/angel_graphql/")
             logger.info(f"Using query path: {query_path}")
 
             # Initialize Angel Studios interface with session management

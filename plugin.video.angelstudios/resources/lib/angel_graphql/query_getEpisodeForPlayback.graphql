@@ -1,0 +1,9 @@
+# Query to fetch a single episode for playback context.
+# Used as emergency fallback when episode cache expired and project query unavailable.
+# Returns Episode type data (playback essentials) but no STILL images.
+
+query getEpisodeForPlayback($guid: ID!) {
+  episode(guid: $guid) {
+    ...EpisodeListItem
+  }
+}

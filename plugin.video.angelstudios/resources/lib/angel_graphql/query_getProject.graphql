@@ -2,19 +2,8 @@
 # This query retrieves detailed information about a project, including its title,
 # seasons, episodes, and various metadata. It also includes early access information
 # for episodes if applicable.
-# 
+#
 # Captured from https://www.angel.com/watch/{slug}.
-
-fragment EpisodeGuildEarlyAccess on Episode {
-  isAngelGuildOnly
-  prereleaseAvailableFor
-  isTrailer
-  guildAvailableDate
-  publiclyAvailableDate
-  earlyAccessDate
-  unavailableReason
-  __typename
-}
 
 query getProject($slug: String!, $includePrerelease: Boolean = false, $includeSeasons: Boolean = true) {
   project(slug: $slug) {
@@ -58,6 +47,66 @@ query getProject($slug: String!, $includePrerelease: Boolean = false, $includeSe
                     id
                     name
                     watchableAvailabilityStatus
+                    portraitStill1: image(aspect: "2:3", category: STILL_1) {
+                      aspect
+                      category
+                      cloudinaryPath
+                      __typename
+                    }
+                    portraitStill2: image(aspect: "2:3", category: STILL_2) {
+                      aspect
+                      category
+                      cloudinaryPath
+                      __typename
+                    }
+                    portraitStill3: image(aspect: "2:3", category: STILL_3) {
+                      aspect
+                      category
+                      cloudinaryPath
+                      __typename
+                    }
+                    portraitStill4: image(aspect: "2:3", category: STILL_4) {
+                      aspect
+                      category
+                      cloudinaryPath
+                      __typename
+                    }
+                    portraitStill5: image(aspect: "2:3", category: STILL_5) {
+                      aspect
+                      category
+                      cloudinaryPath
+                      __typename
+                    }
+                    landscapeStill1: image(aspect: "16:9", category: STILL_1) {
+                      aspect
+                      category
+                      cloudinaryPath
+                      __typename
+                    }
+                    landscapeStill2: image(aspect: "16:9", category: STILL_2) {
+                      aspect
+                      category
+                      cloudinaryPath
+                      __typename
+                    }
+                    landscapeStill3: image(aspect: "16:9", category: STILL_3) {
+                      aspect
+                      category
+                      cloudinaryPath
+                      __typename
+                    }
+                    landscapeStill4: image(aspect: "16:9", category: STILL_4) {
+                      aspect
+                      category
+                      cloudinaryPath
+                      __typename
+                    }
+                    landscapeStill5: image(aspect: "16:9", category: STILL_5) {
+                      aspect
+                      category
+                      cloudinaryPath
+                      __typename
+                    }
                   }
                   __typename
                 }
@@ -152,46 +201,7 @@ query getProject($slug: String!, $includePrerelease: Boolean = false, $includeSe
         includePrerelease: $includePrerelease
         includePresale: $includePrerelease
       ) {
-        id
-        currentUserHasEarlyAccess
-        earlyAccessDate
-        publiclyAvailableDate
-        guildAvailableDate
-        description
-        episodeNumber
-        guid
-        id
-        name
-        posterCloudinaryPath
-        posterLandscapeCloudinaryPath
-        projectSlug
-        seasonId
-        seasonNumber
-        source {
-          credits
-          duration
-          url(input: {segmentFormat: TS})
-          __typename
-        }
-        slug
-        subtitle
-        unavailableReason
-        upNext {
-          id
-          episodeNumber
-          guid
-          projectSlug
-          seasonNumber
-          subtitle
-          __typename
-        }
-        watchPosition {
-          id
-          position
-          __typename
-        }
-        ...EpisodeGuildEarlyAccess
-        __typename
+        ...EpisodeListItem
       }
       id
       name

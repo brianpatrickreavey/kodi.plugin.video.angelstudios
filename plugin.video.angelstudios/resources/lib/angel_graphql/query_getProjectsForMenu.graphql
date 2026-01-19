@@ -2,7 +2,7 @@
 # This query retrieves detailed information about a project, including its title,
 # seasons, episodes, and various metadata. It also includes early access information
 # for episodes if applicable.
-# 
+#
 # Constructed from scratch.  Nothing captured from the website provided a full
 # listing of all proejcts to use.
 
@@ -13,6 +13,51 @@ query getProjectsForMenu {
         theaterDescription
         metadata {
             ...ProjectMetadata
+        }
+        title {
+            __typename
+            ... on ContentDisplayable {
+                portraitTitleImage: image(aspect: "2:3", category: TITLE_ART) {
+                    aspect
+                    category
+                    cloudinaryPath
+                }
+                portraitAngelImage: image(aspect: "2:3", category: ANGEL_KEY_ART_1) {
+                    aspect
+                    category
+                    cloudinaryPath
+                }
+                portraitAngelImage2: image(aspect: "2:3", category: ANGEL_KEY_ART_2) {
+                    aspect
+                    category
+                    cloudinaryPath
+                }
+                portraitAngelImage3: image(aspect: "2:3", category: ANGEL_KEY_ART_3) {
+                    aspect
+                    category
+                    cloudinaryPath
+                }
+                landscapeTitleImage: image(aspect: "16:9", category: TITLE_ART) {
+                    aspect
+                    category
+                    cloudinaryPath
+                }
+                landscapeAngelImage: image(aspect: "16:9", category: ANGEL_KEY_ART_1) {
+                    aspect
+                    category
+                    cloudinaryPath
+                }
+                landscapeAngelImage2: image(aspect: "16:9", category: ANGEL_KEY_ART_2) {
+                    aspect
+                    category
+                    cloudinaryPath
+                }
+                landscapeAngelImage3: image(aspect: "16:9", category: ANGEL_KEY_ART_3) {
+                    aspect
+                    category
+                    cloudinaryPath
+                }
+            }
         }
     }
 }
