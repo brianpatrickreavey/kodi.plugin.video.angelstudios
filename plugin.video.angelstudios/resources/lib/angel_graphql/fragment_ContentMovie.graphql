@@ -1,0 +1,43 @@
+fragment ContentMovie on ContentMovie {
+  id
+  name
+  movieSubtitle: subtitle
+  duration
+  posterCloudinaryPath
+  posterLandscapeCloudinaryPath
+  watchableAvailabilityStatus
+  watchableAt
+  actionsToWatch {
+    __typename
+  }
+  movieImage: image(aspect: "16:9", category: STILL_1) {
+    cloudinaryPath
+    __typename
+  }
+  movieDescription: description(version: SHORT)
+  project {
+    slug
+    projectType
+    name
+    id
+    title {
+      portraitTitleImage {
+        cloudinaryPath
+        __typename
+      }
+      __typename
+    }
+    __typename
+  }
+  source {
+    url(input: {segmentFormat: TS})
+    duration
+    credits
+    __typename
+  }
+  watchPosition {
+    position
+    __typename
+  }
+  __typename
+}

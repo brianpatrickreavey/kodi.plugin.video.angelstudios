@@ -443,109 +443,51 @@ class KodiMenuHandler:
         try:
             self.log.info(f"Fetching continue watching items, after={after}")
 
-            # Step 1: Fetch resume watching guids (lightweight)
+            # Fetch resume watching with full data (fat query)
             resume_data = self.parent.angel_interface.get_resume_watching(first=10, after=after)
 
             if not resume_data:
                 self.parent.show_error("Failed to load Continue Watching")
                 return
 
-            # Fallback: handle legacy shape with 'episodes' list containing embedded project
-            if (
-                isinstance(resume_data, dict)
-                and "episodes" in resume_data
-                and isinstance(resume_data["episodes"], list)
-            ):
-                xbmcplugin.setContent(self.handle, "videos")
-                for episode in resume_data["episodes"]:
-                    episode_guid = episode.get("guid", "")
-                    project_slug = episode.get("projectSlug", "")
-
-                    # Create list item using shared helper
-                    list_item = self._create_list_item_from_episode(
-                        episode,
-                        project=None,  # Project embedded in episode for legacy
-                        content_type="",
-                        stream_url=None,
-                        is_playback=False,
-                    )
-
-                    # Apply progress bar if available
-                    if episode.get("watchPosition"):
-                        self._apply_progress_bar(list_item, episode["watchPosition"], episode.get("duration", 0))
-
-                    # Create URL for playback
-                    url = self.create_plugin_url(
-                        base_url=self.kodi_url,
-                        action="play_episode",
-                        content_type="",
-                        project_slug=project_slug,
-                        episode_guid=episode_guid,
-                    )
-
-                    xbmcplugin.addDirectoryItem(self.handle, url, list_item, False)
-
-                xbmcplugin.endOfDirectory(self.handle)
-                return
-
-            guids = resume_data.get("guids", [])
-            positions = resume_data.get("positions", {})
+            episodes = resume_data.get("episodes", [])
             page_info = resume_data.get("pageInfo", {})
 
-            if not guids:
+            if not episodes:
                 self.log.info("No continue watching items found")
                 self.parent.show_notification("No items in Continue Watching")
                 return
 
-            # Step 2: Batch fetch full episode data for all guids
-            self.log.info(f"Batch fetching {len(guids)} episodes")
-            episodes_data = self.parent.angel_interface.get_episodes_for_guids(guids)
+            # Cache episodes
+            for episode in episodes:
+                guid = episode.get("guid")
+                if guid:
+                    self.parent.cache_manager._set_episode(guid, episode)
 
-            if not episodes_data:
-                self.log.error("Failed to fetch episode data for continue watching")
-                self.parent.show_error("Failed to load episode details")
-                return
-
-            # Step 2b: Fetch unique project names for enrichment
-            unique_slugs = set()
-            for guid in guids:
-                episode_key = f"episode_{guid}"
-                episode = episodes_data.get(episode_key, {})
-                if episode.get("projectSlug"):
-                    unique_slugs.add(episode["projectSlug"])
-
-            project_names = {}
-            if unique_slugs:
-                self.log.info(f"Fetching project names for {len(unique_slugs)} projects")
-                project_names = self.parent.angel_interface.get_projects_by_slugs(list(unique_slugs))
-
-            self.log.info(f"Processing {len(guids)} continue watching items")
+            self.log.info(f"Processing {len(episodes)} continue watching items")
             xbmcplugin.setContent(self.handle, "videos")
 
-            # Step 3: Render menu in guid order, merging watch positions
-            for guid in guids:
-                episode_key = f"episode_{guid}"
-                episode = episodes_data.get(episode_key)
+            # Render menu
+            for episode in episodes:
+                guid = episode.get("guid", "")
+                project_slug = episode.get("projectSlug") or episode.get("project", {}).get("slug", "")
 
-                if not episode:
-                    self.log.warning(f"Episode data missing for guid {guid}; skipping")
-                    continue
-
-                # Enrich with project name if available
-                project_slug = episode.get("projectSlug")
-                project_for_display = None
-                if project_slug and project_slug in project_names:
-                    project_for_display = project_names[project_slug]
-
-                # Enrich with watch position from resume watching response
-                watch_position = positions.get(guid)
-                if watch_position is not None and "watchPosition" not in episode:
-                    episode["watchPosition"] = watch_position
+                # Create a copy for display modifications
+                episode_display = dict(episode)
+                # For series episodes, format with project name and S00E00 in parentheses
+                if episode_display.get("__typename") == "ContentEpisode" and episode_display.get("project") and episode_display["project"].get("name"):
+                    season_num = episode_display.get("seasonNumber")
+                    episode_num = episode_display.get("episodeNumber")
+                    current_subtitle = episode_display.get("subtitle") or episode_display.get("name", "Unknown")
+                    if season_num is not None and episode_num is not None:
+                        episode_display["subtitle"] = f"{current_subtitle} ({episode_display['project']['name']} - S{season_num:02d}E{episode_num:02d})"
+                    else:
+                        episode_display["subtitle"] = f"{current_subtitle} ({episode_display['project']['name']})"
 
                 # Create list item using shared helper
                 list_item = self._create_list_item_from_episode(
-                    episode,
-                    project=project_for_display,
+                    episode_display,
+                    project=episode.get("project"),  # Nested project
                     content_type="",
                     stream_url=None,
                     is_playback=False,
@@ -556,8 +498,6 @@ class KodiMenuHandler:
                     self._apply_progress_bar(list_item, episode["watchPosition"], episode.get("duration", 0))
 
                 # Create URL for playback
-                project_slug = episode.get("projectSlug", "")
-
                 url = self.create_plugin_url(
                     base_url=self.kodi_url,
                     action="play_episode",
@@ -736,11 +676,14 @@ class KodiMenuHandler:
         if is_playback:
             info_tag.setMediaType("video")
             # Additional playback metadata from project
-            if project:
-                info_tag.setTvShowTitle(project.get("name"))
+            if project and isinstance(project.get("name"), str) and project["name"].strip():
+                info_tag.setTvShowTitle(project["name"])
         else:
             info_tag.setMediaType(self._get_kodi_content_type(content_type))
             info_tag.setTitle(episode_subtitle)
+            # For episodes, set tvshowtitle if project available and name is valid
+            if episode.get("mediatype") == "episode" and project and isinstance(project.get("name"), str) and project["name"].strip():
+                info_tag.setTvShowTitle(project["name"])
 
         return list_item
 

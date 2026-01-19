@@ -58,9 +58,11 @@ class TestContinueWatchingCoverage:
             "project": {"slug": "embedded-project", "name": "Embedded Project"},
             # Note: projectSlug field is missing
             "duration": 3600,
+            "source": {"url": "https://example.com"},
+            "watchPosition": {"position": 0},
         }
 
-        resume_data = {"episodes": [episode], "projects": {}, "pageInfo": {"hasNextPage": False}}
+        resume_data = {"episodes": [episode], "pageInfo": {"hasNextPage": False}}
 
         with (
             patch.object(angel_interface_mock, "get_resume_watching", return_value=resume_data),

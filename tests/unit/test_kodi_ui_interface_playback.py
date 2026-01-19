@@ -176,10 +176,13 @@ class TestVideoPlayback:
         addon = MagicMock()
         addon.getSettingBool.return_value = True
 
+        fresh_list_item = MagicMock()
+
         with (
             patch.object(ui, "addon", addon),
             patch("xbmcaddon.Addon", return_value=addon),
             patch.object(ui, "_ensure_isa_available", return_value=True),
+            patch("xbmcgui.ListItem", return_value=fresh_list_item),
         ):
             list_item = ui.menu_handler._create_list_item_from_episode(
                 episode=MOCK_EPISODE_DATA["episode"],

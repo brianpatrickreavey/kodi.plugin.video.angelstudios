@@ -1,6 +1,6 @@
 # Resume watching query with cursor-based pagination
-# Returns minimal data: just guids and watch position
-# Full episode data is fetched via batch getEpisodesForGuids query
+# Returns full data: source, watchPosition, art, etc. for direct playback/rendering
+# No batch fetch needed
 
 query resumeWatching($first: Int, $after: String) {
   resumeWatching(first: $first, after: $after) {
@@ -13,17 +13,161 @@ query resumeWatching($first: Int, $after: String) {
           __typename
           ... on ContentEpisode {
             id
+            project {
+              slug
+              projectType
+              name
+              id
+              title {
+                __typename
+                ... on ContentDisplayable {
+                  portraitTitleImage: image(aspect: "2:3", category: TITLE_ART) {
+                    cloudinaryPath
+                    __typename
+                  }
+                  __typename
+                }
+                __typename
+              }
+              __typename
+            }
             name
+            episodeSubtitle: subtitle
+            slug
+            releaseDate
+            introStartTime
+            introEndTime
+            genres
+            cast {
+              name
+              __typename
+            }
+            duration
+            episodeNumber
+            posterCloudinaryPath
+            posterLandscapeCloudinaryPath
+            watchableAvailabilityStatus
+            watchableAt
+            actionsToWatch {
+              __typename
+            }
+            portraitStill1: image(aspect: "2:3", category: STILL_1) {
+              cloudinaryPath
+              __typename
+            }
+            episodeImage: image(aspect: "16:9", category: STILL_1) {
+              cloudinaryPath
+              __typename
+            }
+            episodeDescription: description(version: SHORT)
+            season {
+              id
+              seasonNumber
+              __typename
+            }
+            url
+            watchPosition {
+              position
+              __typename
+            }
             __typename
           }
           ... on ContentSpecial {
             id
+            project {
+              slug
+              projectType
+              name
+              id
+              title {
+                __typename
+                ... on ContentDisplayable {
+                  portraitTitleImage: image(aspect: "2:3", category: TITLE_ART) {
+                    cloudinaryPath
+                    __typename
+                  }
+                  __typename
+                }
+                __typename
+              }
+              __typename
+            }
             name
+            specialSubtitle: subtitle
+            duration
+            posterCloudinaryPath
+            posterLandscapeCloudinaryPath
+            watchableAvailabilityStatus
+            watchableAt
+            actionsToWatch {
+              __typename
+            }
+            specialImage: image(aspect: "16:9", category: STILL_1) {
+              cloudinaryPath
+              __typename
+            }
+            specialDescription: description(version: SHORT)
+            url
+            watchPosition {
+              position
+              __typename
+            }
             __typename
           }
           ... on ContentMovie {
             id
             name
+            movieSubtitle: subtitle
+            duration
+            posterCloudinaryPath
+            posterLandscapeCloudinaryPath
+            watchableAvailabilityStatus
+            watchableAt
+            actionsToWatch {
+              __typename
+            }
+            movieImage: image(aspect: "16:9", category: STILL_1) {
+              cloudinaryPath
+              __typename
+            }
+            movieDescription: description(version: SHORT)
+            project {
+              slug
+              projectType
+              name
+              id
+              title {
+                __typename
+                ... on ContentDisplayable {
+                  portraitTitleImage: image(aspect: "2:3", category: TITLE_ART) {
+                    cloudinaryPath
+                    __typename
+                  }
+                  __typename
+                }
+                __typename
+              }
+              __typename
+            }
+            url
+            watchPosition {
+              position
+              __typename
+            }
+            __typename
+          }
+          ... on ContentDisplayable {
+            id
+            name
+            description(version: SHORT)
+            landscapeNonTitleImage: image(aspect: "16:9", category: NON_TITLE_ART) {
+              cloudinaryPath
+              __typename
+            }
+            landscapeStillImage: image(aspect: "16:9", category: STILL_1) {
+              cloudinaryPath
+              __typename
+            }
             __typename
           }
         }

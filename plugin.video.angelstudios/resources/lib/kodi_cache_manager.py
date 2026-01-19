@@ -56,6 +56,25 @@ class KodiCacheManager:
         """
         return self._cache_ttl()
 
+    def _set_episode(self, guid, episode):
+        """Cache an episode by guid."""
+        if self._cache_enabled():
+            self.cache.set(f"episode_{guid}", episode, expiration=self._episode_cache_ttl())
+
+    def _get_episode(self, guid):
+        """Get cached episode by guid."""
+        if self._cache_enabled():
+            return self.cache.get(f"episode_{guid}")
+        return None
+
+    def _episode_cache_ttl(self):
+        """Return timedelta for episode cache expiration.
+
+        Currently uses the same global cache_expiration_hours setting.
+        Future: may use separate episode_cache_hours setting.
+        """
+        return self._cache_ttl()
+
     def _cache_enabled(self):
         """Return True if cache is enabled based on addon settings.
 

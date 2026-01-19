@@ -24,7 +24,27 @@ class KodiPlaybackHandler:
     def play_episode(self, episode_guid, project_slug):
         """Play an episode using cached project data (no separate API call)."""
         try:
-            # Fetch project data (uses cache if available)
+            # First, check if episode is cached (e.g., from Continue Watching)
+            episode = self.parent.cache_manager._get_episode(episode_guid)
+            if episode:
+                self.log.info(f"Using cached episode data for: {episode_guid}")
+                # Check for playable source
+                source = episode.get("source")
+                if not source or not source.get("url"):
+                    self.parent.show_error("No playable stream URL found for this episode")
+                    self.log.error(f"No stream URL for cached episode: {episode_guid}")
+                    return
+
+                episode_name = episode.get("subtitle") or episode.get("name", "Unknown")
+                project_name = episode.get("projectSlug", "Unknown")
+                self.log.info(f"Playing cached episode: {episode_name} from project: {project_name}")
+
+                # Play using cached episode data
+                project = episode.get("project", {"name": episode.get("name", "Unknown")})
+                self.play_video(episode_data={"episode": episode, "project": project})
+                return
+
+            # Fallback: Fetch project data and find episode in it
             project = self.parent._get_project(project_slug)
             if not project:
                 self.log.error(f"Project not found: {project_slug}")

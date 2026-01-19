@@ -1,0 +1,43 @@
+fragment ContentSpecial on ContentSpecial {
+  id
+  project {
+    slug
+    projectType
+    name
+    id
+    title {
+      portraitTitleImage {
+        cloudinaryPath
+        __typename
+      }
+      __typename
+    }
+    __typename
+  }
+  name
+  specialSubtitle: subtitle
+  duration
+  posterCloudinaryPath
+  posterLandscapeCloudinaryPath
+  watchableAvailabilityStatus
+  watchableAt
+  actionsToWatch {
+    __typename
+  }
+  specialImage: image(aspect: "16:9", category: STILL_1) {
+    cloudinaryPath
+    __typename
+  }
+  specialDescription: description(version: SHORT)
+  source {
+    url(input: {segmentFormat: TS})
+    duration
+    credits
+    __typename
+  }
+  watchPosition {
+    position
+    __typename
+  }
+  __typename
+}

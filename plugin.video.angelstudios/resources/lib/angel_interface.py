@@ -457,11 +457,11 @@ class AngelStudiosInterface:
         return nodes
 
     def _normalize_resume_episode(self, content, node):
-        """Normalize a ContentEpisode for resume/continue watching list.
+        """Normalize a ContentEpisode/ContentSpecial/ContentMovie for resume/continue watching list.
 
         Preserves existing watchPosition; if missing, uses node.position.
         Extracts seasonNumber from season dict when available.
-        Maps type-specific aliases like episodeSubtitle/episodeDescription.
+        Maps type-specific aliases like episodeSubtitle/specialSubtitle/movieSubtitle.
         Adds guid from node.watchableGuid.
         """
         out = dict(content) if isinstance(content, dict) else {}
@@ -481,13 +481,49 @@ class AngelStudiosInterface:
         season = out.get("season")
         if isinstance(season, dict) and "seasonNumber" in season:
             out["seasonNumber"] = season.get("seasonNumber")
-        # alias mapping
-        if "episodeSubtitle" in out and "subtitle" not in out:
-            out["subtitle"] = out.get("episodeSubtitle")
-            del out["episodeSubtitle"]
-        if "episodeDescription" in out and "description" not in out:
-            out["description"] = out.get("episodeDescription")
-            del out["episodeDescription"]
+        # alias mapping for all content types
+        alias_mappings = {
+            "episodeSubtitle": "subtitle",
+            "episodeDescription": "description",
+            "specialSubtitle": "subtitle",
+            "specialDescription": "description",
+            "movieSubtitle": "subtitle",
+            "movieDescription": "description",
+        }
+        for alias, canonical in alias_mappings.items():
+            if alias in out and canonical not in out:
+                out[canonical] = out.get(alias)
+                del out[alias]
+        # handle url -> source.url for consistency
+        if "url" in out and not out.get("source"):
+            out["source"] = {"url": out["url"]}
+            del out["url"]
+        # extract projectSlug from nested project
+        if not out.get("projectSlug"):
+            project = out.get("project")
+            if isinstance(project, dict) and "slug" in project:
+                out["projectSlug"] = project["slug"]
+        # normalize name from title for specials/movies
+        if "title" in out and not out.get("name"):
+            out["name"] = out["title"]
+        # normalize project name from title
+        if "project" in out and isinstance(out["project"], dict):
+            project = out["project"]
+            name = project.get("name")
+            if not name:
+                title = project.get("title")
+                if isinstance(title, str):
+                    name = title
+                elif isinstance(title, dict):
+                    name = title.get("name") or title.get("title", "Unknown")
+            if name:
+                project["name"] = name
+        # set mediatype based on __typename
+        typename = out.get("__typename")
+        if typename == "ContentMovie":
+            out["mediatype"] = "movie"
+        elif typename in ("ContentEpisode", "ContentSpecial"):
+            out["mediatype"] = "episode"
         return out
 
     def _normalize_contentseries_episode(self, episode_data):
