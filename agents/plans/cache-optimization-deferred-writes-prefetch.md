@@ -2,6 +2,10 @@
 
 **Objective:** Optimize menu performance by deferring episode cache writes and adding background prefetch for projects and episodes. Deferred writes move blocking cache operations after UI render, while prefetch populates caches post-render so subsequent menu navigations operate entirely from cache.
 
+**Status:** Not implemented - deferred due to current performance adequacy and complexity. Reassess after timing instrumentation shows bottlenecks.
+
+**Decision:** Defer implementation pending data on actual bottlenecks (API vs. cache vs. UI). Current caching provides acceptable performance; deferred writes may have regressed in cleanup.
+
 **Design Decisions:**
 - Use API response order for prefetch priority (no cross-navigation tracking)
 - Allow prefetch to complete silently even if user navigates away (no cleanup needed)

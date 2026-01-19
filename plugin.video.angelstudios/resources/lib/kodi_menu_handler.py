@@ -16,6 +16,8 @@ import xbmcvfs    # type: ignore
 
 from simplecache import SimpleCache  # type: ignore
 
+from kodi_utils import timed, TimedBlock
+
 
 class KodiMenuHandler:
     """Handles menu rendering and directory operations for Kodi UI."""
@@ -180,6 +182,7 @@ class KodiMenuHandler:
             }
         )
 
+    @timed(lambda *args, **kwargs: f"content_type={args[1] if len(args) > 1 else kwargs.get('content_type', 'unknown')}")
     def projects_menu(self, content_type=""):
         """Display a menu of projects based on content type, with persistent caching."""
         try:
@@ -201,7 +204,8 @@ class KodiMenuHandler:
                 self.log.info(f"Using cached projects for content type: {content_type}")
             else:
                 self.log.info(f"Fetching projects from AngelStudiosInterface for content type: {content_type}")
-                projects = self.parent.angel_interface.get_projects(project_type=self.parent._get_angel_project_type(content_type))
+                with TimedBlock('projects_api_fetch'):
+                    projects = self.parent.angel_interface.get_projects(project_type=self.parent._get_angel_project_type(content_type))
                 if cache_enabled:
                     self.parent.cache_manager.cache.set(cache_key, projects, expiration=self.parent._cache_ttl())
             try:
@@ -265,6 +269,7 @@ class KodiMenuHandler:
 
         return True
 
+    @timed(lambda *args, **kwargs: f"content_type={args[1] if len(args) > 1 else kwargs.get('content_type', 'unknown')}, project_slug={args[2] if len(args) > 2 else kwargs.get('project_slug', 'unknown')}")
     def seasons_menu(self, content_type, project_slug):
         """Display a menu of seasons for a specific project, with persistent caching."""
         self.log.info(f"Fetching seasons for project: {project_slug}")
@@ -338,6 +343,7 @@ class KodiMenuHandler:
             self.parent.show_error(f"Error fetching project {project_slug}: {str(e)}")
             return False
 
+    @timed(lambda *args, **kwargs: f"content_type={args[1] if len(args) > 1 else kwargs.get('content_type', 'unknown')}, project_slug={args[2] if len(args) > 2 else kwargs.get('project_slug', 'unknown')}, season_id={args[3] if len(args) > 3 else kwargs.get('season_id', 'all')}")
     def episodes_menu(self, content_type, project_slug, season_id=None):
         """Display a menu of episodes for a specific season, with persistent caching."""
         self.log.info(f"Fetching episodes for project: {project_slug}, season: {season_id}")
@@ -438,13 +444,15 @@ class KodiMenuHandler:
         self.log.info("Watchlist menu requested, but not yet implemented.")
         self.parent.show_error("Watchlist is not available yet.")
 
+    @timed(lambda *args, **kwargs: f"after={args[1] if len(args) > 1 else kwargs.get('after', 'none')}")
     def continue_watching_menu(self, after=None):
         """Display continue watching menu with pagination."""
         try:
             self.log.info(f"Fetching continue watching items, after={after}")
 
             # Fetch resume watching with full data (fat query)
-            resume_data = self.parent.angel_interface.get_resume_watching(first=10, after=after)
+            with TimedBlock('continue_watching_api_fetch'):
+                resume_data = self.parent.angel_interface.get_resume_watching(first=10, after=after)
 
             if not resume_data:
                 self.parent.show_error("Failed to load Continue Watching")

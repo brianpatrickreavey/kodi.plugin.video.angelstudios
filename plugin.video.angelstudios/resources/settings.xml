@@ -23,7 +23,7 @@
 
         <category id="authentication" label="30200" help="30201">
             <group id="auth_group" label="30200" help="30201">
-                <setting id="username" type="string" label="1014" help="Angel Studios Username (usually email)">
+                <setting id="username" type="string" label="1014" help="30202">
                     <level>0</level>
                     <default/>
                     <constraints>
@@ -33,7 +33,7 @@
                         <heading>30204</heading>
                     </control>
                 </setting>
-                <setting id="password" type="string" label="733" help="Angel Studios Password">
+                <setting id="password" type="string" label="733" help="30203">
                     <level>0</level>
                     <default/>
                     <constraints>
@@ -135,6 +135,11 @@
                         <step>1</step>
                     </constraints>
                     <control type="slider" format="integer" />
+                </setting>
+                <setting id="enable_performance_logging" type="boolean" label="30411" help="30412">
+                    <level>3</level>
+                    <default>false</default>
+                    <control type="toggle" />
                 </setting>
             </group>
         </category>

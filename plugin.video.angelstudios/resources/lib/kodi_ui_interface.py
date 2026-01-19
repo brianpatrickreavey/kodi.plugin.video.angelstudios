@@ -21,6 +21,7 @@ import kodi_menu_handler
 import kodi_playback_handler
 import kodi_cache_manager
 import kodi_ui_helpers
+from kodi_utils import timed, TimedBlock
 
 
 class KodiUIInterface:

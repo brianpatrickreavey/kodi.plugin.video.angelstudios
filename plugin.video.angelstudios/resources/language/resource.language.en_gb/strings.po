@@ -122,6 +122,14 @@ msgctxt "#30201"
 msgid "Authentication settings"
 msgstr "Authentication settings"
 
+msgctxt "#30202"
+msgid "Angel Studios Username (usually email)"
+msgstr "Angel Studios Username (usually email)"
+
+msgctxt "#30203"
+msgid "Angel Studios Password"
+msgstr "Angel Studios Password"
+
 msgctxt "#30204"
 msgid "Enter username"
 msgstr "Enter username"
@@ -249,6 +257,14 @@ msgstr "Cache expiration (hours)"
 msgctxt "#30410"
 msgid "Set cache lifetime in hours (default 12)."
 msgstr "Set cache lifetime in hours (default 12)."
+
+msgctxt "#30411"
+msgid "Enable performance logging"
+msgstr "Enable performance logging"
+
+msgctxt "#30412"
+msgid "Enable logging of performance metrics for menu loading times"
+msgstr "Enable logging of performance metrics for menu loading times"
 
 # ============================================================================
 # 30500-30599: Maintenance & Troubleshooting

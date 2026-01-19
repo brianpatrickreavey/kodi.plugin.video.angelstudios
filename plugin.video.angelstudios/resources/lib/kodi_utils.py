@@ -3,6 +3,7 @@ import xbmcaddon  # type: ignore
 import xbmcvfs  # type: ignore
 import os
 import inspect
+import time
 
 
 class KodiLogger:
@@ -71,3 +72,50 @@ def get_session_file():
     if not xbmcvfs.exists(cache_dir):
         xbmcvfs.mkdirs(cache_dir)
     return os.path.join(cache_dir, "angel_session.pkl")
+
+
+def timed(context_func=None):
+    """Decorator to time function execution and log if performance logging is enabled.
+    
+    Args:
+        context_func: Optional function that takes (args, kwargs) and returns a string
+                     to append to the log message for additional context.
+    """
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            addon = xbmcaddon.Addon()
+            if addon.getSettingBool('enable_performance_logging'):
+                start = time.perf_counter()
+                result = func(*args, **kwargs)
+                elapsed = (time.perf_counter() - start) * 1000  # ms
+                
+                context = ""
+                if context_func:
+                    try:
+                        context = f" ({context_func(*args, **kwargs)})"
+                    except Exception:
+                        context = " (context_error)"
+                
+                xbmc.log(f'[PERF] {func.__name__}{context}: {elapsed:.2f}ms', xbmc.LOGINFO)
+                return result
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+class TimedBlock:
+    """Context manager to time code blocks and log if performance logging is enabled."""
+    def __init__(self, name):
+        self.name = name
+        self.start = None
+
+    def __enter__(self):
+        addon = xbmcaddon.Addon()
+        if addon.getSettingBool('enable_performance_logging'):
+            self.start = time.perf_counter()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.start is not None:
+            elapsed = (time.perf_counter() - self.start) * 1000  # ms
+            xbmc.log(f'[PERF] {self.name}: {elapsed:.2f}ms', xbmc.LOGINFO)
