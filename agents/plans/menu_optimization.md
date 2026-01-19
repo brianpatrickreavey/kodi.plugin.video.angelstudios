@@ -1,19 +1,45 @@
 # Menu Optimization Plan
 
-**Status**: Updated with API research findings (2026-01-12)
+**Status**: Partially implemented - Core optimizations completed (infotags direct access, debug logging), timing instrumentation added. Offscreen mode and comprehensive measurement still pending.
 **Created**: 2026-01-10
+**Last Updated**: 2026-01-19
 **Target**: Kodi 20+ (xbmcaddon API 3.0.1+)
 
 ## Overview
 
 This document outlines a **measurement-first approach** to menu performance optimization. Initial API research revealed that some proposed optimizations (setInfo batching, ListItem caching) have fundamental architectural constraints in Kodi 20+. We now focus on:
-1. **Instrumentation & measurement** to identify true bottlenecks (API latency vs. UI rendering)
-2. **Offscreen mode** for directory items (proven safe, modest GUI lock savings)
-3. **Data-driven optimization** based on measurement results
+1. ✅ **Instrumentation & measurement** implemented in infotags processing
+2. ❌ **Offscreen mode** for directory items (recommended but not implemented)
+3. ✅ **Data-driven optimization** - major performance gains achieved through infotags optimization
 
-**Key Finding**: Real bottlenecks are API latency (500–2000ms) and image loading, not ListItem creation (10–50ms). Menu rendering is typically not a UX bottleneck in normal workflows.
+**Key Finding**: Real bottlenecks were infotags processing overhead (85-90% reduction achieved) and debug logging (zero-overhead category system implemented). API latency remains the dominant factor in normal workflows.
 
-## Optimization Strategy (Data-Driven Approach)
+## ✅ Implemented Optimizations
+
+### 1. Infotags Direct Access Optimization
+**Status**: ✅ **COMPLETED** - Archived as `optimize-infotags-direct-access.md`
+- **Impact**: 85-90% reduction in episode processing time (33ms → 3-5ms)
+- **Method**: Replaced generic dict iteration with direct attribute access
+- **Files**: `menu_utils.py`, `kodi_menu_handler.py`
+
+### 2. Category-Based Debug Logging
+**Status**: ✅ **COMPLETED** - Archived as `category-based-debug-logging.md`
+- **Impact**: Zero performance overhead for disabled debug categories
+- **Method**: Selective promotion of debug logs to INFO level via user toggles
+- **Files**: `kodi_utils.py`, `main.py`, settings.xml, strings.po
+
+### 3. Timing Instrumentation
+**Status**: ✅ **PARTIALLY IMPLEMENTED** - Added to infotags processing
+- **Impact**: Performance measurement capability in hot paths
+- **Method**: `time.perf_counter()` timing around critical operations
+- **Files**: `menu_utils.py`, `kodi_menu_handler.py`
+
+## ❌ Pending Optimizations
+
+### Offscreen Mode for Directory Items
+**Status**: ❌ **NOT IMPLEMENTED** - Still recommended for modest GUI lock savings
+- **Current State**: Only used for playback items (`offscreen=is_playback`)
+- **Recommendation**: Add `offscreen=True` to all directory ListItem constructors
 
 ### The Measurement Philosophy
 Before optimizing, we must measure. Initial assumptions about UI bottlenecks were tested against Kodi's actual APIs and codebase. Several optimizations that appeared promising turned out to be architecturally unfeasible or impactful. We now instrument real menu operations to identify where time is actually spent.

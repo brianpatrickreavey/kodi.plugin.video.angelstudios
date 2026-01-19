@@ -2,9 +2,9 @@
 
 **Objective:** Optimize menu performance by deferring episode cache writes and adding background prefetch for projects and episodes. Deferred writes move blocking cache operations after UI render, while prefetch populates caches post-render so subsequent menu navigations operate entirely from cache.
 
-**Status:** Not implemented - deferred due to current performance adequacy and complexity. Reassess after timing instrumentation shows bottlenecks.
+**Status:** Superseded - Major performance improvements achieved through infotags optimization (85-90% reduction in menu render time). Current caching performance deemed adequate.
 
-**Decision:** Defer implementation pending data on actual bottlenecks (API vs. cache vs. UI). Current caching provides acceptable performance; deferred writes may have regressed in cleanup.
+**Decision:** Implementation no longer needed. Infotags direct access optimization achieved the performance goals this plan targeted. Reassess only if future performance data shows new bottlenecks.
 
 **Design Decisions:**
 - Use API response order for prefetch priority (no cross-navigation tracking)
