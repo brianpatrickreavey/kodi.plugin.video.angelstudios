@@ -17,6 +17,10 @@ import xbmcvfs    # type: ignore
 from simplecache import SimpleCache  # type: ignore
 
 from kodi_utils import timed, TimedBlock
+try:
+    from menu_projects import ProjectsMenu as ProjectsMenuClass
+except ImportError:
+    ProjectsMenuClass = None
 
 
 class KodiMenuHandler:
@@ -185,101 +189,11 @@ class KodiMenuHandler:
             }
         )
 
-    @timed(
-        context_func=lambda *args, **kwargs: f"content_type={args[1] if len(args) > 1 else kwargs.get('content_type', 'unknown')}",
-        metrics_func=lambda result, elapsed, *args, **kwargs: args[0]._get_projects_metrics(result, elapsed, *args, **kwargs)
-    )
     def projects_menu(self, content_type=""):
         """Display a menu of projects based on content type, with persistent caching."""
-        # Clear previous metrics
-        self._perf_metrics.clear()
-
-        try:
-            self.log.info("Fetching projects from AngelStudiosInterface...")
-
-            cache_key = f"projects_{content_type or 'all'}"
-            cache_enabled = self.parent._cache_enabled()
-            projects = None
-            if cache_enabled:
-                projects = self.parent.cache_manager.cache.get(cache_key)
-                if projects:
-                    self.log.debug(f"Cache hit for {cache_key}")
-                else:
-                    self.log.debug(f"Cache miss for {cache_key}")
-            else:
-                self.log.debug("Cache disabled; bypassing projects cache")
-
-            if projects:
-                self.log.info(f"Using cached projects for content type: {content_type}")
-            else:
-                self.log.info(f"Fetching projects from AngelStudiosInterface for content type: {content_type}")
-                with TimedBlock('projects_api_fetch'):
-                    projects = self.parent.angel_interface.get_projects(project_type=self.parent._get_angel_project_type(content_type))
-                if cache_enabled:
-                    self.parent.cache_manager.cache.set(cache_key, projects, expiration=self.parent._cache_ttl())
-            try:
-                self.log.info(f"Projects: {json.dumps(projects, indent=2)}")
-            except TypeError:
-                self.log.info(f"Projects: <non-serializable type {type(projects).__name__}>")
-
-            if not projects:
-                self.parent.show_error(f"No projects found for content type: {content_type}")
-                return
-
-            self.log.info(
-                f"Processing {len(projects)} '{content_type if content_type else 'all content type'}' projects"
-            )
-
-            # Store metrics for performance logging
-            self._perf_metrics['projects_count'] = len(projects)
-
-            # Set content type for the plugin
-            kodi_content_type = (
-                "movies" if content_type == "movies" else "tvshows" if content_type == "series" else "videos"
-            )
-            xbmcplugin.setContent(self.handle, kodi_content_type)
-            for project in projects:
-                self.log.info(f"Processing project: {project['name']}")
-                self.log.debug(f"Project dictionary: {json.dumps(project, indent=2)}")
-
-                # Create list item
-                list_item = xbmcgui.ListItem(label=project["name"])
-                info_tag = list_item.getVideoInfoTag()
-                info_tag.setMediaType(self.parent._get_kodi_content_type(project["projectType"]))
-                self._process_attributes_to_infotags(list_item, project)
-
-                # Create URL for seasons listing
-                url = self.create_plugin_url(
-                    base_url=self.kodi_url,
-                    action="seasons_menu",
-                    content_type=content_type,
-                    project_slug=project["slug"],
-                )
-
-                # Add to directory
-                xbmcplugin.addDirectoryItem(self.handle, url, list_item, True)
-
-            xbmcplugin.addSortMethod(self.handle, xbmcplugin.SORT_METHOD_LABEL)
-
-            try:
-                enable_prefetch = self.parent.addon.getSettingBool("enable_prefetch")
-                if enable_prefetch:
-                    max_count = self.parent.addon.getSettingInt("prefetch_project_count") or 5
-                    if max_count <= 0:
-                        self.log.warning(f"prefetch_project_count was {max_count}; defaulting to 5")
-                        max_count = 5
-                    slugs = [p.get("slug") for p in projects if p.get("slug")]
-                    self.parent._deferred_prefetch_project(slugs, max_count)
-            except Exception as exc:
-                self.log.warning(f"prefetch settings read failed; skipping prefetch: {exc}")
-
-            xbmcplugin.endOfDirectory(self.handle)
-
-        except Exception as e:
-            self.log.error(f"Error listing {content_type}: {e}")
-            self.parent.show_error(f"Failed to load {self.parent._get_angel_project_type(content_type)}: {str(e)}")
-
-        return True
+        if ProjectsMenuClass is None:
+            raise ImportError("ProjectsMenu could not be imported")
+        return ProjectsMenuClass(self.parent).handle(content_type)
 
     @timed(lambda *args, **kwargs: f"content_type={args[1] if len(args) > 1 else kwargs.get('content_type', 'unknown')}, project_slug={args[2] if len(args) > 2 else kwargs.get('project_slug', 'unknown')}")
     def seasons_menu(self, content_type, project_slug):
