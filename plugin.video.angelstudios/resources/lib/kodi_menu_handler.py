@@ -46,6 +46,9 @@ class KodiMenuHandler:
         self.kodi_url = parent.kodi_url
         self.log = parent.log
 
+        # Performance metrics storage for enhanced logging
+        self._perf_metrics = {}
+
         # Default state for menu toggles
         self.default_menu_enabled = {
             "show_movies": True,
@@ -182,9 +185,15 @@ class KodiMenuHandler:
             }
         )
 
-    @timed(lambda *args, **kwargs: f"content_type={args[1] if len(args) > 1 else kwargs.get('content_type', 'unknown')}")
+    @timed(
+        context_func=lambda *args, **kwargs: f"content_type={args[1] if len(args) > 1 else kwargs.get('content_type', 'unknown')}",
+        metrics_func=lambda result, elapsed, *args, **kwargs: args[0]._get_projects_metrics(result, elapsed, *args, **kwargs)
+    )
     def projects_menu(self, content_type=""):
         """Display a menu of projects based on content type, with persistent caching."""
+        # Clear previous metrics
+        self._perf_metrics.clear()
+        
         try:
             self.log.info("Fetching projects from AngelStudiosInterface...")
 
@@ -220,6 +229,9 @@ class KodiMenuHandler:
             self.log.info(
                 f"Processing {len(projects)} '{content_type if content_type else 'all content type'}' projects"
             )
+
+            # Store metrics for performance logging
+            self._perf_metrics['projects_count'] = len(projects)
 
             # Set content type for the plugin
             kodi_content_type = (
@@ -342,6 +354,17 @@ class KodiMenuHandler:
             self.log.error(f"Error fetching project {project_slug}: {e}")
             self.parent.show_error(f"Error fetching project {project_slug}: {str(e)}")
             return False
+
+    def _get_projects_metrics(self, result, elapsed_ms, *args, **kwargs):
+        """Extract performance metrics for projects_menu function."""
+        count = self._perf_metrics.get('projects_count', 0)
+        if count > 0:
+            per_record = elapsed_ms / count
+            return {
+                'records': count,
+                'per_record': per_record
+            }
+        return {}
 
     @timed(lambda *args, **kwargs: f"content_type={args[1] if len(args) > 1 else kwargs.get('content_type', 'unknown')}, project_slug={args[2] if len(args) > 2 else kwargs.get('project_slug', 'unknown')}, season_id={args[3] if len(args) > 3 else kwargs.get('season_id', 'all')}")
     def episodes_menu(self, content_type, project_slug, season_id=None):

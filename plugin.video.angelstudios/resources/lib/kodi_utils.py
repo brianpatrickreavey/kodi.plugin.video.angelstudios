@@ -74,12 +74,14 @@ def get_session_file():
     return os.path.join(cache_dir, "angel_session.pkl")
 
 
-def timed(context_func=None):
+def timed(context_func=None, metrics_func=None):
     """Decorator to time function execution and log if performance logging is enabled.
     
     Args:
         context_func: Optional function that takes (args, kwargs) and returns a string
                      to append to the log message for additional context.
+        metrics_func: Optional function that takes (result, elapsed_ms, args, kwargs) 
+                     and returns a dict of additional metrics to log.
     """
     def decorator(func):
         def wrapper(*args, **kwargs):
@@ -96,7 +98,22 @@ def timed(context_func=None):
                     except Exception:
                         context = " (context_error)"
                 
-                xbmc.log(f'[PERF] {func.__name__}{context}: {elapsed:.2f}ms', xbmc.LOGINFO)
+                metrics = ""
+                if metrics_func:
+                    try:
+                        metrics_dict = metrics_func(result, elapsed, *args, **kwargs)
+                        if metrics_dict:
+                            metrics_parts = []
+                            for key, value in metrics_dict.items():
+                                if isinstance(value, float):
+                                    metrics_parts.append(f"{key}={value:.1f}")
+                                else:
+                                    metrics_parts.append(f"{key}={value}")
+                            metrics = f" ({', '.join(metrics_parts)})"
+                    except Exception as e:
+                        metrics = f" (metrics_error: {e})"
+                
+                xbmc.log(f'[PERF] {func.__name__}{context}{metrics}: {elapsed:.2f}ms', xbmc.LOGINFO)
                 return result
             return func(*args, **kwargs)
         return wrapper

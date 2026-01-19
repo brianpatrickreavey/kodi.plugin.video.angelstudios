@@ -144,8 +144,8 @@
             </group>
         </category>
 
-        <category id="maintenance" label="14280" help="30501">
-            <group id="maintenance_group" label="14280" help="30501">
+        <category id="maintenance" label="30502" help="30501">
+            <group id="maintenance_group" label="30502" help="30501">
                 <setting id="clear_cache" type="action" label="30510" help="30511">
                     <level>3</level>
                     <data>RunPlugin(plugin://plugin.video.angelstudios/?action=clear_cache)</data>
