@@ -282,6 +282,30 @@ msgctxt "#30416"
 msgid "Number of projects to prefetch in the background"
 msgstr "Number of projects to prefetch in the background"
 
+msgctxt "#30417"
+msgid "Projects cache expiration (hours)"
+msgstr "Projects cache expiration (hours)"
+
+msgctxt "#30418"
+msgid "Set cache lifetime for projects menu data in hours (default 12)."
+msgstr "Set cache lifetime for projects menu data in hours (default 12)."
+
+msgctxt "#30419"
+msgid "Project cache expiration (hours)"
+msgstr "Project cache expiration (hours)"
+
+msgctxt "#30420"
+msgid "Set cache lifetime for individual project data in hours (default 8)."
+msgstr "Set cache lifetime for individual project data in hours (default 8)."
+
+msgctxt "#30421"
+msgid "Episodes cache expiration (hours)"
+msgstr "Episodes cache expiration (hours)"
+
+msgctxt "#30422"
+msgid "Set cache lifetime for episode data in hours (default 72)."
+msgstr "Set cache lifetime for episode data in hours (default 72)."
+
 # ============================================================================
 # 30500-30599: Maintenance & Troubleshooting
 # ============================================================================

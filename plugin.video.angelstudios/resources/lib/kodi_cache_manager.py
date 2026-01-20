@@ -22,39 +22,52 @@ class KodiCacheManager:
         self.addon = parent.addon
 
     def _cache_ttl(self):
-        """Return timedelta for current cache expiration setting.
+        """Return timedelta for projects menu cache expiration.
 
-        Uses addon setting `cache_expiration_hours`. Module-level TTL constants
-        (DEFAULT_CACHE_TTL_PROJECTS_MENU, DEFAULT_CACHE_TTL_EPISODES, DEFAULT_CACHE_TTL_INDIVIDUAL_PROJECT)
-        are provided for clarity and future specialization but are not applied here
-        to avoid changing existing behavior.
+        Uses addon setting `projects_cache_hours` (default: 12 hours).
         """
         try:
-            hours = self.addon.getSettingInt("cache_expiration_hours")
+            hours = self.addon.getSettingInt("projects_cache_hours")
             if not hours:
-                self.log.warning(f"cache_expiration_hours was falsy ({hours!r}); defaulting to 12")
+                self.log.warning(f"projects_cache_hours was falsy ({hours!r}); defaulting to 12")
                 hours = 12
         except Exception as exc:
-            self.log.warning(f"Failed to read cache_expiration_hours; defaulting to 12: {exc}")
+            self.log.warning(f"Failed to read projects_cache_hours; defaulting to 12: {exc}")
             hours = 12
 
         return timedelta(hours=hours)
 
     def _project_cache_ttl(self):
-        """Return timedelta for project cache expiration.
+        """Return timedelta for individual project cache expiration.
 
-        Currently uses the same global cache_expiration_hours setting.
-        Future: may use separate project_cache_hours setting.
+        Uses addon setting `project_cache_hours` (default: 8 hours).
         """
-        return self._cache_ttl()
+        try:
+            hours = self.addon.getSettingInt("project_cache_hours")
+            if not hours:
+                self.log.warning(f"project_cache_hours was falsy ({hours!r}); defaulting to 8")
+                hours = 8
+        except Exception as exc:
+            self.log.warning(f"Failed to read project_cache_hours; defaulting to 8: {exc}")
+            hours = 8
+
+        return timedelta(hours=hours)
 
     def _episode_cache_ttl(self):
         """Return timedelta for episode cache expiration.
 
-        Currently uses the same global cache_expiration_hours setting.
-        Future: may use separate episode_cache_hours setting.
+        Uses addon setting `episodes_cache_hours` (default: 72 hours).
         """
-        return self._cache_ttl()
+        try:
+            hours = self.addon.getSettingInt("episodes_cache_hours")
+            if not hours:
+                self.log.warning(f"episodes_cache_hours was falsy ({hours!r}); defaulting to 72")
+                hours = 72
+        except Exception as exc:
+            self.log.warning(f"Failed to read episodes_cache_hours; defaulting to 72: {exc}")
+            hours = 72
+
+        return timedelta(hours=hours)
 
     def _set_episode(self, guid, episode):
         """Cache an episode by guid."""

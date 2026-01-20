@@ -122,10 +122,10 @@ User Action (Kodi UI)
 **Duration:** 1–2 hours
 **Goal:** Remove cruft, establish constants, verify import strategy.
 
-**Current Status:** Phase 0.2 completed ✅
+**Current Status:** Phase 0.3 completed ✅
 - ✅ 0.1 Unused imports: completed (removed unused imports from 4 lib files; preserved json/xbmcgui for test mocking)
 - ✅ 0.2 Remove unused imports in tests: completed (removed patch from test_kodi_cache_manager.py, MOCK_EPISODE_DATA from test_kodi_ui_helpers.py)
-- 🔶 0.3 TTL constants: pending (constants not defined in code despite plan claim)
+- ✅ 0.3 Add separate cache TTL settings: completed (added projects_cache_hours, project_cache_hours, episodes_cache_hours settings; updated TTL methods)
 - 🔶 0.4 Research docs archived: pending
 - 🔶 0.5 Relative-import audit: pending
 - 🔶 0.6 Kodi-agnostic check for angel_interface.py / angel_authentication.py: pending
@@ -163,29 +163,27 @@ User Action (Kodi UI)
 **Pending Questions (Resolved):**
 - ✅ Confirm no other unused imports in test files - Verified with flake8
 
-#### 0.3 – Extract Cache TTL Constants
+#### 0.3 – Add Separate Cache TTL Settings ✅
 
-**File:**
-- [plugin.video.angelstudios/resources/lib/kodi_ui_interface.py](../plugin.video.angelstudios/resources/lib/kodi_ui_interface.py)
+**Files:**
+- [plugin.video.angelstudios/resources/settings.xml](../plugin.video.angelstudios/resources/settings.xml) — added separate cache expiration settings for different cache types
+- [plugin.video.angelstudios/resources/lib/kodi_cache_manager.py](../plugin.video.angelstudios/resources/lib/kodi_cache_manager.py) — updated TTL methods to use separate settings
 
 **Changes:**
-- Add module-level constants for cache TTL (referenced in user settings):
-  ```python
-  # Cache TTL defaults (in seconds)
-  DEFAULT_CACHE_TTL_PROJECTS = 3600  # 1 hour (projects menu)
-  DEFAULT_CACHE_TTL_EPISODES = 86400 * 3  # 72 hours
-  DEFAULT_CACHE_TTL_PROJECT = 28800  # 8 hours (individual project)
-  ```
-- Replace hardcoded `3600` with `DEFAULT_CACHE_TTL_PROJECTS`
-- Document how TTLs tie to user settings in docstrings
+- Replaced single `cache_expiration_hours` setting with three separate Expert-level settings:
+  - `projects_cache_hours` (projects menu data, default: 12 hours)
+  - `project_cache_hours` (individual project data, default: 8 hours)  
+  - `episodes_cache_hours` (episode data, default: 72 hours)
+- All settings have minimum 1 hour, maximum 168 hours (1 week) with proper validation
+- Updated `_cache_ttl()`, `_project_cache_ttl()`, `_episode_cache_ttl()` methods to use respective settings
+- Removed static constants approach (determined unnecessary)
 
 **Acceptance Criteria:**
-- All cache operations use named constants
-- No hardcoded TTL integers remain
-- Cache behavior unchanged; tests pass
-
-**Pending Questions:**
-- [ ] How to handle TTL constants if not user-setting-tied? Where should they be defined?
+- ✅ Three separate cache expiration settings available in Expert settings (level 3)
+- ✅ All settings have minimum 1 hour, maximum 168 hours with validation
+- ✅ Cache operations use appropriate TTL for their data type
+- ✅ Backward compatibility maintained through sensible defaults
+- ✅ Tests pass (436/436)
 
 #### 0.4 – Archive Research Docs
 
