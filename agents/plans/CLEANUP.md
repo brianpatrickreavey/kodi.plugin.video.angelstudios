@@ -122,11 +122,11 @@ User Action (Kodi UI)
 **Duration:** 1–2 hours
 **Goal:** Remove cruft, establish constants, verify import strategy.
 
-**Current Status:** Phase 0.3 completed ✅
+**Current Status:** Phase 0.4 completed ✅
 - ✅ 0.1 Unused imports: completed (removed unused imports from 4 lib files; preserved json/xbmcgui for test mocking)
 - ✅ 0.2 Remove unused imports in tests: completed (removed patch from test_kodi_cache_manager.py, MOCK_EPISODE_DATA from test_kodi_ui_helpers.py)
-- ✅ 0.3 Add separate cache TTL settings: completed (added projects_cache_hours, project_cache_hours, episodes_cache_hours settings; updated TTL methods)
-- 🔶 0.4 Research docs archived: pending
+- ✅ 0.3 Add separate cache TTL settings: completed (added projects_cache_hours, project_cache_hours, episodes_cache_hours settings; updated cache manager)
+- ✅ 0.4 Research docs archived: completed (all 5 research docs already archived in docs/archive/ with README.md)
 - 🔶 0.5 Relative-import audit: pending
 - 🔶 0.6 Kodi-agnostic check for angel_interface.py / angel_authentication.py: pending
 - 🔶 0.7 Flake8 linting issues: pending (unused vars, long line, unused imports noted)
@@ -172,7 +172,7 @@ User Action (Kodi UI)
 **Changes:**
 - Replaced single `cache_expiration_hours` setting with three separate Expert-level settings:
   - `projects_cache_hours` (projects menu data, default: 12 hours)
-  - `project_cache_hours` (individual project data, default: 8 hours)  
+  - `project_cache_hours` (individual project data, default: 8 hours)
   - `episodes_cache_hours` (episode data, default: 72 hours)
 - All settings have minimum 1 hour, maximum 168 hours (1 week) with proper validation
 - Updated `_cache_ttl()`, `_project_cache_ttl()`, `_episode_cache_ttl()` methods to use respective settings
@@ -185,7 +185,7 @@ User Action (Kodi UI)
 - ✅ Backward compatibility maintained through sensible defaults
 - ✅ Tests pass (436/436)
 
-#### 0.4 – Archive Research Docs
+#### 0.4 – Archive Research Docs ✅
 
 **Files to Move:**
 - [docs/IMAGE_PREFETCH_RESEARCH.md](../docs/IMAGE_PREFETCH_RESEARCH.md)
@@ -195,9 +195,11 @@ User Action (Kodi UI)
 - [docs/TIMING_INSTRUMENTATION.md](../docs/TIMING_INSTRUMENTATION.md)
 
 **Action:**
-- Create `docs/archive/` directory
-- Move all 5 research docs to `docs/archive/`
-- Add `README.md` in archive explaining why (investigation notes, not actionable guidance)
+- ✅ Create `docs/archive/` directory (already exists)
+- ✅ Move all 5 research docs to `docs/archive/` (already moved)
+- ✅ Add `README.md` in archive explaining why (already exists with comprehensive explanation)
+
+**Status:** Already completed prior to this cleanup phase. All research docs are properly archived with documentation explaining their purpose.
 - Update `.gitignore` to exclude archive if needed (or keep for history)
 
 **Acceptance Criteria:**
