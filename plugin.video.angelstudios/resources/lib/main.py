@@ -37,9 +37,9 @@ debug_promotion = False
 
 # Define category-to-setting mapping
 category_settings = {
-    'art': 'debug_art_promotion',
-    'timing': 'debug_timing_promotion',
-    'api': 'debug_api_promotion',
+    "art": "debug_art_promotion",
+    "timing": "debug_timing_promotion",
+    "api": "debug_api_promotion",
 }
 
 # Load category promotions from settings

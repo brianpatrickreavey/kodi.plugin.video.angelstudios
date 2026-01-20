@@ -5,11 +5,12 @@ Tests delegation to handlers and overall integration.
 
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'plugin.video.angelstudios', 'resources', 'lib'))
 
-import pytest
-from unittest.mock import MagicMock
-from kodi_ui_interface import KodiUIInterface
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "plugin.video.angelstudios", "resources", "lib"))
+
+import pytest  # noqa: E402
+from unittest.mock import MagicMock  # noqa: E402
+from kodi_ui_interface import KodiUIInterface  # noqa: E402
 
 
 @pytest.fixture

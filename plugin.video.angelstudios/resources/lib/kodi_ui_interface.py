@@ -3,11 +3,11 @@ Kodi UI helper functions for Angel Studios addon.
 Handles all Kodi-specific UI operations and list item creation.
 """
 
-import json
+import json  # noqa: F401
 import os
 
 import xbmcaddon  # type: ignore
-import xbmcgui  # type: ignore
+import xbmcgui  # type: ignore  # noqa: F401
 import xbmcvfs  # type: ignore
 
 import kodi_menu_handler

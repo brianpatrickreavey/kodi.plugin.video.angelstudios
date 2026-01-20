@@ -343,7 +343,7 @@ def projects_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, c
     projects_data = MOCK_PROJECTS_DATA[content_type]
 
     # Set up the mock cache behavior
-    with patch.object(ui.cache_manager, '_cache_enabled', return_value=True):
+    with patch.object(ui.cache_manager, "_cache_enabled", return_value=True):
         ui.cache_manager.cache.get.return_value = projects_data if cache_hit else None
         angel_interface_mock.get_projects.return_value = projects_data
 
@@ -404,7 +404,7 @@ class TestProjectsMenu:
         ui, logger_mock, angel_interface_mock = ui_interface
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
-        with patch.object(ui.cache_manager, '_cache_enabled', return_value=True):
+        with patch.object(ui.cache_manager, "_cache_enabled", return_value=True):
             ui.cache_manager.cache.get.return_value = None
             angel_interface_mock.get_projects.return_value = []  # No projects
 
@@ -432,7 +432,7 @@ class TestProjectsMenu:
 
         # Set up exception on get_projects
         angel_interface_mock.get_projects.side_effect = Exception(f"{TEST_EXCEPTION_MESSAGE} for {content_type}")
-        with patch.object(ui.cache_manager, '_cache_enabled', return_value=True):
+        with patch.object(ui.cache_manager, "_cache_enabled", return_value=True):
             ui.cache_manager.cache.get.return_value = None  # Cache miss
 
             with patch.object(ui, "show_error") as mock_show_error:
@@ -462,7 +462,7 @@ def seasons_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, pr
     mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
     # Set up mocks
-    with patch.object(ui.cache_manager, '_cache_enabled', return_value=True):
+    with patch.object(ui.cache_manager, "_cache_enabled", return_value=True):
         ui.cache_manager.cache.get.return_value = project_data if cache_hit else None
         angel_interface_mock.get_project.return_value = project_data if not cache_hit else None
         mock_list_item.return_value = MagicMock()
@@ -557,7 +557,7 @@ class TestSeasonsMenu:
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
         # Set up mocks for project not found
-        with patch.object(ui.cache_manager, '_cache_enabled', return_value=True):
+        with patch.object(ui.cache_manager, "_cache_enabled", return_value=True):
             ui.cache_manager.cache.get.return_value = None  # Cache miss
             angel_interface_mock.get_project.return_value = None  # Project not found
 
@@ -599,7 +599,7 @@ class TestSeasonsMenu:
         # Set up exception
         angel_interface_mock.get_project.side_effect = Exception(TEST_EXCEPTION_MESSAGE)
 
-        with patch.object(ui.cache_manager, '_cache_enabled', return_value=True):
+        with patch.object(ui.cache_manager, "_cache_enabled", return_value=True):
             with (
                 patch.object(ui, "show_error") as mock_show_error,
                 patch.object(ui.cache_manager.cache, "get", return_value=None) as mock_cache_get,
@@ -614,7 +614,9 @@ class TestSeasonsMenu:
                 angel_interface_mock.get_project.assert_called_once_with("test-project")
 
                 # Ensure error was logged and shown
-                mock_show_error.assert_called_once_with(f"Error fetching project test-project: {TEST_EXCEPTION_MESSAGE}")
+                mock_show_error.assert_called_once_with(
+                    f"Error fetching project test-project: {TEST_EXCEPTION_MESSAGE}"
+                )
 
             # Ensure the method returns False on exception
             assert result is False
@@ -626,7 +628,7 @@ def episodes_menu_logic_helper(ui_interface, mock_xbmc, mock_cache, cache_hit, p
     mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
     # Set up mocks
-    with patch.object(ui.cache_manager, '_cache_enabled', return_value=True):
+    with patch.object(ui.cache_manager, "_cache_enabled", return_value=True):
         ui.cache_manager.cache.get.return_value = project_data if cache_hit else None
         angel_interface_mock.get_project.return_value = project_data if not cache_hit else None
 
@@ -715,7 +717,7 @@ class TestEpisodesMenu:
         ui, logger_mock, angel_interface_mock = ui_interface
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
-        with patch.object(ui.cache_manager, '_cache_enabled', return_value=True):
+        with patch.object(ui.cache_manager, "_cache_enabled", return_value=True):
             ui.cache_manager.cache.get.return_value = None
             angel_interface_mock.get_project.return_value = None
 
@@ -734,7 +736,7 @@ class TestEpisodesMenu:
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
         project_data = MOCK_PROJECT_DATA["multi_season_project"]
-        with patch.object(ui.cache_manager, '_cache_enabled', return_value=True):
+        with patch.object(ui.cache_manager, "_cache_enabled", return_value=True):
             ui.cache_manager.cache.get.return_value = project_data
             angel_interface_mock.get_project.return_value = project_data
 
@@ -753,7 +755,7 @@ class TestEpisodesMenu:
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
         angel_interface_mock.get_project.side_effect = Exception(TEST_EXCEPTION_MESSAGE)
-        with patch.object(ui.cache_manager, '_cache_enabled', return_value=True):
+        with patch.object(ui.cache_manager, "_cache_enabled", return_value=True):
             ui.cache_manager.cache.get.return_value = None
 
             with patch.object(ui, "show_error") as mock_show_error:
@@ -825,7 +827,7 @@ class TestEpisodesMenu:
             episode["watchPosition"] = {"position": 30.0}  # 30 seconds watched
             episode["source"] = {"url": "http://example.com/video.mp4", "duration": 3600}  # 1 hour
 
-        with patch.object(ui.cache_manager, '_cache_enabled', return_value=True):
+        with patch.object(ui.cache_manager, "_cache_enabled", return_value=True):
             ui.cache_manager.cache.get.return_value = project_data
             angel_interface_mock.get_project.return_value = None
 
@@ -1071,8 +1073,20 @@ class TestContinueWatchingMenu:
 
         resume_data = {
             "episodes": [
-                {"guid": "guid-1", "name": "Episode 1", "projectSlug": "project-1", "source": {"url": "https://example.com/1.m3u8"}, "project": {"slug": "project-1", "name": "Test Show"}},
-                {"guid": "guid-2", "name": "Episode 2", "projectSlug": "project-1", "source": {"url": "https://example.com/2.m3u8"}, "project": {"slug": "project-1", "name": "Test Show"}},
+                {
+                    "guid": "guid-1",
+                    "name": "Episode 1",
+                    "projectSlug": "project-1",
+                    "source": {"url": "https://example.com/1.m3u8"},
+                    "project": {"slug": "project-1", "name": "Test Show"},
+                },
+                {
+                    "guid": "guid-2",
+                    "name": "Episode 2",
+                    "projectSlug": "project-1",
+                    "source": {"url": "https://example.com/2.m3u8"},
+                    "project": {"slug": "project-1", "name": "Test Show"},
+                },
             ],
             "pageInfo": {"hasNextPage": False},
         }
@@ -1106,6 +1120,8 @@ class TestContinueWatchingMenu:
 
             mock_notify.assert_called_once_with("No items in Continue Watching")
             mock_add_item.assert_not_called()
+
+
 class TestUtils:
     @pytest.mark.parametrize(
         "watch_position,duration,expected_resume",

@@ -128,7 +128,9 @@ class TestKodiUIInterfaceLines1589_1597:
                 ui.menu_handler._process_attributes_to_infotags(list_item, info_dict)
 
             # Verify the debug log at lines 1583-1587
-            mock_debug.assert_any_call("[ART] direct portraitTitleImage: {'cloudinaryPath': 'direct_portrait.jpg'}", category="art")
+            mock_debug.assert_any_call(
+                "[ART] direct portraitTitleImage: " "{'cloudinaryPath': 'direct_portrait.jpg'}", category="art"
+            )
             mock_debug.assert_any_call("[ART] Using direct portraitTitleImage: direct_portrait.jpg", category="art")
 
 

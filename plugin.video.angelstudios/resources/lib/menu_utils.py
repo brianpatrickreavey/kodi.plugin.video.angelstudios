@@ -77,7 +77,7 @@ class MenuUtils:
         Note: For agents/AI: This is a performance-critical hot path. Avoid adding loops or
         per-key logging. If schema changes, update direct checks explicitly.
         """
-        with TimedBlock('_process_attributes_to_infotags'):
+        with TimedBlock("_process_attributes_to_infotags"):
             self.log.info(f"Processing attributes for list item: {list_item.getLabel()}")
             info_tag = list_item.getVideoInfoTag()
 
@@ -114,7 +114,7 @@ class MenuUtils:
                 name = actor_entry.get("name")
                 if name and isinstance(name, str) and name.strip():
                     try:
-                        valid_actors.append(__import__('xbmc').Actor(name=name.strip()))
+                        valid_actors.append(__import__("xbmc").Actor(name=name.strip()))
                     except Exception:
                         pass
             if valid_actors:
@@ -207,7 +207,7 @@ class MenuUtils:
 
         # Both directory items and playback items must be set to IsPlayable true
         # if the episode is available.
-        list_item = __import__('xbmcgui').ListItem(label=episode_subtitle, offscreen=is_playback)
+        list_item = __import__("xbmcgui").ListItem(label=episode_subtitle, offscreen=is_playback)
         list_item.setProperty("IsPlayable", "true" if episode_available else "false")
 
         # Create ListItem
@@ -229,7 +229,7 @@ class MenuUtils:
             if use_isa:
                 isa_ready = self.parent._ensure_isa_available("hls")
                 if not isa_ready:
-                    isa_ready = __import__('xbmc').getCondVisibility("System.HasAddon(inputstream.adaptive)")
+                    isa_ready = __import__("xbmc").getCondVisibility("System.HasAddon(inputstream.adaptive)")
                     if isa_ready:
                         self.log.info("ISA detected via System.HasAddon; proceeding without inputstreamhelper")
 
@@ -281,7 +281,7 @@ class MenuUtils:
                     list_item.setPath(manifest_url)
 
             # Stream details
-            video_stream_detail = __import__('xbmc').VideoStreamDetail()
+            video_stream_detail = __import__("xbmc").VideoStreamDetail()
             video_stream_detail.setCodec("h264")
             video_stream_detail.setWidth(1920)
             video_stream_detail.setHeight(1080)
@@ -299,7 +299,9 @@ class MenuUtils:
         try:
             if project and isinstance(project, dict) and "logoCloudinaryPath" in project:
                 if "logoCloudinaryPath" not in art_info:
-                    self.log.debug(f"[ART] Injecting project logo into episode: {project['logoCloudinaryPath']}", category="art")
+                    self.log.debug(
+                        f"[ART] Injecting project logo into episode: {project['logoCloudinaryPath']}", category="art"
+                    )
                     art_info["logoCloudinaryPath"] = project["logoCloudinaryPath"]
         except Exception:
             pass
@@ -318,11 +320,14 @@ class MenuUtils:
         else:
             info_tag.setMediaType(self._get_kodi_content_type(content_type))
             info_tag.setTitle(episode_subtitle)
-            # For episodes, set tvshowtitle if project available and name is valid
-            if episode.get("mediatype") == "episode" and project and isinstance(project.get("name"), str) and project["name"].strip():
+            if (
+                episode.get("mediatype") == "episode"
+                and project
+                and isinstance(project.get("name"), str)
+                and project["name"].strip()
+            ):
                 info_tag.setTvShowTitle(project["name"])
-
-        return list_item
+        return list_item  # noqa: E129
 
     def _apply_progress_bar(self, list_item, watch_position_seconds, duration_seconds):
         """

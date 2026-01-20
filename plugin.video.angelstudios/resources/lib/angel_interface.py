@@ -12,6 +12,7 @@ import logging
 import os
 import re
 import sys
+from typing import Any, Optional
 
 import angel_authentication
 import requests
@@ -22,6 +23,7 @@ AngelStudioSession = angel_authentication.AngelStudioSession
 # Library constants
 angel_website_url = "https://www.angel.com"
 angel_graphql_url = "https://api.angelstudios.com/graphql"
+
 
 
 class AngelStudiosInterface:
@@ -36,7 +38,7 @@ class AngelStudiosInterface:
         username=None,
         password=None,
         session_file="",
-        logger=None,
+        logger: Optional[Any] = None,
         query_path=None,
         tracer=None,
     ):
@@ -84,6 +86,10 @@ class AngelStudiosInterface:
         else:
             self.log.error("Failed to initialize session: No session available")
             raise Exception("Failed to initialize session: No session available")
+
+    def _debug_log(self, message, category=None):
+        """Helper to log debug messages with optional category support."""
+        self.log.debug(message, category=category)  # pyright: ignore[reportCallIssue]
 
     def _load_query(self, operation: str) -> str:
         """Load and cache a GraphQL query file by operation name."""
@@ -159,14 +165,14 @@ class AngelStudiosInterface:
             "query": query,
             "variables": variables,
         }
-        self.log.debug(f"Executing GraphQL query: {operation}", category="api")
-        self.log.debug(f"GraphQL query body:\n{query}", category="api")
-        self.log.debug(f"GraphQL variables: {variables}", category="api")
+        self._debug_log(f"Executing GraphQL query: {operation}", category="api")
+        self._debug_log(f"GraphQL query body:\n{query}", category="api")
+        self._debug_log(f"GraphQL variables: {variables}", category="api")
         try:
             response = self.session.post(angel_graphql_url, json=query_dict)
             response.raise_for_status()
             result = response.json()
-            self.log.debug(f"GraphQL response data: {json.dumps(result, indent=2)}", category="api")
+            self._debug_log(f"GraphQL response data: {json.dumps(result, indent=2)}", category="api")
             if "errors" in result:
                 self.log.error(f"GraphQL errors: {result['errors']}")
                 self.log.error(f"session headers: {self.session.headers}")
@@ -322,15 +328,15 @@ class AngelStudiosInterface:
                 "variables": {},
             }
 
-            self.log.debug(f"Batch projects query for {len(slugs)} slugs", category="api")
-            self.log.debug(f"Batch projects query:\n{query}", category="api")
+            self._debug_log(f"Batch projects query for {len(slugs)} slugs", category="api")
+            self._debug_log(f"Batch projects query:\n{query}", category="api")
 
             try:
                 response = self.session.post(angel_graphql_url, json=query_dict)
                 response.raise_for_status()
                 result = response.json()
 
-                self.log.debug(f"Batch projects response: {json.dumps(result, indent=2)}", category="api")
+                self._debug_log(f"Batch projects response: {json.dumps(result, indent=2)}", category="api")
 
                 if "errors" in result:
                     self.log.error(f"GraphQL errors: {result['errors']}")
@@ -606,9 +612,9 @@ class AngelStudiosInterface:
                 "variables": {},
             }
 
-            self.log.debug(f"Executing batch episodes query for {len(guids)} guids", category="api")
-            self.log.debug(f"Batch GraphQL query:\n{query}", category="api")
-            self.log.debug(f"Batch GraphQL variables: {query_dict['variables']}", category="api")
+            self._debug_log(f"Executing batch episodes query for {len(guids)} guids", category="api")
+            self._debug_log(f"Batch GraphQL query:\n{query}", category="api")
+            self._debug_log(f"Batch GraphQL variables: {query_dict['variables']}", category="api")
 
             try:
                 response = self.session.post(angel_graphql_url, json=query_dict)

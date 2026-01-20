@@ -185,7 +185,7 @@ class TestVideoPlayback:
                 episode=MOCK_EPISODE_DATA["episode"],
                 project=MOCK_EPISODE_DATA["project"],
                 content_type="",
-                is_playback=True
+                is_playback=True,
             )
 
         list_item.setProperty.assert_any_call("inputstream", "inputstream.adaptive")
@@ -273,10 +273,7 @@ class TestVideoPlayback:
             patch.object(ui, "_ensure_isa_available", return_value=True),
         ):
             list_item = ui.menu_handler._create_list_item_from_episode(
-                episode={"source": {"url": manifest_url}},
-                project={},
-                content_type="",
-                is_playback=True
+                episode={"source": {"url": manifest_url}}, project={}, content_type="", is_playback=True
             )
 
         list_item.setProperty.assert_any_call("inputstream.adaptive.chooser_resolution_max", "720p")
@@ -298,10 +295,7 @@ class TestVideoPlayback:
             patch.object(ui, "_ensure_isa_available", return_value=True),
         ):
             list_item = ui.menu_handler._create_list_item_from_episode(
-                episode={"source": {"url": manifest_url}},
-                project={},
-                content_type="",
-                is_playback=True
+                episode={"source": {"url": manifest_url}}, project={}, content_type="", is_playback=True
             )
 
         list_item.setProperty.assert_any_call("inputstream.adaptive.stream_selection_type", "ask-quality")
@@ -346,10 +340,7 @@ class TestVideoPlayback:
             patch("xbmc.getCondVisibility", return_value=True),
         ):
             list_item = ui.menu_handler._create_list_item_from_episode(
-                episode={"source": {"url": manifest_url}},
-                project={},
-                content_type="",
-                is_playback=True
+                episode={"source": {"url": manifest_url}}, project={}, content_type="", is_playback=True
             )
 
         list_item.setProperty.assert_any_call("inputstream", "inputstream.adaptive")

@@ -100,10 +100,11 @@ def timed(context_func=None, metrics_func=None):
         metrics_func: Optional function that takes (result, elapsed_ms, args, kwargs)
                      and returns a dict of additional metrics to log.
     """
+
     def decorator(func):
         def wrapper(*args, **kwargs):
             addon = xbmcaddon.Addon()
-            if addon.getSettingBool('enable_performance_logging'):
+            if addon.getSettingBool("enable_performance_logging"):
                 start = time.perf_counter()
                 result = func(*args, **kwargs)
                 elapsed = (time.perf_counter() - start) * 1000  # ms
@@ -130,26 +131,29 @@ def timed(context_func=None, metrics_func=None):
                     except Exception as e:
                         metrics = f" (metrics_error: {e})"
 
-                xbmc.log(f'[PERF] {func.__name__}{context}{metrics}: {elapsed:.2f}ms', xbmc.LOGINFO)
+                xbmc.log(f"[PERF] {func.__name__}{context}{metrics}: {elapsed:.2f}ms", xbmc.LOGINFO)
                 return result
             return func(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
 class TimedBlock:
     """Context manager to time code blocks and log if performance logging is enabled."""
+
     def __init__(self, name):
         self.name = name
         self.start = None
 
     def __enter__(self):
         addon = xbmcaddon.Addon()
-        if addon.getSettingBool('enable_performance_logging'):
+        if addon.getSettingBool("enable_performance_logging"):
             self.start = time.perf_counter()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.start is not None:
             elapsed = (time.perf_counter() - self.start) * 1000  # ms
-            xbmc.log(f'[PERF] {self.name}: {elapsed:.2f}ms', xbmc.LOGINFO)
+            xbmc.log(f"[PERF] {self.name}: {elapsed:.2f}ms", xbmc.LOGINFO)

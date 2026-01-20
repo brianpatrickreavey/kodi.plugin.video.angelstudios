@@ -4,11 +4,12 @@ Tests for KodiUIHelpers class.
 
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'plugin.video.angelstudios', 'resources', 'lib'))
 
-import pytest
-from unittest.mock import patch, MagicMock
-from kodi_ui_helpers import KodiUIHelpers
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "plugin.video.angelstudios", "resources", "lib"))
+
+import pytest  # noqa: E402
+from unittest.mock import patch, MagicMock  # noqa: E402
+from kodi_ui_helpers import KodiUIHelpers  # noqa: E402
 
 
 @pytest.fixture
@@ -30,7 +31,7 @@ def test_set_angel_interface(ui_helpers):
 
 def test_show_error(ui_helpers):
     """Test show_error displays error dialog and logs."""
-    with patch('xbmcgui.Dialog') as mock_dialog:
+    with patch("xbmcgui.Dialog") as mock_dialog:
         ui_helpers.show_error("Test error", "Test Title")
         mock_dialog().ok.assert_called_once_with("Test Title", "Test error")
         ui_helpers.parent.log.error.assert_called_once()
@@ -38,7 +39,7 @@ def test_show_error(ui_helpers):
 
 def test_show_notification(ui_helpers):
     """Test show_notification displays notification and logs."""
-    with patch('xbmcgui.Dialog') as mock_dialog:
+    with patch("xbmcgui.Dialog") as mock_dialog:
         ui_helpers.show_notification("Test message", "Test Title", 3000)
         mock_dialog().notification.assert_called_once_with("Test Title", "Test message", time=3000)
         ui_helpers.parent.log.info.assert_called_once()
@@ -47,14 +48,14 @@ def test_show_notification(ui_helpers):
 def test_show_auth_details_dialog_no_session(ui_helpers):
     """Test show_auth_details_dialog when no session available."""
     ui_helpers.parent.angel_interface = None
-    with patch('xbmcgui.Dialog') as mock_dialog:
+    with patch("xbmcgui.Dialog") as mock_dialog:
         ui_helpers.show_auth_details_dialog()
         mock_dialog().ok.assert_called_once()
 
 
 def test_clear_debug_data_no_dir(ui_helpers):
     """Test clear_debug_data when trace dir does not exist."""
-    with patch('os.path.isdir', return_value=False):
+    with patch("os.path.isdir", return_value=False):
         result = ui_helpers.clear_debug_data()
         assert result is True
         ui_helpers.parent.log.info.assert_called_once()
@@ -62,10 +63,9 @@ def test_clear_debug_data_no_dir(ui_helpers):
 
 def test_clear_debug_data_with_files(ui_helpers):
     """Test clear_debug_data removes files."""
-    with patch('os.path.isdir', return_value=True), \
-         patch('os.listdir', return_value=['file1.json', 'file2.json']), \
-         patch('os.path.isfile', return_value=True), \
-         patch('os.remove') as mock_remove:
+    with patch("os.path.isdir", return_value=True), patch(
+        "os.listdir", return_value=["file1.json", "file2.json"]
+    ), patch("os.path.isfile", return_value=True), patch("os.remove") as mock_remove:
         result = ui_helpers.clear_debug_data()
         assert result is True
         assert mock_remove.call_count == 2
@@ -73,8 +73,9 @@ def test_clear_debug_data_with_files(ui_helpers):
 
 def test_clear_debug_data_with_notification(ui_helpers):
     """Test clear_debug_data_with_notification."""
-    with patch.object(ui_helpers, 'clear_debug_data', return_value=True), \
-         patch.object(ui_helpers, 'show_notification') as mock_show:
+    with patch.object(ui_helpers, "clear_debug_data", return_value=True), patch.object(
+        ui_helpers, "show_notification"
+    ) as mock_show:
         ui_helpers.clear_debug_data_with_notification()
         mock_show.assert_called_once_with("Debug data cleared.")
 
@@ -83,7 +84,7 @@ def test_force_logout_with_notification(ui_helpers):
     """Test force_logout_with_notification."""
     ui_helpers.parent.angel_interface = MagicMock()
     ui_helpers.parent.angel_interface.force_logout.return_value = True
-    with patch.object(ui_helpers, 'show_notification') as mock_show:
+    with patch.object(ui_helpers, "show_notification") as mock_show:
         ui_helpers.force_logout_with_notification()
         mock_show.assert_called_once_with("Logged out locally.")
 
@@ -128,7 +129,7 @@ def test_redact_sensitive_dict(ui_helpers):
 
 def test_redact_sensitive_string(ui_helpers):
     """Test _redact_sensitive redacts string."""
-    data = 'Authorization: Bearer token123'
+    data = "Authorization: Bearer token123"
     redacted = ui_helpers._redact_sensitive(data)
     assert "<redacted>" in redacted
 

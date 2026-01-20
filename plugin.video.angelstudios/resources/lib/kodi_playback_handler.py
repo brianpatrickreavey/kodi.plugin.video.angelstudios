@@ -3,9 +3,9 @@ Kodi Playback Handler for Angel Studios addon.
 Handles all Kodi-specific playback operations and stream resolution.
 """
 
-import xbmc       # type: ignore
-import xbmcgui    # type: ignore
-import xbmcplugin # type: ignore
+import xbmc  # type: ignore
+import xbmcgui  # type: ignore
+import xbmcplugin  # type: ignore
 
 
 class KodiPlaybackHandler:

@@ -14,6 +14,7 @@ class TestDeferredPrefetchProject:
 
         # Use real cache manager for this test
         from kodi_cache_manager import KodiCacheManager
+
         ui.cache_manager = KodiCacheManager(ui)
 
         # Mock cache query - no cached projects

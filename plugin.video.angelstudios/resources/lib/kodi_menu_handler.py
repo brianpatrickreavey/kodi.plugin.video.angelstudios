@@ -6,11 +6,12 @@ Handles all Kodi-specific menu rendering and directory operations.
 import json
 from urllib.parse import urlencode
 
-import xbmc       # type: ignore
-import xbmcgui    # type: ignore
-import xbmcplugin # type: ignore
+import xbmc  # type: ignore
+import xbmcgui  # type: ignore
+import xbmcplugin  # type: ignore
 
 from kodi_utils import timed, TimedBlock
+
 try:
     from menu_projects import ProjectsMenu as ProjectsMenuClass
 except ImportError:
@@ -189,7 +190,12 @@ class KodiMenuHandler:
             raise ImportError("ProjectsMenu could not be imported")
         return ProjectsMenuClass(self.parent).handle(content_type)
 
-    @timed(lambda *args, **kwargs: f"content_type={args[1] if len(args) > 1 else kwargs.get('content_type', 'unknown')}, project_slug={args[2] if len(args) > 2 else kwargs.get('project_slug', 'unknown')}")
+    @timed(
+        lambda *args, **kwargs: "content_type={}, project_slug={}".format(
+            args[1] if len(args) > 1 else kwargs.get("content_type", "unknown"),
+            args[2] if len(args) > 2 else kwargs.get("project_slug", "unknown"),
+        )
+    )
     def seasons_menu(self, content_type, project_slug):
         """Display a menu of seasons for a specific project, with persistent caching."""
         self.log.info(f"Fetching seasons for project: {project_slug}")
@@ -265,16 +271,19 @@ class KodiMenuHandler:
 
     def _get_projects_metrics(self, result, elapsed_ms, *args, **kwargs):
         """Extract performance metrics for projects_menu function."""
-        count = self._perf_metrics.get('projects_count', 0)
+        count = self._perf_metrics.get("projects_count", 0)
         if count > 0:
             per_record = elapsed_ms / count
-            return {
-                'records': count,
-                'per_record': per_record
-            }
+            return {"records": count, "per_record": per_record}
         return {}
 
-    @timed(lambda *args, **kwargs: f"content_type={args[1] if len(args) > 1 else kwargs.get('content_type', 'unknown')}, project_slug={args[2] if len(args) > 2 else kwargs.get('project_slug', 'unknown')}, season_id={args[3] if len(args) > 3 else kwargs.get('season_id', 'all')}")
+    @timed(
+        lambda *args, **kwargs: "content_type={}, project_slug={}, season_id={}".format(
+            args[1] if len(args) > 1 else kwargs.get("content_type", "unknown"),
+            args[2] if len(args) > 2 else kwargs.get("project_slug", "unknown"),
+            args[3] if len(args) > 3 else kwargs.get("season_id", "all"),
+        )
+    )
     def episodes_menu(self, content_type, project_slug, season_id=None):
         """Display a menu of episodes for a specific season, with persistent caching."""
         self.log.info(f"Fetching episodes for project: {project_slug}, season: {season_id}")
@@ -298,8 +307,6 @@ class KodiMenuHandler:
                 all_episodes.sort(key=lambda e: (e.get("seasonNumber", 0), e.get("episodeNumber", 0)))
                 episodes_list = all_episodes
                 sort_episodic = True  # Assume episodic for aggregated view
-                season_for_sort = None  # Not used for sorting in all-episodes
-                season_map = {}  # Not used for all-episodes
             else:
                 season = next(
                     (s for s in project.get("seasons", []) if s.get("id") == season_id),
@@ -311,8 +318,6 @@ class KodiMenuHandler:
                     return
                 episodes_list = [ep for ep in season.get("episodes", []) if ep and isinstance(ep, dict)]
                 sort_episodic = episodes_list[0].get("seasonNumber", 0) > 0 if episodes_list else False
-                season_for_sort = season
-                season_map = {}  # Not used for specific season
 
             episode_count = len(episodes_list)
             self.log.info(f"Processing {episode_count} episodes for project: {project_slug}, season: {season_id}")
@@ -382,7 +387,7 @@ class KodiMenuHandler:
             self.log.info(f"Fetching continue watching items, after={after}")
 
             # Fetch resume watching with full data (fat query)
-            with TimedBlock('continue_watching_api_fetch'):
+            with TimedBlock("continue_watching_api_fetch"):
                 resume_data = self.parent.angel_interface.get_resume_watching(first=10, after=after)
 
             if not resume_data:
@@ -414,12 +419,22 @@ class KodiMenuHandler:
                 # Create a copy for display modifications
                 episode_display = dict(episode)
                 # For series episodes, format with project name and S00E00 in parentheses
-                if episode_display.get("__typename") == "ContentEpisode" and episode_display.get("project") and episode_display["project"].get("name"):
+                has_project_name = (
+                    episode_display.get("__typename") == "ContentEpisode"
+                    and episode_display.get("project")
+                    and episode_display["project"].get("name")
+                )
+                if has_project_name:
                     season_num = episode_display.get("seasonNumber")
                     episode_num = episode_display.get("episodeNumber")
                     current_subtitle = episode_display.get("subtitle") or episode_display.get("name", "Unknown")
                     if season_num is not None and episode_num is not None:
-                        episode_display["subtitle"] = f"{current_subtitle} ({episode_display['project']['name']} - S{season_num:02d}E{episode_num:02d})"
+                        subtitle_text = (
+                            f"{current_subtitle} "
+                            f"({episode_display['project']['name']} - "
+                            f"S{season_num:02d}E{episode_num:02d})"
+                        )
+                        episode_display["subtitle"] = subtitle_text
                     else:
                         episode_display["subtitle"] = f"{current_subtitle} ({episode_display['project']['name']})"
 
@@ -601,7 +616,9 @@ class KodiMenuHandler:
         try:
             if project and isinstance(project, dict) and "logoCloudinaryPath" in project:
                 if "logoCloudinaryPath" not in art_info:
-                    self.log.debug(f"[ART] Injecting project logo into episode: {project['logoCloudinaryPath']}", category="art")
+                    self.log.debug(
+                        f"[ART] Injecting project logo into episode: {project['logoCloudinaryPath']}", category="art"
+                    )
                     art_info["logoCloudinaryPath"] = project["logoCloudinaryPath"]
         except Exception:
             pass
@@ -620,11 +637,14 @@ class KodiMenuHandler:
         else:
             info_tag.setMediaType(self._get_kodi_content_type(content_type))
             info_tag.setTitle(episode_subtitle)
-            # For episodes, set tvshowtitle if project available and name is valid
-            if episode.get("mediatype") == "episode" and project and isinstance(project.get("name"), str) and project["name"].strip():
+            if (
+                episode.get("mediatype") == "episode"
+                and project
+                and isinstance(project.get("name"), str)
+                and project["name"].strip()
+            ):
                 info_tag.setTvShowTitle(project["name"])
-
-        return list_item
+        return list_item  # noqa: E129
 
     def _process_attributes_to_infotags(self, list_item, info_dict):
         """
@@ -658,7 +678,7 @@ class KodiMenuHandler:
         Note: For agents/AI: This is a performance-critical hot path. Avoid adding loops or
         per-key logging. If schema changes, update direct checks explicitly.
         """
-        with TimedBlock('_process_attributes_to_infotags'):
+        with TimedBlock("_process_attributes_to_infotags"):
             self.log.info(f"Processing attributes for list item: {list_item.getLabel()}")
             self.log.debug(f"Attribute dict: {info_dict}")
             info_tag = list_item.getVideoInfoTag()
