@@ -1,7 +1,7 @@
 # Project Cleanup Plan
 
 **Date:** January 15, 2026
-**Status:** Pending – Phase 0 not started, Phase 1 not started
+**Status:** Phase 0 complete ✅, Phase 1 not started
 **Owner:** Architecture & Product
 **Audience:** Developer, Code Reviewer, QA
 
@@ -122,7 +122,7 @@ User Action (Kodi UI)
 **Duration:** 1–2 hours
 **Goal:** Remove cruft, establish constants, verify import strategy.
 
-**Current Status:** Phase 0.6 completed ✅
+**Current Status:** Phase 0 complete ✅
 - ✅ 0.1 Unused imports: completed (removed unused imports from 4 lib files; preserved json/xbmcgui for test mocking)
 - ✅ 0.2 Remove unused imports in tests: completed (removed patch from test_kodi_cache_manager.py, MOCK_EPISODE_DATA from test_kodi_ui_helpers.py)
 - ✅ 0.3 Add separate cache TTL settings: completed (added projects_cache_hours, project_cache_hours, episodes_cache_hours settings; updated cache manager)
