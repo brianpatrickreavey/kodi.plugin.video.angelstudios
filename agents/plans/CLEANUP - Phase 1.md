@@ -1,7 +1,7 @@
-# Project Cleanup Plan
+# Project Cleanup Plan - Phase 1
 
-**Date:** January 15, 2026
-**Status:** Phase 0 complete ✅, Phase 1 not started
+**Date:** January 20, 2026
+**Status:** Phase 1 not started
 **Owner:** Architecture & Product
 **Audience:** Developer, Code Reviewer, QA
 
@@ -16,15 +16,10 @@ This cleanup plan addresses code organization, import strategy, caching patterns
 - **Out of Scope (defer to next feature):** Session refresh token strategy, resumeWatching caching, integration tests, major architectural shifts.
 
 **Risk Profile:**
-- **Phase 0:** Zero risk (pure removals and constants extraction).
 - **Phase 1:** Low-to-medium risk (refactors with comprehensive test coverage validation).
-- **Phase 2:** Medium-to-high risk (behavioral changes; deferred post-commit).
 
 **Timeline Estimate:**
-- Phase 0: 1–2 hours
 - Phase 1: 3–6 hours
-- Phase 2: 8+ hours (deferred)
-- **Total (Phases 0–1): ~6–8 hours**
 
 **Success Criteria:**
 1. All phases complete with test coverage maintained (aim for 100% where practical; edge cases deferred to future testing revamp)
@@ -35,7 +30,7 @@ This cleanup plan addresses code organization, import strategy, caching patterns
 
 ---
 
-## Current State Assessment
+## Current State Assessment (Post Phase 0)
 
 ### Architecture Overview
 
@@ -76,15 +71,15 @@ User Action (Kodi UI)
 6. **Logging:** KodiLogger wraps xbmc.log; stack introspection on every call; unredacted auth headers.
 7. **Tests:** Unit tests mirrored to lib structure; fixtures in conftest.py; parametrization + mock patches; 100% coverage enforced.
 
-### Known Issues (from Audit)
+### Known Issues (from Audit, Post Phase 0)
 
 **Imports:**
-- Unused imports in `kodi_ui_interface.py`, `angel_interface.py`, `angel_authentication.py`
-- Duplicate imports in `test_kodi_ui_interface_menus.py`
+- ✅ Unused imports removed (Phase 0)
+- ✅ Duplicate imports removed (Phase 0)
 - Optional addon detection uses correct pattern ✅
 
 **Caching:**
-- Hardcoded 1-hour TTL for projects menu (inconsistent with user settings)
+- ✅ Separate cache TTL settings added (Phase 0)
 - Query/fragment in-memory file caches have no eviction strategy (but small, low-impact); consider renaming to clarify they cache file contents, not data responses (e.g., `_query_file_cache`, `_fragment_file_cache`)
 - resumeWatching results not cached (deferred to Phase 1)
 
@@ -100,7 +95,7 @@ User Action (Kodi UI)
 - Hardcoded icons and constants scattered
 
 **Logging:**
-- KodiLogger stack introspection (9 frames) on every call (performance concern)
+- KodiLogger stack introspection (9 frames) on every log call (performance concern)
 - GraphQL errors logged as empty `{}` (missing context)
 
 **Tests & Fixtures:**
@@ -109,7 +104,7 @@ User Action (Kodi UI)
 - Multi-patch context managers correct ✅; documentation lacking
 
 **Docs:**
-- 5 research docs (`*_RESEARCH.md`, `*_ANALYSIS.md`) lack status markers
+- ✅ Research docs archived (Phase 0)
 - `continue-watching.md` outdated
 - Deprecated API references in code + docs
 
@@ -117,198 +112,124 @@ User Action (Kodi UI)
 
 ## Cleanup Phases
 
-### Phase 0: Quick Wins *(Zero Risk)*
+### Phase 1: Quick Wins *(Low-to-Medium Risk)*
 
-**Duration:** 1–2 hours
-**Goal:** Remove cruft, establish constants, verify import strategy.
+**Duration:** 3–6 hours
+**Goal:** Improve readability, consistency, logging, and minor performance wins while maintaining 100% test coverage.
 
-**Current Status:** Phase 0 complete ✅
-- ✅ 0.1 Unused imports: completed (removed unused imports from 4 lib files; preserved json/xbmcgui for test mocking)
-- ✅ 0.2 Remove unused imports in tests: completed (removed patch from test_kodi_cache_manager.py, MOCK_EPISODE_DATA from test_kodi_ui_helpers.py)
-- ✅ 0.3 Add separate cache TTL settings: completed (added projects_cache_hours, project_cache_hours, episodes_cache_hours settings; updated cache manager)
-- ✅ 0.4 Research docs archived: completed (all 5 research docs already archived in docs/archive/ with README.md)
-- ✅ 0.5 Relative-import audit: completed (verified current absolute import structure is correct for this codebase)
-- ✅ 0.6 Kodi-agnostic check: completed (angel_interface.py and angel_authentication.py confirmed Kodi-agnostic)
-- ✅ 0.7 Pyright type checking issues: completed (resolved category parameter errors after black formatting)
+**Current Status:** Phase 1 not started
 
-**Test/coverage state:** `make unittest-with-coverage` passes (436/436, 88% coverage). Phase 0.2 completed.
-
-#### 0.1 – Remove Unused Imports ✅
+#### 1.1 – Refactor Test Fixtures (conftest.py)
 
 **Files:**
-- [plugin.video.angelstudios/resources/lib/kodi_menu_handler.py](../plugin.video.angelstudios/resources/lib/kodi_menu_handler.py) — removed unused `os`, `time`, `xbmcaddon`, `xbmcvfs`, `simplecache.SimpleCache`
-- [plugin.video.angelstudios/resources/lib/kodi_ui_helpers.py](../plugin.video.angelstudios/resources/lib/kodi_ui_helpers.py) — removed unused `datetime.timedelta`, `xbmc`, `xbmcaddon`, `xbmcplugin`
-- [plugin.video.angelstudios/resources/lib/kodi_ui_interface.py](../plugin.video.angelstudios/resources/lib/kodi_ui_interface.py) — removed unused `time`, `datetime.timedelta`, `urllib.parse.urlencode`, `xbmc`, `xbmcplugin`, `simplecache.SimpleCache`, `kodi_utils.timed`, `kodi_utils.TimedBlock`; kept `json`, `xbmcgui` for test mocking
-- [plugin.video.angelstudios/resources/lib/menu_projects.py](../plugin.video.angelstudios/resources/lib/menu_projects.py) — removed unused `xbmc`, `kodi_utils.timed`
+- [tests/unit/conftest.py](../tests/unit/conftest.py) — refactor all fixtures for clarity and composability
 
-**Acceptance Criteria:**
-- ✅ `flake8` reports no unused import violations (F401)
-- ✅ Tests still pass (436/436)
-- ✅ Test coverage maintained or improved (88%)
-
-**Pending Questions (Resolved):**
-- ✅ Confirm xbmcaddon is actually used (we verified it is, but double-check) - xbmcaddon usage confirmed in kodi_ui_interface.py; kept for testing
-- ✅ Any exceptions to removing unused imports in other files? - Preserved `json` and `xbmcgui` imports in kodi_ui_interface.py as they are needed for test mocking (unittest.mock.patch at module level)
-
-#### 0.2 – Remove Unused Imports in Tests ✅
-
-**Files:**
-- [tests/unit/test_kodi_cache_manager.py](../tests/unit/test_kodi_cache_manager.py) — removed unused `patch` import in local import at line 386
-- [tests/unit/test_kodi_ui_helpers.py](../tests/unit/test_kodi_ui_helpers.py) — removed unused `MOCK_EPISODE_DATA` import
-
-**Acceptance Criteria:**
-- ✅ `flake8` reports no unused import violations (F401) in test files
-- ✅ Tests pass (436/436)
-
-**Pending Questions (Resolved):**
-- ✅ Confirm no other unused imports in test files - Verified with flake8
-
-#### 0.3 – Add Separate Cache TTL Settings ✅
-
-**Files:**
-- [plugin.video.angelstudios/resources/settings.xml](../plugin.video.angelstudios/resources/settings.xml) — added separate cache expiration settings for different cache types
-- [plugin.video.angelstudios/resources/lib/kodi_cache_manager.py](../plugin.video.angelstudios/resources/lib/kodi_cache_manager.py) — updated TTL methods to use separate settings
-
-**Changes:**
-- Replaced single `cache_expiration_hours` setting with three separate Expert-level settings:
-  - `projects_cache_hours` (projects menu data, default: 12 hours)
-  - `project_cache_hours` (individual project data, default: 8 hours)
-  - `episodes_cache_hours` (episode data, default: 72 hours)
-- All settings have minimum 1 hour, maximum 168 hours (1 week) with proper validation
-- Updated `_cache_ttl()`, `_project_cache_ttl()`, `_episode_cache_ttl()` methods to use respective settings
-- Removed static constants approach (determined unnecessary)
-
-**Acceptance Criteria:**
-- ✅ Three separate cache expiration settings available in Expert settings (level 3)
-- ✅ All settings have minimum 1 hour, maximum 168 hours with validation
-- ✅ Cache operations use appropriate TTL for their data type
-- ✅ Backward compatibility maintained through sensible defaults
-- ✅ Tests pass (436/436)
-
-#### 0.4 – Archive Research Docs ✅
-
-**Files to Move:**
-- [docs/IMAGE_PREFETCH_RESEARCH.md](../docs/IMAGE_PREFETCH_RESEARCH.md)
-- [docs/IMAGE_PREFETCH_VERIFICATION_GUIDE.md](../docs/IMAGE_PREFETCH_VERIFICATION_GUIDE.md)
-- [docs/INFOTAGS_OPTIMIZATION_RESEARCH.md](../docs/INFOTAGS_OPTIMIZATION_RESEARCH.md)
-- [docs/TIMING_ANALYSIS.md](../docs/TIMING_ANALYSIS.md)
-- [docs/TIMING_INSTRUMENTATION.md](../docs/TIMING_INSTRUMENTATION.md)
+**Current Issue:**
+Fixtures are functional but cryptic (mock setup hard to follow); test data centralized but fixture chains could be clearer.
 
 **Action:**
-- ✅ Create `docs/archive/` directory (already exists)
-- ✅ Move all 5 research docs to `docs/archive/` (already moved)
-- ✅ Add `README.md` in archive explaining why (already exists with comprehensive explanation)
+Refactor `conftest.py` to use descriptive fixture names, add comprehensive docstrings, and structure for composability. Group fixtures by purpose (Kodi UI mocks, session mocks, cache mocks, composed fixtures).
 
-**Status:** Already completed prior to this cleanup phase. All research docs are properly archived with documentation explaining their purpose.
-- Update `.gitignore` to exclude archive if needed (or keep for history)
-
-**Acceptance Criteria:**
-- `docs/` contains only durable docs (data_structure, metadata-mapping, features/*, DEFERRED_CACHE_WRITES)
-- Archive dir created with moved docs
-- No broken references in active docs
-
-**Pending Questions:**
-- [ ] Confirm all 5 research docs exist and should be moved
-
-#### 0.5 – Verify Relative Imports in Lib ✅
-
-**Scope:** Audit all imports in `resources/lib/**/*.py`
-
-**Expected Pattern:**
-- Internal lib modules: `from kodi_utils import TimedBlock` ✅ (absolute imports appropriate for this codebase)
-- External: `from requests import Session` ✅
-- Kodi (xbmc*): `import xbmcplugin` ✅
-
-**Action:** Verified no problematic absolute imports of internal modules. The current import structure is correct for this codebase where the lib directory is added to Python path via `sys.path.insert()` in tests.
-
-**Acceptance Criteria:**
-- ✅ All internal imports work correctly (absolute imports are appropriate for this structure)
-- ✅ No circular dependencies detected
-- ✅ Tests pass (436/436)
-
-**Status:** Current import structure is correct and doesn't need changes. Absolute imports for internal modules are appropriate when the lib directory is in the Python path.
-
-#### 0.6 – Verify angel_interface.py and angel_authentication.py are KODI-Agnostic ✅
-
-**Scope:**
-- [plugin.video.angelstudios/resources/lib/angel_interface.py](../plugin.video.angelstudios/resources/lib/angel_interface.py)
-- [plugin.video.angelstudios/resources/lib/angel_authentication.py](../plugin.video.angelstudios/resources/lib/angel_authentication.py)
-
-**Expected (both files):**
-- No `import xbmc*`, `import xbmcplugin`, `import xbmcgui`, `import xbmcaddon` ✅
-- No `SimpleCache` usage ✅
-- No Kodi-specific logic (safe to use in non-Kodi Python environments) ✅
-- Dependencies: only `requests`, `BeautifulSoup`, standard library ✅
-
-**Action:** Grep verified zero xbmc imports + SimpleCache in both files.
-
-**Acceptance Criteria:**
-- ✅ Zero xbmc imports found in either file
-- ✅ Zero SimpleCache usage found
-- ✅ Both files can be imported in pure Python environment without errors (confirmed by test imports)
-- ✅ Tests confirm (test fixtures don't inject Kodi mocks for these module tests)
-
-**Status:** Both files are confirmed Kodi-agnostic and meet all requirements.
-
-**Pending Questions:**
-- [ ] Confirm no xbmc imports or SimpleCache usage in these files
-
-#### 0.7 – Resolve Pyright Type Checking Issues After Black Formatting
-
-**Scope:** Fix pyright errors introduced after running `black` for code formatting, specifically "No parameter named 'category'" in `log.debug()` calls.
-
-**Issues Resolved:**
-- Pyright reported 10 "No parameter named 'category'" errors on `self.log.debug()` calls with `category="api"` in `angel_interface.py`.
-- Root cause: Module designed as Kodi-agnostic, but `category` is a Kodi-specific extension not supported by standard `logging.Logger`.
-- Standard loggers accept `category` via `**kwargs` at runtime, but pyright's static analysis flagged it as invalid.
-
-**Solution Implemented:**
-- **Removed `LoggerProtocol`**: Eliminated protocol enforcing Kodi-specific method signatures to maintain agnosticism.
-- **Changed logger type hint**: Updated `logger: Optional[LoggerProtocol]` to `logger: Optional[Any]` to allow flexible logger types.
-- **Added `_debug_log` helper method**: Created wrapper in `AngelStudiosInterface` to abstract category-based logging:
-  ```python
-  def _debug_log(self, message, category=None):
-      """Helper to log debug messages with optional category support."""
-      self.log.debug(message, category=category)  # pyright: ignore[reportCallIssue]
-  ```
-- **Replaced direct calls**: Updated 9 `self.log.debug(..., category="api")` calls to use `self._debug_log(..., category="api")`.
-- **Used specific pyright ignore**: Applied `# pyright: ignore[reportCallIssue]` to suppress only the call issue error.
-
-**Acceptance Criteria:**
-- ✅ Pyright reports 0 errors, 0 warnings, 0 informations
-- ✅ Tests pass (436/436), coverage maintained (96% for `angel_interface.py`)
-- ✅ Module remains Kodi-agnostic (works with standard and Kodi loggers)
-- ✅ Category feature preserved for Kodi environments
-
-**Example Before/After:**
+**Example Structure:**
 ```python
-# BEFORE (conftest.py excerpt)
-@pytest.fixture
-def mock_addon():
-    addon = MagicMock()
-    addon.getSetting.side_effect = lambda key: {...}
-    return addon
+## ============================================================================
+## Kodi UI Mocks
+## ============================================================================
 
-# AFTER
 @pytest.fixture
 def kodi_addon_mock():
-    """Mock Kodi addon with common settings (language, cache TTLs, etc.).
+    """Mock Kodi addon with common settings.
 
     Returns:
-        MagicMock: Configured addon mock for unit tests.
-
-    Note: Tests override getSetting() as needed for specific test cases.
+        MagicMock: Addon mock with getSetting() configured for cache TTLs,
+                   language, etc. Tests override as needed.
     """
     addon = MagicMock()
-    addon.getSetting.side_effect = lambda key: {...}
+    addon.getSetting.side_effect = lambda key: {
+        "projects_cache_hours": "12",
+        "project_cache_hours": "8",
+        "episodes_cache_hours": "72",
+        # ... other settings ...
+    }.get(key, "")
     return addon
+
+@pytest.fixture
+def kodi_handle():
+    """Kodi plugin handle (typically integer 1)."""
+    return 1
+
+@pytest.fixture
+def kodi_xbmcplugin_mock():
+    """Mock xbmcplugin module with common methods.
+
+    Yields:
+        dict: Named mocks for addDirectoryItem, endOfDirectory, setResolvedUrl.
+    """
+    with patch('xbmcplugin.addDirectoryItem') as mock_add, \
+         patch('xbmcplugin.endOfDirectory') as mock_end, \
+         patch('xbmcplugin.setResolvedUrl') as mock_resolve:
+        yield {
+            'addDirectoryItem': mock_add,
+            'endOfDirectory': mock_end,
+            'setResolvedUrl': mock_resolve,
+        }
+
+## ============================================================================
+## Session & API Mocks
+## ============================================================================
+
+@pytest.fixture
+def mock_http_session():
+    """Mock requests.Session for HTTP calls.
+
+    Returns:
+        MagicMock: Session with post(), get() methods pre-configured.
+    """
+    session = MagicMock()
+    session.headers = {"Authorization": "Bearer fake_token"}
+    session.cookies = {}
+    session.post.return_value.json.return_value = {}
+    session.post.return_value.status_code = 200
+    return session
+
+## ============================================================================
+## Composed Fixtures (convenience)
+## ============================================================================
+
+@pytest.fixture
+def kodi_ui_interface(kodi_addon_mock, kodi_handle, kodi_xbmcplugin_mock,
+                      kodi_xbmcgui_mock, mock_simplecache, mock_angel_studio_session):
+    """Fully configured KodiUIInterface for testing.
+
+    Patches Kodi modules + cache + session, then yields ready-to-use UI interface.
+
+    Returns:
+        KodiUIInterface: Configured for unit testing.
+    """
+    with patch('xbmcaddon.Addon', return_value=kodi_addon_mock), \
+         patch('xbmcplugin.setResolvedUrl') as _, \
+         patch('xbmcgui.ListItem') as mock_li, \
+         patch('simplecache.SimpleCache', return_value=mock_simplecache):
+        # Configure ListItem to return proper mock
+        mock_li.return_value.getVideoInfoTag.return_value = MagicMock()
+
+        # Create UI interface
+        ui = KodiUIInterface(handle=kodi_handle)
+        ui.angel_interface = MagicMock()  # Override with mock
+        ui.angel_interface.get_projects.return_value = []
+
+        return ui
 ```
 
 **Acceptance Criteria:**
 - Every fixture has a docstring (purpose + returns)
 - Fixture names are descriptive (prefer 3–5 words)
+- Composed fixtures documented with clear composition
 - Tests still pass (mock behavior unchanged)
 - Code review confirms "hard to follow fixtures" complaint resolved
+
+**Pending Questions:**
+- [ ] Confirm fixture structure and naming conventions
 
 #### 1.2 – Redact Auth Logs in angel_authentication.py
 
@@ -534,47 +455,9 @@ def episodes_menu(self, ...):
 
 ---
 
-### Phase 2: Deeper Improvements *(Higher Risk — Deferred to Next Feature)*
-
-This phase introduces behavioral changes and is **deferred post-commit**. Documented here for future reference.
-
-#### 2.1 – Implement Session Refresh Token Strategy
-
-**Status:** DEFERRED
-
-**Scope:** [plugin.video.angelstudios/resources/lib/angel_authentication.py](../plugin.video.angelstudios/resources/lib/angel_authentication.py)
-
-**Current:** Session validated on-demand; full re-auth if invalid.
-**Proposed:** Refresh token logic; proactive refresh before expiry.
-
-**Acceptance Criteria:** TBD in next feature planning.
-
-#### 2.2 – Add Integration Tests
-
-**Status:** DEFERRED
-
-**Scope:** `tests/integration/` (new)
-
-**Proposed:** Tests that exercise full flow (API + UI + caching).
-
-**Acceptance Criteria:** TBD in next feature planning.
-
-#### 2.4 – Optimize KodiLogger Performance
-
-**Status:** DEFERRED
-
-**Scope:** [plugin.video.angelstudios/resources/lib/kodi_utils.py](../plugin.video.angelstudios/resources/lib/kodi_utils.py) (KodiLogger)
-
-**Current:** Stack introspection on every log call (9 frames checked).
-**Proposed:** Cache frame info or use faster caller detection.
-
-**Acceptance Criteria:** TBD in next feature planning.
-
----
-
 ## Test Strategy & Validation
 
-### Unit Tests (Phases 0–1)
+### Unit Tests (Phase 1)
 
 **Requirement:** Maintain test coverage (aim for 100% where practical; edge cases and comprehensive testing revamp deferred to future project)
 
@@ -593,7 +476,7 @@ make unittest-with-coverage
 
 Expected output: Coverage report; aim to maintain or improve coverage without exhaustive edge case testing (deferred).
 
-### Code Quality (Phases 0–1)
+### Code Quality (Phase 1)
 
 **Commands:**
 ```bash
@@ -749,7 +632,9 @@ def kodi_addon_mock():
     """
     addon = MagicMock()
     addon.getSetting.side_effect = lambda key: {
-        "cache_ttl_projects": "3600",
+        "projects_cache_hours": "12",
+        "project_cache_hours": "8",
+        "episodes_cache_hours": "72",
         # ... other settings ...
     }.get(key, "")
     addon.getAddonInfo.side_effect = lambda key: {
@@ -767,7 +652,7 @@ def kodi_xbmcplugin_mock():
     """Mock xbmcplugin module with common methods.
 
     Yields:
-        MagicMock: Patched xbmcplugin module.
+        dict: Named mocks for addDirectoryItem, endOfDirectory, setResolvedUrl.
     """
     with patch('xbmcplugin.addDirectoryItem') as mock_add, \
          patch('xbmcplugin.endOfDirectory') as mock_end, \
@@ -881,18 +766,6 @@ def kodi_ui_interface(kodi_addon_mock, kodi_handle, kodi_xbmcplugin_mock,
 
 ## Docs Strategy
 
-### Research Docs → Archive
-
-**Move to `docs/archive/`:**
-- IMAGE_PREFETCH_RESEARCH.md
-- IMAGE_PREFETCH_VERIFICATION_GUIDE.md
-- INFOTAGS_OPTIMIZATION_RESEARCH.md
-- TIMING_ANALYSIS.md
-- TIMING_INSTRUMENTATION.md
-
-**Rationale:** Investigation and exploration; not actionable post-implementation.
-**Add:** `docs/archive/README.md` explaining why archived.
-
 ### Durable Docs (Update/Keep)
 
 | File | Action |
@@ -902,13 +775,6 @@ def kodi_ui_interface(kodi_addon_mock, kodi_handle, kodi_xbmcplugin_mock,
 | [DEFERRED_CACHE_WRITES.md](../docs/DEFERRED_CACHE_WRITES.md) | **Update**: Remove SimpleCache references; note caching happens in UI layer |
 | [features/continue-watching.md](../docs/features/continue-watching.md) | **Update**: Verify implementation; refresh examples |
 | [.github/copilot-instructions.md](../.github/copilot-instructions.md) | **Review**: Ensure architecture guidance matches cleaned-up code |
-
-### New Docs (Optional)
-
-Consider adding in future (not in this cleanup):
-- `docs/ARCHITECTURE.md` — High-level overview (data flow, components, key patterns)
-- `docs/TESTING.md` — Unit test strategy, fixtures, coverage approach
-- `docs/CACHING.md` — Consolidated caching guide (cache keys, TTLs, invalidation)
 
 ---
 
@@ -952,40 +818,7 @@ Timing logs from Phase 1 complete become baseline. Phase 2 (deferred) can measur
 
 ## Progress Tracking
 
-**Process Note:** Update CLEANUP.md status and commit changes between each sub-phase step (0.1, 0.2, etc.) for easy rollback. Review and answer pending questions before moving to next sub-phase step.
-
-### Phase 0 Checklist
-
-- [ ] 0.1 – Remove unused imports (3 files)
-  - [ ] kodi_ui_interface.py
-  - [ ] angel_interface.py
-  - [ ] angel_authentication.py
-  - [ ] Tests pass; pyright/flake8 clean
-- [ ] 0.2 – Remove duplicate imports (tests)
-  - [ ] test_kodi_ui_interface_menus.py
-- [ ] 0.3 – Extract cache TTL constants
-  - [ ] kodi_ui_interface.py (module-level constants)
-  - [ ] Update all hardcoded TTLs
-  - [ ] Tests pass
-- [ ] 0.4 – Archive research docs
-  - [ ] Create `docs/archive/`
-  - [ ] Move 5 docs
-  - [ ] Add README
-- [ ] 0.5 – Verify relative imports
-  - [ ] All internal lib imports are relative
-  - [ ] No circular dependencies
-  - [ ] pyright clean
-- [ ] 0.6 – Verify angel_interface.py and angel_authentication.py are KODI-agnostic
-  - [ ] Zero xbmc imports in both files
-  - [ ] Zero SimpleCache usage in both files
-  - [ ] Pure Python import check for both
-- [x] 0.7 – Resolve pyright type checking issues after black formatting
-  - [x] Remove LoggerProtocol and update type hints
-  - [x] Add _debug_log helper method with pyright ignore
-  - [x] Replace 9 direct log.debug calls with helper
-  - [x] Pyright reports 0 errors, tests pass
-- [ ] **Phase 0 Complete**: Run `make unittest-with-coverage` → expect coverage maintained or improved
-- [ ] **Phase 0 Complete**: Run `make lint` → expect targeted errors resolved
+**Process Note:** Update CLEANUP - Phase 1.md status and commit changes between each sub-phase step (1.1, 1.2, etc.) for easy rollback. Review and answer pending questions before moving to next sub-phase step.
 
 ### Phase 1 Checklist
 
@@ -1029,14 +862,6 @@ Timing logs from Phase 1 complete become baseline. Phase 2 (deferred) can measur
 
 ## Risk Mitigation
 
-### Phase 0 Risks: **Minimal**
-
-**Risk:** Unused import removal breaks static analysis or imports elsewhere.
-**Mitigation:** Run pyright + full test suite after each removal.
-
-**Risk:** Cache TTL constant extraction affects behavior.
-**Mitigation:** Replace hardcoded values exactly; test coverage catches any mismatches.
-
 ### Phase 1 Risks: **Medium**
 
 **Risk:** Fixture refactoring changes mock behavior; tests pass but behavior diverges.
@@ -1048,16 +873,12 @@ Timing logs from Phase 1 complete become baseline. Phase 2 (deferred) can measur
 **Risk:** Infotag mapping loop misses edge cases (type coercion, None values).
 **Mitigation:** Add type checking in loop; handle None gracefully; log warnings; tests cover edge cases.
 
-### Phase 2 Risks: **Higher** (deferred)
-
-Session refresh / resumeWatching caching could affect auth flow or cache invalidation. Deferred to next feature for dedicated testing.
-
 ---
 
 ## Post-Cleanup Checklist (Final)
 
 **Before Commit:**
-- [ ] All phases complete (0–1)
+- [ ] All phases complete (1)
 - [ ] `make unittest-with-coverage` → expect coverage maintained or improved
 - [ ] `make format-and-lint` → zero errors
 - [ ] Code review approved
@@ -1070,21 +891,21 @@ Session refresh / resumeWatching caching could affect auth flow or cache invalid
 
 **Commit Messages (per sub-phase step):**
 ```
-Phase 0.1: feat: cleanup 0.1 - remove unused imports
+Phase 1.1: feat: cleanup 1.1 - refactor test fixtures
 
 Completed: [list specific files/changes]
 - Test coverage maintained or improved
 
 Refs: #cleanup
 
-Phase 0.2: feat: cleanup 0.2 - remove duplicate imports
+Phase 1.2: feat: cleanup 1.2 - redact auth logs
 
 Completed: [list specific files/changes]
 - Test coverage maintained or improved
 
 Refs: #cleanup
 
-[... continue for each 0.x and 1.x ...]
+[... continue for each 1.x ...]
 
 Phase 1.8: feat: cleanup 1.8 - remove deprecated API references
 
@@ -1097,17 +918,6 @@ Refs: #cleanup
 ---
 
 ## Appendix: File Change Summary
-
-### Phase 0 Changes
-
-| File | Change Type | Scope |
-|------|---|---|
-| `resources/lib/kodi_ui_interface.py` | Remove import | 1 line |
-| `resources/lib/angel_interface.py` | Remove imports + Add constants | 2 removals + ~5 new lines |
-| `resources/lib/angel_authentication.py` | Remove import | 1 line |
-| `tests/unit/test_kodi_ui_interface_menus.py` | Remove import | 1 line |
-| `docs/archive/` | Move 5 docs | New directory |
-| `docs/archive/README.md` | Create | ~20 lines |
 
 ### Phase 1 Changes
 
@@ -1126,5 +936,5 @@ Refs: #cleanup
 
 ---
 
-**Document Status:** Ready for Review
-**Next Step:** Architect/Product approval → Implementation begins with Phase 0
+**Document Status:** Ready for Implementation
+**Next Step:** Begin Phase 1.1 implementation
