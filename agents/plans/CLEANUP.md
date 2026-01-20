@@ -122,13 +122,13 @@ User Action (Kodi UI)
 **Duration:** 1–2 hours
 **Goal:** Remove cruft, establish constants, verify import strategy.
 
-**Current Status:** Phase 0.5 completed ✅
+**Current Status:** Phase 0.6 completed ✅
 - ✅ 0.1 Unused imports: completed (removed unused imports from 4 lib files; preserved json/xbmcgui for test mocking)
 - ✅ 0.2 Remove unused imports in tests: completed (removed patch from test_kodi_cache_manager.py, MOCK_EPISODE_DATA from test_kodi_ui_helpers.py)
 - ✅ 0.3 Add separate cache TTL settings: completed (added projects_cache_hours, project_cache_hours, episodes_cache_hours settings; updated cache manager)
 - ✅ 0.4 Research docs archived: completed (all 5 research docs already archived in docs/archive/ with README.md)
 - ✅ 0.5 Relative-import audit: completed (verified current absolute import structure is correct for this codebase)
-- 🔶 0.6 Kodi-agnostic check for angel_interface.py / angel_authentication.py: pending
+- ✅ 0.6 Kodi-agnostic check: completed (angel_interface.py and angel_authentication.py confirmed Kodi-agnostic)
 - 🔶 0.7 Flake8 linting issues: pending (unused vars, long line, unused imports noted)
 
 **Test/coverage state:** `make unittest-with-coverage` passes (436/436, 88% coverage). Phase 0.2 completed.
@@ -228,25 +228,27 @@ User Action (Kodi UI)
 
 **Status:** Current import structure is correct and doesn't need changes. Absolute imports for internal modules are appropriate when the lib directory is in the Python path.
 
-#### 0.6 – Verify angel_interface.py and angel_authentication.py are KODI-Agnostic
+#### 0.6 – Verify angel_interface.py and angel_authentication.py are KODI-Agnostic ✅
 
 **Scope:**
 - [plugin.video.angelstudios/resources/lib/angel_interface.py](../plugin.video.angelstudios/resources/lib/angel_interface.py)
 - [plugin.video.angelstudios/resources/lib/angel_authentication.py](../plugin.video.angelstudios/resources/lib/angel_authentication.py)
 
 **Expected (both files):**
-- No `import xbmc*`, `import xbmcplugin`, `import xbmcgui`, `import xbmcaddon`
-- No `SimpleCache` usage
-- No Kodi-specific logic (safe to use in non-Kodi Python environments)
-- Dependencies: only `requests`, `BeautifulSoup`, standard library
+- No `import xbmc*`, `import xbmcplugin`, `import xbmcgui`, `import xbmcaddon` ✅
+- No `SimpleCache` usage ✅
+- No Kodi-specific logic (safe to use in non-Kodi Python environments) ✅
+- Dependencies: only `requests`, `BeautifulSoup`, standard library ✅
 
-**Action:** Grep for xbmc imports + SimpleCache in both files.
+**Action:** Grep verified zero xbmc imports + SimpleCache in both files.
 
 **Acceptance Criteria:**
-- Zero xbmc imports found in either file
-- Zero SimpleCache usage found
-- Both files can be imported in pure Python environment without errors
-- Tests confirm (test fixtures don't inject Kodi mocks for these module tests)
+- ✅ Zero xbmc imports found in either file
+- ✅ Zero SimpleCache usage found
+- ✅ Both files can be imported in pure Python environment without errors (confirmed by test imports)
+- ✅ Tests confirm (test fixtures don't inject Kodi mocks for these module tests)
+
+**Status:** Both files are confirmed Kodi-agnostic and meet all requirements.
 
 **Pending Questions:**
 - [ ] Confirm no xbmc imports or SimpleCache usage in these files
