@@ -6,13 +6,9 @@ Handles UI dialogs, notifications, logging, and utility functions.
 import json
 import os
 import time
-from datetime import timedelta
 from urllib.parse import urlencode
 
-import xbmc  # type: ignore
-import xbmcaddon  # type: ignore
 import xbmcgui  # type: ignore
-import xbmcplugin  # type: ignore
 import xbmcvfs  # type: ignore
 
 REDACTED = "<redacted>"

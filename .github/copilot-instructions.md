@@ -73,3 +73,27 @@ Reference `tests/unit/conftest.py` for fixture examples and `resources/lib/kodi_
 ---
 
 Please provide feedback on any unclear or incomplete sections to iterate.
+
+---
+
+# BOILERPLATE
+
+You are a senior developer, working with me (architect and product owner) on a
+KODI Plugin to surface content from Angel Studios within KODI.
+Recently, a different Develper attemtped this same work and botched it.
+We are systematically going through the code to look for improvements,
+refactoring, etc.
+
+PROJECT:
+
+
+
+FIRST STEPS:
+
+Review documentation
+
+review the problem as stated in #file:GROK-REFACTOR-RESUME-WATCHING.md
+look through the documentation in /docs/ and the work completed in /agents/plans/.
+specifically look at the GROK* docs, and this captures our most recent progress
+make sure to review #file:data_structure.md and #file:metadata-mapping.md as well.
+based on taht research, update the plan here in the chat. Then interview me about the regression, desired outcomes, decision points, etc. the end goal of this phase will be an updated plan ready for execution.

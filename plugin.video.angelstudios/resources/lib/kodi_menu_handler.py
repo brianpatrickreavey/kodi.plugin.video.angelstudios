@@ -4,17 +4,11 @@ Handles all Kodi-specific menu rendering and directory operations.
 """
 
 import json
-import os
-import time
 from urllib.parse import urlencode
 
 import xbmc       # type: ignore
-import xbmcaddon  # type: ignore
 import xbmcgui    # type: ignore
 import xbmcplugin # type: ignore
-import xbmcvfs    # type: ignore
-
-from simplecache import SimpleCache  # type: ignore
 
 from kodi_utils import timed, TimedBlock
 try:

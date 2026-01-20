@@ -5,23 +5,15 @@ Handles all Kodi-specific UI operations and list item creation.
 
 import json
 import os
-import time
-from datetime import timedelta
-from urllib.parse import urlencode
 
-import xbmc  # type: ignore
 import xbmcaddon  # type: ignore
 import xbmcgui  # type: ignore
-import xbmcplugin  # type: ignore
 import xbmcvfs  # type: ignore
-
-from simplecache import SimpleCache  # type: ignore
 
 import kodi_menu_handler
 import kodi_playback_handler
 import kodi_cache_manager
 import kodi_ui_helpers
-from kodi_utils import timed, TimedBlock
 
 
 class KodiUIInterface:

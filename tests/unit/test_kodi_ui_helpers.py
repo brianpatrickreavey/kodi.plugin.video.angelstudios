@@ -9,7 +9,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'plugin.v
 import pytest
 from unittest.mock import patch, MagicMock
 from kodi_ui_helpers import KodiUIHelpers
-from .unittest_data import MOCK_EPISODE_DATA
 
 
 @pytest.fixture

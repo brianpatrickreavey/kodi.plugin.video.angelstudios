@@ -383,7 +383,7 @@ class TestCacheUtils:
         assert cache_mock._win.clearProperty.call_count == 2
 
     def test_cache_enabled_disable_cache_true_probe_false(self, ui_interface):
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import MagicMock
 
         ui, logger_mock, angel_interface_mock = ui_interface
 
