@@ -12,6 +12,9 @@ black-check:
 flake8:
 	source .venv/bin/activate && flake8 plugin.video.angelstudios/ tests/ --max-line-length=120
 
+pyright:
+	source .venv/bin/activate && pyright plugin.video.angelstudios/
+
 lint: black-check flake8
 	source .venv/bin/activate && pyright plugin.video.angelstudios/
 
