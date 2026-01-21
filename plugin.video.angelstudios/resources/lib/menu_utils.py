@@ -395,18 +395,27 @@ class MenuUtils:
                 info_tag.setTvShowTitle(project["name"])
         return list_item  # noqa: E129
 
-    def _apply_progress_bar(self, list_item, watch_position_seconds, duration_seconds):
+    def _apply_progress_bar(self, list_item, watch_position_data, duration_seconds):
         """
         Apply native Kodi resume point indicator to a ListItem.
 
         Args:
             list_item: xbmcgui.ListItem to apply progress to
-            watch_position_seconds: Current watch position in seconds (float)
+            watch_position_data: Watch position data - either a number (seconds) or dict with 'position' field
             duration_seconds: Total duration in seconds (float)
 
         Returns:
             None. Modifies list_item in place.
         """
+        # Extract position from data structure
+        if isinstance(watch_position_data, dict):
+            watch_position_seconds = watch_position_data.get("position")
+            if watch_position_seconds is None:
+                self.log.warning(f"Invalid watchPosition data: missing 'position' field in {watch_position_data}")
+                return
+        else:
+            watch_position_seconds = watch_position_data
+
         if watch_position_seconds is None or duration_seconds is None or duration_seconds == 0:
             self.log.debug(
                 f"Skipping progress bar: watch_position={watch_position_seconds}, " f"duration={duration_seconds}"
