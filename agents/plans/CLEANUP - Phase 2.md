@@ -1,7 +1,7 @@
 # Project Cleanup Plan - Phase 2
 
-**Date:** January 20, 2026
-**Status:** Phase 2 deferred
+**Date:** January 21, 2026
+**Status:** Ready for Implementation
 **Owner:** Architecture & Product
 **Audience:** Developer, Code Reviewer, QA
 
@@ -12,13 +12,13 @@
 This cleanup plan addresses code organization, import strategy, caching patterns, authentication, UI consistency, error handling, logging, tests, and documentation accumulated during multi-feature development. The goal is to establish a clean, maintainable baseline before committing these features.
 
 **Scope:**
-- **Out of Scope (defer to next feature):** Session refresh token strategy, resumeWatching caching, integration tests, major architectural shifts.
+- **Out of Scope:** Major architectural shifts, session refresh tokens (moved to separate feature).
 
 **Risk Profile:**
-- **Phase 2:** Medium-to-high risk (behavioral changes; deferred post-commit).
+- **Phase 2:** Medium risk (behavioral changes; implement with caution).
 
 **Timeline Estimate:**
-- Phase 2: 8+ hours (deferred)
+- Phase 2: 8+ hours
 
 **Success Criteria:**
 1. All phases complete with test coverage maintained (aim for 100% where practical; edge cases deferred to future testing revamp)
@@ -80,7 +80,7 @@ User Action (Kodi UI)
 **Caching:**
 - ✅ Separate cache TTL settings added (Phase 0)
 - Query/fragment in-memory file caches have no eviction strategy (but small, low-impact); consider renaming to clarify they cache file contents, not data responses (e.g., `_query_file_cache`, `_fragment_file_cache`)
-- resumeWatching results not cached (deferred to Phase 2)
+- resumeWatching results not cached
 
 **Auth:**
 - No session refresh token logic; validation only on-demand
@@ -111,142 +111,128 @@ User Action (Kodi UI)
 
 ## Cleanup Phases
 
-### Phase 2: Deeper Improvements *(Higher Risk — Deferred to Next Feature)*
+### Phase 2: Deeper Improvements
 
-This phase introduces behavioral changes and is **deferred post-commit**. Documented here for future reference.
+#### 2.1 – Add Request Timeouts
 
-#### 2.1 – Implement Session Refresh Token Strategy
+**Status:** READY
 
-**Status:** DEFERRED
+**Scope:** [plugin.video.angelstudios/resources/lib/angel_authentication.py](../plugin.video.angelstudios/resources/lib/angel_authentication.py), [plugin.video.angelstudios/resources/lib/angel_interface.py](../plugin.video.angelstudios/resources/lib/angel_interface.py)
 
-**Scope:** [plugin.video.angelstudios/resources/lib/angel_authentication.py](../plugin.video.angelstudios/resources/lib/angel_authentication.py)
-
-**Current:** Session validated on-demand; full re-auth if invalid.
-**Proposed:** Refresh token logic; proactive refresh before expiry.
+**Current:** No request timeouts configured; requests may hang indefinitely.
+**Proposed:** Add configurable timeouts to all HTTP requests.
 
 **Action:**
-1. Add refresh token storage to session persistence
-2. Implement `_refresh_session()` method that uses refresh token
-3. Modify `_validate_session()` to attempt refresh before full re-auth
-4. Add refresh token expiry handling
+1. Add timeout constants (30s for auth, 10s for API calls) - make configurable via settings (Expert/level3)
+2. Update all `requests` calls to include `timeout` parameter
+3. Handle timeout exceptions: log all errors, handle expected errors (bad credentials, etc.) with visual notifications, catch unexpected errors and log them - both should raise visual notifications
+4. Consider HTTP-call helper for centralizing timeouts if beneficial
+5. Verify all HTTP calls are in angel_authentication.py and angel_interface.py
 
 **Example Implementation:**
 ```python
-def _refresh_session(self):
-    """Attempt to refresh the session using stored refresh token."""
-    if not self._refresh_token or not self._refresh_token_expiry:
-        return False
+# In angel_authentication.py
+TIMEOUT_AUTH = 30  # seconds
 
-    if datetime.now() > self._refresh_token_expiry:
-        # Refresh token expired, need full re-auth
-        return False
+def _authenticate(self):
+    # ... existing code ...
+    response = self.session.post(
+        f"{self.base_url}/oauth/token",
+        json=auth_data,
+        timeout=TIMEOUT_AUTH
+    )
 
-    # Make refresh request
-    refresh_data = {
-        "refreshToken": self._refresh_token,
-        "grant_type": "refresh_token"
-    }
+# In angel_interface.py
+TIMEOUT_API = 10  # seconds
 
-    try:
-        response = self.session.post(
-            f"{self.base_url}/oauth/token",
-            json=refresh_data,
-            timeout=30
-        )
-        response.raise_for_status()
-        token_data = response.json()
-
-        # Update session with new tokens
-        self.session.headers.update({
-            "Authorization": f"Bearer {token_data['access_token']}"
-        })
-        self._access_token_expiry = datetime.now() + timedelta(seconds=token_data['expires_in'])
-        self._refresh_token = token_data.get('refresh_token', self._refresh_token)
-        self._refresh_token_expiry = datetime.now() + timedelta(days=30)  # Assume 30-day refresh expiry
-
-        # Persist updated session
-        self._persist_session()
-        return True
-
-    except Exception as e:
-        self.log.debug(f"Session refresh failed: {e}")
-        return False
-
-def _validate_session(self):
-    """Validate session, attempting refresh if needed."""
-    if not self.session or not self._access_token_expiry:
-        return False
-
-    # Check if access token is still valid with buffer
-    if datetime.now() < (self._access_token_expiry - timedelta(minutes=5)):
-        return True
-
-    # Try to refresh
-    if self._refresh_session():
-        return True
-
-    # Refresh failed, need full re-auth
-    return False
+def _execute_graphql_query(self, query, variables=None):
+    # ... existing code ...
+    response = self.session.post(
+        self.graphql_url,
+        json=payload,
+        timeout=TIMEOUT_API
+    )
 ```
 
 **Acceptance Criteria:**
-- Session refresh attempted before full re-auth
-- Refresh tokens stored securely (encrypted if possible)
-- Token expiry handled gracefully
-- Tests cover refresh success/failure scenarios
-- No breaking changes to existing auth flow
+- All HTTP requests have appropriate timeouts
+- Timeouts configurable via Expert settings
+- Timeout and other HTTP exceptions handled with proper logging and user notifications
+- HTTP-call helper implemented if beneficial
+- No unhandled HTTP calls found outside target files
 
-**Pending Questions:**
-- [ ] Confirm refresh token API endpoints and format
-- [ ] Determine refresh token storage security requirements
+#### 2.2 – Cache resumeWatching Results
 
-#### 2.2 – Add Integration Tests
+**Status:** READY
 
-**Status:** DEFERRED
+**Scope:** [plugin.video.angelstudios/resources/lib/kodi_ui_interface.py](../plugin.video.angelstudios/resources/lib/kodi_ui_interface.py)
 
-**Scope:** `tests/integration/` (new)
-
-**Proposed:** Tests that exercise full flow (API + UI + caching).
+**Current:** resumeWatching results not cached; fetched on every menu load.
+**Proposed:** Cache resumeWatching API responses to improve performance.
 
 **Action:**
-1. Create `tests/integration/` directory
-2. Add integration test for complete user flows:
-   - Project browsing → Episode selection → Playback
-   - Continue watching → Resume playback
-   - Cache hit/miss scenarios
-3. Use real HTTP calls with test credentials (separate from unit tests)
-4. Mock only external dependencies (Kodi UI, file system)
+1. Identify resumeWatching API calls in UI methods
+2. Add caching with configurable TTL (10 minutes default)
+3. Cache paginated responses since API calls are paginated
+4. Cache response from angel_interface, not HTTP call itself
+5. Cache invalidation out of scope (revisit in feature-dedicated-player.md)
 
-**Example Test Structure:**
+**Example Implementation:**
 ```python
-# tests/integration/test_project_browse_flow.py
-def test_project_browse_to_episode_playback():
-    """Test complete flow from project list to episode playback."""
-    # Setup: Authenticate with test account
-    # Action: Browse projects → Select project → Browse episodes → Select episode
-    # Assert: Playback URL generated correctly, metadata populated
+def get_continue_watching_items(self):
+    """Get continue watching items with caching."""
+    cache_key = "continue_watching"
+    cached_data = self.cache.get(cache_key)
+    if cached_data:
+        return cached_data
 
-# tests/integration/test_continue_watching_flow.py
-def test_continue_watching_resume():
-    """Test continue watching with resume functionality."""
-    # Setup: Mock partial watch progress
-    # Action: Load continue watching menu → Select item → Resume playback
-    # Assert: Resume time applied correctly
+    # Fetch from API
+    data = self.angel_interface.get_resume_watching()
+    if data:
+        self.cache.set(cache_key, data, ttl=600)  # 10 minutes
+    return data
 ```
 
 **Acceptance Criteria:**
-- Integration tests run separately from unit tests
-- Test credentials isolated from production
-- Full user flows validated
-- CI/CD integration for integration test suite
+- resumeWatching results cached with configurable 10-minute default TTL
+- Paginated responses properly cached
+- Performance improved for continue watching menu
+- No stale data issues (invalidation handled in future feature)
 
-**Pending Questions:**
-- [ ] Confirm test account setup and credentials management
-- [ ] Determine integration test frequency (nightly vs on-demand)
+#### 2.3 – Rename Query/Fragment Caches for Clarity
+
+**Status:** READY
+
+**Scope:** [plugin.video.angelstudios/resources/lib/angel_interface.py](../plugin.video.angelstudios/resources/lib/angel_interface.py)
+
+**Current:** `_query_cache` and `_fragment_cache` cache file contents but names suggest data caching.
+**Proposed:** Rename to `_query_file_cache` and `_fragment_file_cache` for clarity.
+
+**Action:**
+1. Rename cache attributes and references
+2. Update any related comments/documentation
+3. Assume no external references (investigate during implementation)
+4. Consider archiving unused GraphQL files
+5. Ensure no functional changes
+
+**Example Implementation:**
+```python
+class AngelStudiosInterface:
+    def __init__(self):
+        self._query_file_cache = {}  # Cache for loaded query files
+        self._fragment_file_cache = {}  # Cache for loaded fragment files
+```
+
+**Acceptance Criteria:**
+- Cache names clearly indicate they cache file contents
+- All references updated consistently
+- No external references broken (investigate during implementation)
+- Unused GraphQL files archived if found
+- No functional changes to caching behavior
 
 #### 2.4 – Optimize KodiLogger Performance
 
-**Status:** DEFERRED
+**Status:** READY
 
 **Scope:** [plugin.video.angelstudios/resources/lib/kodi_utils.py](../plugin.video.angelstudios/resources/lib/kodi_utils.py) (KodiLogger)
 
@@ -255,8 +241,10 @@ def test_continue_watching_resume():
 
 **Action:**
 1. Analyze current stack inspection usage
-2. Implement caching for frame information
+2. Implement caching for frame information (ignore memory impact for now - not many frames)
 3. Consider alternative caller detection methods
+4. If no way to cache without sacrificing accuracy, abandon caching
+5. Use existing PERF patterns for timing tests if implemented
 
 **Example Optimization:**
 ```python
@@ -292,37 +280,184 @@ class KodiLogger:
 ```
 
 **Acceptance Criteria:**
-- Logging performance improved (measure with timing tests)
+- Logging performance improved (measure with timing tests if beneficial)
 - Caller info still accurate for debugging
-- Memory usage reasonable (cache doesn't grow unbounded)
+- If caching sacrifices accuracy, optimization abandoned
 - Backward compatibility maintained
 
-**Pending Questions:**
-- [ ] Measure current performance impact
-- [ ] Confirm acceptable trade-offs for accuracy vs performance
+**Status:** READY
+
+**Scope:** [plugin.video.angelstudios/resources/lib/angel_authentication.py](../plugin.video.angelstudios/resources/lib/angel_authentication.py), [plugin.video.angelstudios/resources/lib/angel_interface.py](../plugin.video.angelstudios/resources/lib/angel_interface.py)
+
+**Current:** No request timeouts configured; requests may hang indefinitely.
+**Proposed:** Add configurable timeouts to all HTTP requests.
+
+**Action:**
+1. Add timeout constants (30s for auth, 10s for API calls) - make configurable via settings (Expert/level3)
+2. Update all `requests` calls to include `timeout` parameter
+3. Handle timeout exceptions: log all errors, handle expected errors (bad credentials, etc.) with visual notifications, catch unexpected errors and log them - both should raise visual notifications
+4. Consider HTTP-call helper for centralizing timeouts if beneficial
+5. Verify all HTTP calls are in angel_authentication.py and angel_interface.py
+
+**Example Implementation:**
+```python
+# In angel_authentication.py
+TIMEOUT_AUTH = 30  # seconds
+
+def _authenticate(self):
+    # ... existing code ...
+    response = self.session.post(
+        f"{self.base_url}/oauth/token",
+        json=auth_data,
+        timeout=TIMEOUT_AUTH
+    )
+
+# In angel_interface.py
+TIMEOUT_API = 10  # seconds
+
+def _execute_graphql_query(self, query, variables=None):
+    # ... existing code ...
+    response = self.session.post(
+        self.graphql_url,
+        json=payload,
+        timeout=TIMEOUT_API
+    )
+```
+
+**Acceptance Criteria:**
+- All HTTP requests have appropriate timeouts
+- Timeouts configurable via Expert settings
+- Timeout and other HTTP exceptions handled with proper logging and user notifications
+- HTTP-call helper implemented if beneficial
+- No unhandled HTTP calls found outside target files
+
+#### 2.3 – Cache resumeWatching Results
+
+**Status:** READY
+
+**Scope:** [plugin.video.angelstudios/resources/lib/kodi_ui_interface.py](../plugin.video.angelstudios/resources/lib/kodi_ui_interface.py)
+
+**Current:** resumeWatching results not cached; fetched on every menu load.
+**Proposed:** Cache resumeWatching API responses to improve performance.
+
+**Action:**
+1. Identify resumeWatching API calls in UI methods
+2. Add caching with configurable TTL (10 minutes default)
+3. Cache paginated responses since API calls are paginated
+4. Cache response from angel_interface, not HTTP call itself
+5. Cache invalidation out of scope (revisit in feature-dedicated-player.md)
+
+**Example Implementation:**
+```python
+def get_continue_watching_items(self):
+    """Get continue watching items with caching."""
+    cache_key = "continue_watching"
+    cached_data = self.cache.get(cache_key)
+    if cached_data:
+        return cached_data
+
+    # Fetch from API
+    data = self.angel_interface.get_resume_watching()
+    if data:
+        self.cache.set(cache_key, data, ttl=600)  # 10 minutes
+    return data
+```
+
+**Acceptance Criteria:**
+- resumeWatching results cached with configurable 10-minute default TTL
+- Paginated responses properly cached
+- Performance improved for continue watching menu
+- No stale data issues (invalidation handled in future feature)
+
+#### 2.4 – Rename Query/Fragment Caches for Clarity
+
+**Status:** READY
+
+**Scope:** [plugin.video.angelstudios/resources/lib/angel_interface.py](../plugin.video.angelstudios/resources/lib/angel_interface.py)
+
+**Current:** `_query_cache` and `_fragment_cache` cache file contents but names suggest data caching.
+**Proposed:** Rename to `_query_file_cache` and `_fragment_file_cache` for clarity.
+
+**Action:**
+1. Rename cache attributes and references
+2. Update any related comments/documentation
+3. Assume no external references (investigate during implementation)
+4. Consider archiving unused GraphQL files
+5. Ensure no functional changes
+
+**Example Implementation:**
+```python
+class AngelStudiosInterface:
+    def __init__(self):
+        self._query_file_cache = {}  # Cache for loaded query files
+        self._fragment_file_cache = {}  # Cache for loaded fragment files
+```
+
+**Acceptance Criteria:**
+- Cache names clearly indicate they cache file contents
+- All references updated consistently
+- No external references broken (investigate during implementation)
+- Unused GraphQL files archived if found
+- No functional changes to caching behavior
+
+#### 2.5 – Optimize KodiLogger Performance
+
+**Status:** READY
+
+**Scope:** [plugin.video.angelstudios/resources/lib/kodi_utils.py](../plugin.video.angelstudios/resources/lib/kodi_utils.py) (KodiLogger)
+
+**Current:** Stack introspection on every log call (9 frames checked).
+**Proposed:** Cache frame info or use faster caller detection.
+
+**Action:**
+1. Analyze current stack inspection usage
+2. Implement caching for frame information (ignore memory impact for now - not many frames)
+3. Consider alternative caller detection methods
+4. If no way to cache without sacrificing accuracy, abandon caching
+5. Use existing PERF patterns for timing tests if implemented
+
+**Example Optimization:**
+```python
+class KodiLogger:
+    def __init__(self, logger_name):
+        self.logger = logging.getLogger(logger_name)
+        self._frame_cache = {}  # Cache for frame info
+
+    def debug(self, message, *args, **kwargs):
+        # Use cached or simplified caller info
+        caller_info = self._get_caller_info()
+        # ... format and log ...
+
+    def _get_caller_info(self):
+        """Get caller info with caching to reduce stack inspection."""
+        frame = inspect.currentframe()
+        try:
+            # Walk up stack to find relevant caller
+            for _ in range(3):  # Skip logger frames
+                frame = frame.f_back
+            filename = frame.f_code.co_filename
+            lineno = frame.f_lineno
+            funcname = frame.f_code.co_name
+
+            # Cache key based on filename/lineno
+            cache_key = f"{filename}:{lineno}"
+            if cache_key not in self._frame_cache:
+                self._frame_cache[cache_key] = f"{filename}:{lineno} in {funcname}"
+
+            return self._frame_cache[cache_key]
+        finally:
+            del frame
+```
+
+**Acceptance Criteria:**
+- Logging performance improved (measure with timing tests if beneficial)
+- Caller info still accurate for debugging
+- If caching sacrifices accuracy, optimization abandoned
+- Backward compatibility maintained
 
 ---
 
 ## Test Strategy & Validation
-
-### Integration Tests (Phase 2)
-
-**Requirement:** Add integration tests for full user flows.
-
-**Testing Philosophy:** Validate end-to-end functionality with real API calls and minimal mocking.
-
-**Approach:**
-1. **Separate test suite**: `tests/integration/` runs independently
-2. **Test credentials**: Use dedicated test account/API keys
-3. **Mock boundaries**: Only mock Kodi UI and file system; use real HTTP
-4. **CI/CD**: Run integration tests nightly or on-demand
-
-**Commands:**
-```bash
-make integration-tests
-```
-
-Expected output: Integration test results; focus on flow validation over edge cases.
 
 ### Code Quality (Phase 2)
 
@@ -339,8 +474,9 @@ Expected: Zero errors; zero warnings; consistent formatting.
 ### Manual Verification
 
 After Phase 2, **code review checklist:**
-- [ ] Session refresh implemented without breaking existing auth
-- [ ] Integration tests validate full flows
+- [ ] Request timeouts added to all HTTP calls
+- [ ] resumeWatching results cached appropriately
+- [ ] Query/fragment caches renamed for clarity
 - [ ] KodiLogger performance optimized
 - [ ] All user-visible behavior preserved
 
@@ -354,10 +490,6 @@ After Phase 2, **code review checklist:**
 
 **Add targets:**
 ```makefile
-.PHONY: integration-tests
-integration-tests:
-	pytest tests/integration/ -v --tb=short
-
 .PHONY: performance-test
 performance-test:
 	@echo "Running performance tests..."
@@ -387,9 +519,6 @@ htmlcov/
 *.egg-info/
 dist/
 build/
-
-# Integration test credentials
-test_credentials_integration.json
 ```
 
 ### Create pytest.ini
@@ -413,75 +542,84 @@ markers =
 
 ## Progress Tracking
 
-**Process Note:** Phase 2 deferred to next feature cycle. Documented here for future reference.
+**Implementation Order:** Implement phases separately like Phase 1 (test, review, commit between steps).
 
 ### Phase 2 Checklist
 
-- [ ] 2.1 – Implement Session Refresh Token Strategy
-  - [ ] Refresh token storage implemented
-  - [ ] `_refresh_session()` method added
-  - [ ] `_validate_session()` updated to use refresh
-  - [ ] Tests cover refresh scenarios
-- [ ] 2.2 – Add Integration Tests
-  - [ ] `tests/integration/` directory created
-  - [ ] Full flow tests implemented
-  - [ ] Test credentials configured
-  - [ ] CI/CD integration added
+- [ ] 2.1 – Add Request Timeouts
+  - [ ] Timeout constants defined (30s auth, 10s API)
+  - [ ] All HTTP requests updated with timeouts
+  - [ ] Configurable via Expert settings
+  - [ ] Exception handling with logging and user notifications
+  - [ ] HTTP-call helper implemented if beneficial
+  - [ ] Verified all HTTP calls covered
+- [ ] 2.2 – Cache resumeWatching Results
+  - [ ] Caching added to resumeWatching methods
+  - [ ] Configurable 10-minute default TTL
+  - [ ] Paginated responses properly cached
+- [ ] 2.3 – Rename Query/Fragment Caches for Clarity
+  - [ ] Cache attributes renamed
+  - [ ] All references updated
+  - [ ] External references investigated
+  - [ ] Unused GraphQL files archived if found
 - [ ] 2.4 – Optimize KodiLogger Performance
-  - [ ] Stack inspection optimized
-  - [ ] Performance measured and improved
-  - [ ] Accuracy maintained
-- [ ] **Phase 2 Complete**: Run `make integration-tests` → validate full flows
-- [ ] **Phase 2 Complete**: Run `make performance-test` → measure improvements
+  - [ ] Stack inspection optimized with caching
+  - [ ] Accuracy maintained (abandon if not possible)
+  - [ ] Performance measured if beneficial
+- [ ] **Phase 2 Complete**: Run `make unittest-with-coverage` → coverage maintained
+- [ ] **Phase 2 Complete**: Code review sign-off
+- [ ] 2.3 – Cache resumeWatching Results
+  - [ ] Caching added to resumeWatching methods
+  - [ ] Configurable 10-minute default TTL
+  - [ ] Paginated responses properly cached
+- [ ] 2.4 – Rename Query/Fragment Caches for Clarity
+  - [ ] Cache attributes renamed
+  - [ ] All references updated
+  - [ ] External references investigated
+  - [ ] Unused GraphQL files archived if found
+- [ ] 2.5 – Optimize KodiLogger Performance
+  - [ ] Stack inspection optimized with caching
+  - [ ] Accuracy maintained (abandon if not possible)
+  - [ ] Performance measured if beneficial
+- [ ] **Phase 2 Complete**: Run `make unittest-with-coverage` → coverage maintained
 - [ ] **Phase 2 Complete**: Code review sign-off
 
 ---
 
 ## Risk Mitigation
 
-### Phase 2 Risks: **Higher** (deferred)
+### Phase 2 Risks: Medium
 
-Session refresh / resumeWatching caching could affect auth flow or cache invalidation. Deferred to next feature for dedicated testing.
+**Risk:** Request timeouts cause false failures.
+**Mitigation:** Reasonable timeout values; proper exception handling with user notifications.
 
-**Risk:** Session refresh introduces auth failures.
-**Mitigation:** Fallback to full re-auth; extensive testing of refresh scenarios.
-
-**Risk:** Integration tests flaky due to external dependencies.
-**Mitigation:** Use dedicated test environment; retry logic; separate from unit tests.
+**Risk:** Caching resumeWatching leads to stale data.
+**Mitigation:** Short configurable TTL; invalidation handled in future feature.
 
 **Risk:** Logger optimization breaks debugging.
-**Mitigation:** Maintain caller info accuracy; performance gains validated.
+**Mitigation:** Maintain caller info accuracy; abandon caching if accuracy sacrificed.
+
+**Risk:** Breaking changes affect users.
+**Mitigation:** Pre-1.0 status allows breaking changes; thorough testing.
 
 ---
 
 ## Post-Cleanup Checklist (Final)
 
-**Before Commit:**
-- [ ] All phases complete (2)
-- [ ] `make unittest-with-coverage` → expect coverage maintained or improved
-- [ ] `make integration-tests` → validate full flows
+**Before Each Phase Commit:**
+- [ ] Phase implemented and tested
+- [ ] `make unittest-with-coverage` → coverage maintained or improved
 - [ ] `make format-and-lint` → zero errors
 - [ ] Code review approved
-- [ ] Docs updated/archived
-- [ ] .gitignore updated
-- [ ] Makefile targets added
-- [ ] pytest.ini created
-- [ ] .flake8 config created
-- [ ] Timing baseline captured
+- [ ] Backward compatibility verified (pre-1.0 allows breaking changes)
 
-**Commit Messages (per sub-phase step):**
+**Commit Messages (per phase):**
 ```
-Phase 2.1: feat: implement session refresh token strategy
+Phase 2.1: feat: add request timeouts
 
 Completed: [list specific files/changes]
-- Test coverage maintained or improved
-
-Refs: #cleanup
-
-Phase 2.2: feat: add integration tests
-
-Completed: [list specific files/changes]
-- Test coverage maintained or improved
+- HTTP requests now have configurable timeouts
+- Exception handling with user notifications added
 
 Refs: #cleanup
 
@@ -490,7 +628,7 @@ Refs: #cleanup
 Phase 2.4: feat: optimize KodiLogger performance
 
 Completed: [list specific files/changes]
-- Test coverage maintained or improved
+- Logging performance improved with frame caching
 
 Refs: #cleanup
 ```
@@ -503,14 +641,15 @@ Refs: #cleanup
 
 | File | Change Type | Scope |
 |------|---|---|
-| `resources/lib/angel_authentication.py` | Add refresh token logic | ~50 lines |
-| `tests/integration/` | New directory with tests | ~200 lines |
+| `resources/lib/angel_authentication.py` | Add timeouts | ~10 lines |
+| `resources/lib/angel_interface.py` | Add timeouts + cache renaming | ~15 lines |
+| `resources/lib/kodi_ui_interface.py` | Add resumeWatching caching | ~20 lines |
 | `resources/lib/kodi_utils.py` | Optimize KodiLogger | ~30 lines |
-| `Makefile` | Add integration targets | ~10 lines |
+| `Makefile` | Add performance targets | ~5 lines |
 | `pytest.ini` | Update for integration | ~5 lines |
-| `.gitignore` | Add integration artifacts | ~5 lines |
+| `.gitignore` | Add artifacts | ~5 lines |
 
 ---
 
-**Document Status:** Deferred for future implementation
-**Next Step:** Complete Phase 1, then revisit Phase 2 in next feature cycle
+**Document Status:** Ready for implementation
+**Next Step:** Implement Phase 2 changes
