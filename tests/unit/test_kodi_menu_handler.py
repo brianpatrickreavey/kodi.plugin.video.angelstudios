@@ -889,11 +889,12 @@ class TestContinueWatchingMenu:
         with (
             patch.object(ui.menu_handler, "_create_list_item_from_episode", return_value=mock_list_item) as mock_create,
             patch.object(ui.menu_handler, "_apply_progress_bar") as mock_progress,
+            patch.object(ui, "get_resume_watching", return_value=resume_data) as mock_get_resume,
         ):
             ui.continue_watching_menu(after=None)
 
-            # Verify API called correctly
-            angel_interface_mock.get_resume_watching.assert_called_once_with(first=10, after=None)
+            # Verify API called correctly through cached method
+            mock_get_resume.assert_called_once_with(first=10, after=None)
 
             # Verify items created (2 episodes + 1 load more)
             assert mock_add_item.call_count == 3
@@ -916,10 +917,13 @@ class TestContinueWatchingMenu:
         resume_data = {"guids": [], "positions": {}, "pageInfo": {"hasNextPage": False, "endCursor": None}}
         angel_interface_mock.get_resume_watching.return_value = resume_data
 
-        with patch.object(ui, "show_notification") as mock_notify:
+        with (
+            patch.object(ui, "show_notification") as mock_notify,
+            patch.object(ui, "get_resume_watching", return_value=resume_data) as mock_get_resume,
+        ):
             ui.continue_watching_menu(after="cursor-abc")
 
-            angel_interface_mock.get_resume_watching.assert_called_once_with(first=10, after="cursor-abc")
+            mock_get_resume.assert_called_once_with(first=10, after="cursor-abc")
             mock_notify.assert_called_once_with("No items in Continue Watching")
 
     def test_continue_watching_menu_empty_items(self, ui_interface, mock_xbmc):
@@ -932,9 +936,13 @@ class TestContinueWatchingMenu:
             "pageInfo": {"hasNextPage": False},
         }
 
-        with patch.object(ui, "show_notification") as mock_notify:
+        with (
+            patch.object(ui, "show_notification") as mock_notify,
+            patch.object(ui, "get_resume_watching", return_value={"episodes": [], "pageInfo": {"hasNextPage": False}}) as mock_get_resume,
+        ):
             ui.continue_watching_menu()
 
+            mock_get_resume.assert_called_once_with(first=10, after=None)
             mock_notify.assert_called_once_with("No items in Continue Watching")
             mock_add_item.assert_not_called()
             mock_end_dir.assert_not_called()
@@ -964,9 +972,11 @@ class TestContinueWatchingMenu:
         with (
             patch.object(ui.menu_handler, "_create_list_item_from_episode", return_value=mock_list_item),
             patch.object(ui.menu_handler, "_apply_progress_bar"),
+            patch.object(ui, "get_resume_watching", return_value=resume_data) as mock_get_resume,
         ):
             ui.continue_watching_menu()
 
+            mock_get_resume.assert_called_once_with(first=10, after=None)
             # Only 1 episode item, no "Load More"
             assert mock_add_item.call_count == 1
             mock_end_dir.assert_called_once()
@@ -978,9 +988,13 @@ class TestContinueWatchingMenu:
 
         angel_interface_mock.get_resume_watching.return_value = {}
 
-        with patch.object(ui, "show_error") as mock_error:
+        with (
+            patch.object(ui, "show_error") as mock_error,
+            patch.object(ui, "get_resume_watching", return_value={}) as mock_get_resume,
+        ):
             ui.continue_watching_menu()
 
+            mock_get_resume.assert_called_once_with(first=10, after=None)
             mock_error.assert_called_once_with("Failed to load Continue Watching")
             mock_add_item.assert_not_called()
 
@@ -991,9 +1005,13 @@ class TestContinueWatchingMenu:
 
         angel_interface_mock.get_resume_watching.side_effect = Exception("API error")
 
-        with patch.object(ui, "show_error") as mock_error:
+        with (
+            patch.object(ui, "show_error") as mock_error,
+            patch.object(ui, "get_resume_watching", side_effect=Exception("API error")) as mock_get_resume,
+        ):
             ui.continue_watching_menu()
 
+            mock_get_resume.assert_called_once_with(first=10, after=None)
             mock_error.assert_called_once()
             assert "Failed to load Continue Watching" in str(mock_error.call_args)
 
@@ -1024,9 +1042,11 @@ class TestContinueWatchingMenu:
         with (
             patch.object(ui.menu_handler, "_create_list_item_from_episode", return_value=mock_created_item),
             patch.object(ui.menu_handler, "_apply_progress_bar") as mock_progress,
+            patch.object(ui, "get_resume_watching", return_value=resume_data) as mock_get_resume,
         ):
             ui.continue_watching_menu()
 
+            mock_get_resume.assert_called_once_with(first=10, after=None)
             # Verify progress bar called with correct values
             mock_progress.assert_called_once_with(mock_created_item, {"position": 1200}, 3600)
 
@@ -1061,9 +1081,11 @@ class TestContinueWatchingMenu:
         with (
             patch.object(ui.menu_handler, "_create_list_item_from_episode", return_value=mock_list_item),
             patch.object(ui.menu_handler, "_apply_progress_bar") as mock_progress,
+            patch.object(ui, "get_resume_watching", return_value=resume_data) as mock_get_resume,
         ):
             ui.continue_watching_menu()
 
+            mock_get_resume.assert_called_once_with(first=10, after=None)
             # Progress bar should not be called since position is missing
             mock_progress.assert_not_called()
 
@@ -1097,9 +1119,11 @@ class TestContinueWatchingMenu:
         with (
             patch.object(ui.menu_handler, "_create_list_item_from_episode", return_value=mock_list_item) as mock_create,
             patch.object(ui.menu_handler, "_apply_progress_bar"),
+            patch.object(ui, "get_resume_watching", return_value=resume_data) as mock_get_resume,
         ):
             ui.continue_watching_menu()
 
+            mock_get_resume.assert_called_once_with(first=10, after=None)
             # 2 items added
             assert mock_add_item.call_count == 2
             assert mock_create.call_count == 2
@@ -1116,9 +1140,13 @@ class TestContinueWatchingMenu:
             "pageInfo": {"endCursor": None, "hasNextPage": False},
         }
 
-        with patch.object(ui, "show_notification") as mock_notify:
+        with (
+            patch.object(ui, "show_notification") as mock_notify,
+            patch.object(ui, "get_resume_watching", return_value={"episodes": [], "pageInfo": {"endCursor": None, "hasNextPage": False}}) as mock_get_resume,
+        ):
             ui.continue_watching_menu()
 
+            mock_get_resume.assert_called_once_with(first=10, after=None)
             mock_notify.assert_called_once_with("No items in Continue Watching")
             mock_add_item.assert_not_called()
 

@@ -368,7 +368,7 @@ class KodiMenuHandler(MenuUtils):
 
             # Fetch resume watching with full data (fat query)
             with TimedBlock("continue_watching_api_fetch"):
-                resume_data = self.parent.angel_interface.get_resume_watching(first=10, after=after)
+                resume_data = self.parent.get_resume_watching(first=10, after=after)
 
             if not resume_data:
                 self.parent.show_error("Failed to load Continue Watching")
