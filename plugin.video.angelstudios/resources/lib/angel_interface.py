@@ -41,6 +41,7 @@ class AngelStudiosInterface:
         logger: Optional[Any] = None,
         query_path=None,
         tracer=None,
+        timeout=30,
     ):
         # Use the provided logger, or default to the module logger
         if logger is not None:
@@ -52,6 +53,9 @@ class AngelStudiosInterface:
             self.log = logging.getLogger("AngelStudiosInterface")
             self.log.info("STDOUT logger initialized")
         self.log.debug(f"{self.log=}")
+
+        # Store timeout setting
+        self.timeout = timeout
 
         # Set the tracer function provided by the calling function
         self.tracer = tracer
@@ -65,6 +69,7 @@ class AngelStudiosInterface:
             password=password,
             session_file=session_file,
             logger=self.log,
+            timeout=self.timeout,
         )
         self.angel_studios_session.authenticate()
 
@@ -169,7 +174,7 @@ class AngelStudiosInterface:
         self._debug_log(f"GraphQL query body:\n{query}", category="api")
         self._debug_log(f"GraphQL variables: {variables}", category="api")
         try:
-            response = self.session.post(angel_graphql_url, json=query_dict)
+            response = self.session.post(angel_graphql_url, json=query_dict, timeout=self.timeout)
             response.raise_for_status()
             result = response.json()
             self._debug_log(f"GraphQL response data: {json.dumps(result, indent=2)}", category="api")
@@ -191,6 +196,10 @@ class AngelStudiosInterface:
 
             self._trace_request(operation, query_dict, status=response.status_code, response_data=data)
             return data
+        except requests.Timeout:
+            self.log.error(f"GraphQL request timeout ({self.timeout}s) for operation '{operation}'")
+            self._trace_request(operation, query_dict, status=None, error=f"Timeout ({self.timeout}s)")
+            raise Exception(f"Request timeout: Unable to connect to Angel Studios (timeout: {self.timeout}s)")
         except requests.RequestException as e:
             self.log.error(f"GraphQL request failed: {e}")
             if hasattr(e, "response") and e.response is not None and hasattr(e.response, "text"):
@@ -340,7 +349,7 @@ class AngelStudiosInterface:
             self._debug_log(f"Batch projects query:\n{query}", category="api")
 
             try:
-                response = self.session.post(angel_graphql_url, json=query_dict)
+                response = self.session.post(angel_graphql_url, json=query_dict, timeout=self.timeout)
                 response.raise_for_status()
                 result = response.json()
 
@@ -362,6 +371,9 @@ class AngelStudiosInterface:
                 self.log.info(f"Batch query returned {len(remapped_data)} projects")
                 return remapped_data
 
+            except requests.Timeout:
+                self.log.error(f"Batch projects request timeout ({self.timeout}s)")
+                raise Exception(f"Request timeout: Unable to connect to Angel Studios (timeout: {self.timeout}s)")
             except requests.RequestException as e:
                 self.log.error(f"Batch projects request failed: {e}")
                 if hasattr(e, "response") and e.response is not None and hasattr(e.response, "text"):
@@ -370,6 +382,9 @@ class AngelStudiosInterface:
 
         except Exception as e:
             self.log.error(f"Error fetching batch projects: {e}")
+            # Re-raise timeout exceptions to allow UI to handle them
+            if isinstance(e, Exception) and "Request timeout" in str(e):
+                raise
             return {}
 
     def get_episode_data(self, episode_guid, project_slug=None):
@@ -625,7 +640,7 @@ class AngelStudiosInterface:
             self._debug_log(f"Batch GraphQL variables: {query_dict['variables']}", category="api")
 
             try:
-                response = self.session.post(angel_graphql_url, json=query_dict)
+                response = self.session.post(angel_graphql_url, json=query_dict, timeout=self.timeout)
                 response.raise_for_status()
                 result = response.json()
 
@@ -647,6 +662,9 @@ class AngelStudiosInterface:
                 self.log.info(f"Batch query returned {len(remapped_data)} episodes")
                 return remapped_data
 
+            except requests.Timeout:
+                self.log.error(f"Batch episodes request timeout ({self.timeout}s)")
+                raise Exception(f"Request timeout: Unable to connect to Angel Studios (timeout: {self.timeout}s)")
             except requests.RequestException as e:
                 self.log.error(f"Batch episodes request failed: {e}")
                 self.log.debug(
@@ -658,6 +676,9 @@ class AngelStudiosInterface:
 
         except Exception as e:
             self.log.error(f"Error fetching batch episodes: {e}")
+            # Re-raise timeout exceptions to allow UI to handle them
+            if isinstance(e, Exception) and "Request timeout" in str(e):
+                raise
             return {}
 
     def session_check(self):

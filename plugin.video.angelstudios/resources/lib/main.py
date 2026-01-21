@@ -60,6 +60,7 @@ ui_interface = KodiUIInterface(HANDLE, URL, logger=logger, angel_interface=angel
 # Get credentials from addon settings once at module load
 USERNAME = ADDON.getSettingString("username")
 PASSWORD = ADDON.getSettingString("password")
+TIMEOUT = ADDON.getSettingInt("request_timeout")
 
 
 def router(paramstring):
@@ -180,6 +181,7 @@ if __name__ == "__main__":
                 logger=logger,
                 query_path=query_path,
                 tracer=ui_interface.get_trace_callback(),
+                timeout=TIMEOUT,
             )
             # Initialize UI helper
             logger.info(f"Setting Angel Interface for Kodi UI {asi}")

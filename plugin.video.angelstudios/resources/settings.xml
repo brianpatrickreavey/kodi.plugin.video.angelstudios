@@ -18,6 +18,19 @@
                     </constraints>
                     <control type="spinner" format="string" />
                 </setting>
+                <setting id="request_timeout" type="integer" label="30116" help="30117">
+                    <level>0</level>
+                    <default>30</default>
+                    <constraints>
+                        <minimum>10</minimum>
+                        <step>5</step>
+                        <maximum>120</maximum>
+                    </constraints>
+                    <control format="integer" type="slider">
+                        <popup>false</popup>
+                        <formatlabel>14045</formatlabel>
+                    </control>
+                </setting>
             </group>
         </category>
 

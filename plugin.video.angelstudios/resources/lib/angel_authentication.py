@@ -14,10 +14,11 @@ import angel_utils
 class AngelStudioSession:
     """Class to handle Angel Studios authentication and session management"""
 
-    def __init__(self, username=None, password=None, session_file="", logger=None):
+    def __init__(self, username=None, password=None, session_file="", logger=None, timeout=30):
         self.username = username
         self.password = password
         self.session_file = session_file
+        self.timeout = timeout
         self.session = requests.Session()
         self.session_valid = False
         self.web_url = "https://www.angel.com"
@@ -102,7 +103,15 @@ class AngelStudioSession:
         )
 
         # Step 1: Get login page
-        login_page_response = self.session.get(login_url)
+        try:
+            login_page_response = self.session.get(login_url, timeout=self.timeout)
+        except requests.Timeout:
+            self.log.error(f"Timeout ({self.timeout}s) fetching login page")
+            raise Exception(f"Request timeout: Unable to connect to Angel Studios (timeout: {self.timeout}s)")
+        except requests.RequestException as e:
+            self.log.error(f"Failed to fetch login page: {e}")
+            raise Exception("Failed to fetch the login page")
+        
         if login_page_response.status_code != 200:
             self.log.error(f"Failed to fetch the login page: {login_page_response.status_code}")
             raise Exception("Failed to fetch the login page")
@@ -131,7 +140,15 @@ class AngelStudioSession:
 
         # Step 3: Get post-email page
         self.log.info(f"Fetching post-email page: {email_uri}")
-        email_response = self.session.get(email_uri)
+        try:
+            email_response = self.session.get(email_uri, timeout=self.timeout)
+        except requests.Timeout:
+            self.log.error(f"Timeout ({self.timeout}s) fetching post-email page")
+            raise Exception(f"Request timeout: Unable to connect to Angel Studios (timeout: {self.timeout}s)")
+        except requests.RequestException as e:
+            self.log.error(f"Failed to fetch the post-email page: {e}")
+            raise Exception("Failed to fetch the post-email page")
+        
         if email_response.status_code != 200:
             self.log.error(f"Failed to fetch the post-email page: {email_response.status_code}")
             raise Exception("Failed to fetch the post-email page")
@@ -159,7 +176,14 @@ class AngelStudioSession:
         }
 
         # Step 5: Post password
-        password_response = self.session.post(password_uri, data=password_payload, allow_redirects=False)
+        try:
+            password_response = self.session.post(password_uri, data=password_payload, allow_redirects=False, timeout=self.timeout)
+        except requests.Timeout:
+            self.log.error(f"Timeout ({self.timeout}s) posting password")
+            raise Exception(f"Request timeout: Unable to connect to Angel Studios (timeout: {self.timeout}s)")
+        except requests.RequestException as e:
+            self.log.error(f"Password post failed: {e}")
+            raise Exception("Login failed")
         if password_response.status_code in (302, 303):
             redirect_url = password_response.headers.get("Location")
             if not redirect_url:
@@ -167,7 +191,14 @@ class AngelStudioSession:
                 raise Exception("Login redirect missing Location header")
             self.log.info(f"Following redirect to: {redirect_url}")
             # Follow the redirect - required to complete the login process
-            redirect_response = self.session.get(redirect_url, allow_redirects=True)
+            try:
+                redirect_response = self.session.get(redirect_url, allow_redirects=True, timeout=self.timeout)
+            except requests.Timeout:
+                self.log.error(f"Timeout ({self.timeout}s) following login redirect")
+                raise Exception(f"Request timeout: Unable to connect to Angel Studios (timeout: {self.timeout}s)")
+            except requests.RequestException as e:
+                self.log.error(f"Redirect follow failed: {e}")
+                raise Exception("Login failed after redirect")
 
             self.log.debug(f"{redirect_response.status_code=}")
             self.log.debug(f"{redirect_response.url=}")

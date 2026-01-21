@@ -65,7 +65,7 @@ class TestAngelStudiosInterface:
 
             interface = AngelStudiosInterface(logger=logger)
 
-            mock_session_class.assert_called_once_with(username=None, password=None, session_file="", logger=logger)
+            mock_session_class.assert_called_once_with(username=None, password=None, session_file="", logger=logger, timeout=30)
             mock_session_class.return_value.authenticate.assert_called_once()
             mock_session_class.return_value.get_session.assert_called_once()
             assert interface.log is logger
@@ -906,3 +906,23 @@ class TestAngelStudiosInterface:
             result = angel_interface.get_projects_by_slugs(slugs)
 
             assert result == {}
+
+    def test_graphql_timeout_raises_exception(self, angel_interface):
+        """GraphQL timeout raises specific timeout exception."""
+        with patch.object(angel_interface.session, "post", side_effect=requests.Timeout("Connection timed out")):
+            with pytest.raises(Exception, match="Request timeout: Unable to connect to Angel Studios \\(timeout: 30s\\)"):
+                angel_interface._graphql_query("testOp", {})
+
+    def test_batch_projects_timeout_raises_exception(self, angel_interface):
+        """Batch projects timeout raises specific timeout exception."""
+        slugs = ["test-slug"]
+        with patch.object(angel_interface.session, "post", side_effect=requests.Timeout("Connection timed out")):
+            with pytest.raises(Exception, match="Request timeout: Unable to connect to Angel Studios \\(timeout: 30s\\)"):
+                angel_interface.get_projects_by_slugs(slugs)
+
+    def test_batch_episodes_timeout_raises_exception(self, angel_interface):
+        """Batch episodes timeout raises specific timeout exception."""
+        guids = ["test-guid"]
+        with patch.object(angel_interface.session, "post", side_effect=requests.Timeout("Connection timed out")):
+            with pytest.raises(Exception, match="Request timeout: Unable to connect to Angel Studios \\(timeout: 30s\\)"):
+                angel_interface.get_episodes_for_guids(guids)
