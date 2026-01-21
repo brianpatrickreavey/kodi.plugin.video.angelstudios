@@ -1,7 +1,7 @@
 # Project Cleanup Plan - Phase 1
 
 **Date:** January 20, 2026
-**Status:** Phase 1.7 completed
+**Status:** Phase 1.8 completed
 **Owner:** Architecture & Product
 **Audience:** Developer, Code Reviewer, QA
 
@@ -877,8 +877,15 @@ Timing logs from Phase 1 complete become baseline. Phase 2 (deferred) can measur
 - Updated data flow, edge cases, and file references
 - Removed outdated implementation plans and TODOs
 - [ ] 1.8 – Remove deprecated API references
-  - [ ] No `@deprecated` or stale TODOs
-  - [ ] Docs updated
+  - [x] No `@deprecated` or stale TODOs
+  - [x] Docs updated
+
+**Completed:** January 21, 2026
+- Comprehensive audit found no deprecated API references to remove
+- TODO comments are for future features (logout endpoint, cache writing)
+- Legacy format handling is active backward compatibility code
+- Placeholder methods are for planned features (watchlist, top picks)
+- Documentation reflects current API surface with no stale references
 - [ ] **Phase 1 Complete**: Run `make unittest-with-coverage` → expect coverage maintained or improved
 - [ ] **Phase 1 Complete**: Run `make format-and-lint` → expect zero errors
 - [ ] **Phase 1 Complete**: Code review sign-off
