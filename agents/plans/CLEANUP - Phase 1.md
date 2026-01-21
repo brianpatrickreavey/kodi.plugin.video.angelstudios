@@ -1,7 +1,7 @@
 # Project Cleanup Plan - Phase 1
 
 **Date:** January 20, 2026
-**Status:** Phase 1.5 completed
+**Status:** Phase 1.6 completed
 **Owner:** Architecture & Product
 **Audience:** Developer, Code Reviewer, QA
 
@@ -424,7 +424,16 @@ def episodes_menu(self, ...):
 - No code duplication
 
 **Pending Questions:**
-- [ ] Confirm all locations where progress bar logic is used
+- [x] Confirm all locations where progress bar logic is used
+
+**Completed:** January 21, 2026
+- Single `_apply_progress_bar()` implementation consolidated in `MenuUtils`
+- Removed duplicate implementation from `KodiMenuHandler`
+- Updated `episodes_menu()` to use unified builder with `overlay_progress` option
+- Progress bar logic now consistent across `continue_watching_menu()` and `episodes_menu()`
+- Updated test to verify unified builder usage
+- All tests pass (436/436) with 88% coverage maintained
+- Pyright type checking: 0 errors, 0 warnings
 
 #### 1.7 – Update continue-watching.md
 
@@ -848,9 +857,15 @@ Timing logs from Phase 1 complete become baseline. Phase 2 (deferred) can measur
   - [x] Debug logging suppression via settings validated
   - [x] Comments added explaining optimization rationale
 - [ ] 1.6 – Consolidate progress bar logic
-  - [ ] Single `_apply_progress_bar()` implementation
-  - [ ] Used in `_build_list_item_for_content()`
-  - [ ] Consistent behavior across menus
+  - [x] Single `_apply_progress_bar()` implementation in MenuUtils
+  - [x] Used in `_build_list_item_for_content()` with overlay_progress option
+  - [x] Consistent behavior across continue_watching_menu and episodes_menu
+
+**Completed:** January 21, 2026
+- Fixed progress bar regression from Phase 1.4 (watchPosition dict handling)
+- Single implementation in MenuUtils with proper dict extraction
+- Integrated into unified builder with overlay_progress parameter
+- All tests pass (436/436) with 88% coverage maintained
 - [ ] 1.7 – Update continue-watching.md
   - [ ] Docs match implementation
   - [ ] Examples accurate
