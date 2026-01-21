@@ -3,6 +3,7 @@ Menu Utilities for Angel Studios Kodi addon.
 Shared utilities and mappings used across menu handlers.
 """
 
+import xbmcgui  # type: ignore
 from kodi_utils import TimedBlock
 
 # Map menu content types to Angel Studios project types for API calls
@@ -44,6 +45,71 @@ class MenuUtils:
     def create_plugin_url(self, **kwargs):
         """Create a URL for calling the plugin recursively"""
         return f"{self.kodi_url}?{__import__('urllib.parse').urlencode(kwargs)}"
+
+    def _build_list_item_for_content(self, content, content_type_str, **options):
+        """
+        Build a Kodi ListItem for content (episode, project, season, etc.).
+
+        Args:
+            content (dict): Content data (from API)
+            content_type_str (str): 'episode', 'project', 'season', etc.
+            **options: Additional configuration options
+                - overlay_progress (bool): Whether to add resume point overlay
+                - include_resume (bool): Whether to populate watchPosition
+                - is_playback (bool): Whether this is for playback (vs directory)
+                - project (dict): Optional project data for episodes
+                - stream_url (str): Optional stream URL for playback
+                - content_type (str): Content type for media type mapping
+
+        Returns:
+            xbmcgui.ListItem: Configured list item ready for addDirectoryItem()
+        """
+        # Handle episode-specific logic
+        if content_type_str == "episode":
+            list_item = self._create_list_item_from_episode(
+                content,
+                project=options.get("project"),
+                content_type=options.get("content_type", ""),
+                stream_url=options.get("stream_url"),
+                is_playback=options.get("is_playback", False),
+            )
+            # Apply progress bar for directory mode episodes (like continue watching)
+            if options.get("overlay_progress") and not options.get("is_playback", False) and content.get("watchPosition"):
+                self._apply_progress_bar(list_item, content["watchPosition"], content.get("duration", 0))
+            return list_item
+
+        # General content handling for projects, seasons, etc.
+        label = content.get("name", "Unknown")
+
+        # Handle unavailable content
+        if content_type_str == "episode" and not content.get("source"):
+            label = f"[I] {label} (Unavailable)[/I]"
+
+        list_item = xbmcgui.ListItem(label=label)
+
+        # Set basic properties
+        if content_type_str == "episode":
+            list_item.setProperty("IsPlayable", "true" if content.get("source") else "false")
+            list_item.setIsFolder(False if options.get("is_playback", False) else True)
+        else:
+            list_item.setIsFolder(True)
+
+        # Set infotags
+        info_tag = list_item.getVideoInfoTag()
+        if content_type_str == "episode":
+            info_tag.setMediaType("video")
+        else:
+            # Use the content_type from options if provided (for seasons, projects, etc.)
+            media_content_type = options.get("content_type", "")
+            info_tag.setMediaType(self._get_kodi_content_type(media_content_type))
+
+        self._process_attributes_to_infotags(list_item, content)
+
+        # Apply progress bar if requested
+        if options.get("overlay_progress") and content.get("watchPosition"):
+            self._apply_progress_bar(list_item, content["watchPosition"], content.get("duration", 0))
+
+        return list_item
 
     def _process_attributes_to_infotags(self, list_item, info_dict):
         """

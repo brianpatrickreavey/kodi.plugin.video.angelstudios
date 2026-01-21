@@ -17,23 +17,11 @@ try:
 except ImportError:
     ProjectsMenuClass = None
 
+from menu_utils import MenuUtils
 
-class KodiMenuHandler:
+
+class KodiMenuHandler(MenuUtils):
     """Handles menu rendering and directory operations for Kodi UI."""
-
-    # Map menu content types to Angel Studios project types for API calls
-    angel_menu_content_mapper = {
-        "movies": "movie",
-        "series": "series",
-        "specials": "special",
-    }
-
-    # Map Angel Studios content types to Kodi content types
-    kodi_content_mapper = {
-        "movies": "movies",
-        "series": "tvshows",
-        "specials": "videos",
-    }
 
     def __init__(self, parent):
         """
@@ -221,14 +209,12 @@ class KodiMenuHandler:
                 for season in project.get("seasons", []):
                     self.log.info(f"Processing season: {season['name']}")
                     self.log.debug(f"Season dictionary: {json.dumps(season, indent=2)}")
-                    # Create list item
-                    list_item = xbmcgui.ListItem(label=season["name"])
-                    info_tag = list_item.getVideoInfoTag()
-                    info_tag.setMediaType(self.parent._get_kodi_content_type(content_type))
-                    self._process_attributes_to_infotags(list_item, season)
+                    # Create list item using unified builder
+                    list_item = self._build_list_item_for_content(season, "season", content_type=content_type)
                     # Set sort title for proper ordering
                     season_number = season["episodes"][0].get("seasonNumber", 0) if season.get("episodes") else 0
                     sort_title = f"Season {season_number:03d}"
+                    info_tag = list_item.getVideoInfoTag()
                     info_tag.setSortTitle(sort_title)
                     self.log.debug(f"Season '{season['name']}' set sort title: '{sort_title}'")
 
@@ -438,18 +424,16 @@ class KodiMenuHandler:
                     else:
                         episode_display["subtitle"] = f"{current_subtitle} ({episode_display['project']['name']})"
 
-                # Create list item using shared helper
-                list_item = self._create_list_item_from_episode(
+                # Create list item using unified builder
+                list_item = self._build_list_item_for_content(
                     episode_display,
+                    "episode",
                     project=episode.get("project"),  # Nested project
                     content_type="",
                     stream_url=None,
                     is_playback=False,
+                    overlay_progress=bool(episode.get("watchPosition"))
                 )
-
-                # Apply progress bar if available
-                if episode.get("watchPosition"):
-                    self._apply_progress_bar(list_item, episode["watchPosition"], episode.get("duration", 0))
 
                 # Create URL for playback
                 url = self.create_plugin_url(
@@ -492,14 +476,6 @@ class KodiMenuHandler:
     def create_plugin_url(self, **kwargs):
         """Create a URL for calling the plugin recursively"""
         return f"{self.kodi_url}?{urlencode(kwargs)}"
-
-    def _get_angel_project_type(self, menu_content_type):
-        """Map menu content type to Angel Studios project type for API calls."""
-        return self.angel_menu_content_mapper.get(menu_content_type, "videos")
-
-    def _get_kodi_content_type(self, content_type):
-        """Map content type to Kodi media type for info tags."""
-        return self.kodi_content_mapper.get(content_type, "video")
 
     def _create_list_item_from_episode(
         self, episode, project=None, content_type="", stream_url=None, is_playback=False

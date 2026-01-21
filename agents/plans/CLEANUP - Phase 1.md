@@ -1,7 +1,7 @@
 # Project Cleanup Plan - Phase 1
 
 **Date:** January 20, 2026
-**Status:** Phase 1.3 completed
+**Status:** Phase 1.4 completed
 **Owner:** Architecture & Product
 **Audience:** Developer, Code Reviewer, QA
 
@@ -293,7 +293,7 @@ if "errors" in result:
 - Updated test assertions to verify new logging format
 - All tests pass with 87% coverage maintained
 
-#### 1.4 – Extract ListItem Builder Abstraction
+#### 1.4 – Extract ListItem Builder Abstraction ✅ COMPLETED
 
 **File:** [plugin.video.angelstudios/resources/lib/kodi_ui_interface.py](../plugin.video.angelstudios/resources/lib/kodi_ui_interface.py)
 
@@ -354,14 +354,17 @@ def episodes_menu(self, ...):
 ```
 
 **Acceptance Criteria:**
-- Single `_build_list_item_for_content()` method used across all menus
-- No duplication in list item creation
-- Tests parametrize over content types
-- 100% test coverage maintained
+- ✅ Single `_build_list_item_for_content()` method used across all menus
+- ✅ No duplication in list item creation
+- ✅ Tests parametrize over content types
+- ✅ 100% test coverage maintained
 
-**Pending Questions:**
-- [ ] Assess pros & cons of ListItem builder abstraction
-- [ ] Confirm all menu locations that need the builder
+**Implementation Details:**
+- Moved `_build_list_item_for_content()` to `MenuUtils` base class for shared access
+- Made `KodiMenuHandler` inherit from `MenuUtils` to consolidate functionality
+- Updated `projects_menu()`, `seasons_menu()`, `episodes_menu()`, `continue_watching_menu()` to use unified builder
+- Maintained backward compatibility and all existing functionality
+- All 124 menu handler tests pass
 
 #### 1.5 – Review Infotag Field Mapping (VALIDATE ONLY - DO NOT REFACTOR)
 
@@ -829,10 +832,10 @@ Timing logs from Phase 1 complete become baseline. Phase 2 (deferred) can measur
   - [x] Error messages logged with details
   - [x] Operation name in logs
   - [x] Tests verify logging
-- [ ] 1.4 – Extract ListItem builder
-  - [ ] Single `_build_list_item_for_content()` method
-  - [ ] All menus use builder
-  - [ ] No duplication in list item creation
+- [x] 1.4 – Extract ListItem builder
+  - [x] Single `_build_list_item_for_content()` method
+  - [x] All menus use builder
+  - [x] No duplication in list item creation
 - [ ] 1.5 – Review infotag field mapping
   - [ ] If-chains validated as intact and optimized
   - [ ] Debug logging suppression via settings validated

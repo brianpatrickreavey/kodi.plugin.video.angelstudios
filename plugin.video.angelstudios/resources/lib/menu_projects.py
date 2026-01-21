@@ -103,11 +103,10 @@ class ProjectsMenu(MenuUtils):
             self.log.info(f"Processing project: {project['name']}")
             self.log.debug(f"Project dictionary: {json.dumps(project, indent=2)}")
 
-            # Create list item
-            list_item = xbmcgui.ListItem(label=project["name"])
+            # Create list item using unified builder
+            list_item = self._build_list_item_for_content(project, "project")
             info_tag = list_item.getVideoInfoTag()
             info_tag.setMediaType(self._get_kodi_content_type(project["projectType"]))
-            self._process_attributes_to_infotags(list_item, project)
 
             # Create URL for seasons listing
             url = self.create_plugin_url(
