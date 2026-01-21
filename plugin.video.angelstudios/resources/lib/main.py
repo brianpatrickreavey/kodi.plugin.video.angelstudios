@@ -32,14 +32,15 @@ URL = sys.argv[0]
 HANDLE = int(sys.argv[1])
 ADDON = xbmcaddon.Addon()
 
-# Instantiate the logger - debug_promotion is always False, promotion is category-based only
-debug_promotion = False
+# Instantiate the logger with debug promotion settings
+promote_all_debug = ADDON.getSettingBool("debug_promote_all")
 
 # Define category-to-setting mapping
 category_settings = {
     "art": "debug_art_promotion",
     "timing": "debug_timing_promotion",
     "api": "debug_api_promotion",
+    "cache": "debug_cache_promotion",
 }
 
 # Load category promotions from settings
@@ -50,7 +51,16 @@ for category, setting_id in category_settings.items():
     except Exception:
         category_promotions[category] = False
 
-logger = KodiLogger(debug_promotion=debug_promotion, category_promotions=category_promotions)
+# Load general promotion settings
+uncategorized_promotion = ADDON.getSettingBool("debug_uncategorized_promotion")
+miscategorized_promotion = ADDON.getSettingBool("debug_miscategorized_promotion")
+
+logger = KodiLogger(
+    promote_all_debug=promote_all_debug,
+    category_promotions=category_promotions,
+    uncategorized_promotion=uncategorized_promotion,
+    miscategorized_promotion=miscategorized_promotion,
+)
 
 # Create Angel Studios interface
 angel_interface = None

@@ -35,7 +35,7 @@ class TestKodiLogger:
         xbmc = sys.modules["xbmc"]
         xbmc.log.reset_mock()
 
-        logger = kodi_utils.KodiLogger(debug_promotion=True)
+        logger = kodi_utils.KodiLogger(uncategorized_promotion=True)
 
         frame = SimpleNamespace(f_locals={"self": object()})
         stack = [SimpleNamespace(function="outer", frame=frame), SimpleNamespace(function="inner", frame=frame)]

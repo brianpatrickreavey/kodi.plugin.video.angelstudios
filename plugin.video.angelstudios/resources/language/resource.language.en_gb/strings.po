@@ -370,6 +370,38 @@ msgctxt "#30515"
 msgid "Removes all debug data and logs."
 msgstr "Removes all debug data and logs."
 
+msgctxt "#30516"
+msgid "Promote cache debug logs"
+msgstr "Promote cache debug logs"
+
+msgctxt "#30517"
+msgid "Show cache operation debug messages in Kodi log when debug mode is off."
+msgstr "Show cache operation debug messages in Kodi log when debug mode is off."
+
+msgctxt "#30518"
+msgid "Promote miscategorized debug logs"
+msgstr "Promote miscategorized debug logs"
+
+msgctxt "#30519"
+msgid "Show debug messages with unknown categories in Kodi log when debug mode is off."
+msgstr "Show debug messages with unknown categories in Kodi log when debug mode is off."
+
+msgctxt "#30520"
+msgid "Promote uncategorized debug logs"
+msgstr "Promote uncategorized debug logs"
+
+msgctxt "#30521"
+msgid "Show debug messages without categories in Kodi log when debug mode is off."
+msgstr "Show debug messages without categories in Kodi log when debug mode is off."
+
+msgctxt "#30522"
+msgid "Promote all debug logs"
+msgstr "Promote all debug logs"
+
+msgctxt "#30523"
+msgid "Show all debug messages in Kodi log regardless of category or debug mode."
+msgstr "Show all debug messages in Kodi log regardless of category or debug mode."
+
 # ============================================================================
 # 30600-30699: Future Use
 # ============================================================================

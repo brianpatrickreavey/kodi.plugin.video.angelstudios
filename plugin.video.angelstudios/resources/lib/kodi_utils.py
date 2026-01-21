@@ -9,24 +9,33 @@ import time
 class KodiLogger:
     """Simple logger class to log messages to Kodi log with category-based debug promotion"""
 
-    def __init__(self, debug_promotion=False, category_promotions=None):
-        self.debug_promotion = debug_promotion
+    def __init__(self, promote_all_debug=False, category_promotions=None, uncategorized_promotion=False, miscategorized_promotion=False):
+        self.promote_all_debug = promote_all_debug
         self.category_promotions = category_promotions or {}
+        self.uncategorized_promotion = uncategorized_promotion
+        self.miscategorized_promotion = miscategorized_promotion
 
     def debug(self, message, category=None):
         """Log debug message with optional category-based promotion to INFO level."""
-        is_promoted = self.debug_promotion  # Default to general debug promotion
-        prefix = "(debug)"
+        # Check promote_all_debug first - overrides everything
+        if self.promote_all_debug:
+            self.xbmclog(f"(all-debug) {message}", xbmc.LOGINFO)
+            return
 
+        # Determine promotion based on category
         if category:
             if category in self.category_promotions:
                 is_promoted = self.category_promotions[category]
                 prefix = f"({category}-debug)"
             else:
-                # Unknown category - warn and use unknown prefix
+                # Unknown category - use miscategorized promotion
+                is_promoted = self.miscategorized_promotion
+                prefix = "(misc-debug)"
                 self.xbmclog(f"Unknown debug category '{category}' - consider adding setting", xbmc.LOGINFO)
-                prefix = "(unknown-debug)"
-                is_promoted = self.debug_promotion
+        else:
+            # No category - use uncategorized promotion
+            is_promoted = self.uncategorized_promotion
+            prefix = "(debug)"
 
         if is_promoted:
             promoted_message = f"{prefix} {message}"

@@ -116,10 +116,10 @@ class KodiUIInterface:
         if cache_enabled:
             cached_data = self.cache_manager.cache.get(cache_key)
             if cached_data is not None:
-                self.log.debug(f"Cache hit for {cache_key}")
+                self.log.debug(f"Cache hit for {cache_key}", category="cache")
                 return cached_data
             else:
-                self.log.debug(f"Cache miss for {cache_key}")
+                self.log.debug(f"Cache miss for {cache_key}", category="cache")
         
         # Fetch from API
         self.log.info(f"Fetching resume watching data from AngelStudiosInterface: first={first}, after={after}")
