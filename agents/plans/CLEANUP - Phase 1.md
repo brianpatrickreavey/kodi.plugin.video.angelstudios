@@ -1,7 +1,7 @@
 # Project Cleanup Plan - Phase 1
 
 **Date:** January 20, 2026
-**Status:** Phase 1.1 completed
+**Status:** Phase 1.2 completed
 **Owner:** Architecture & Product
 **Audience:** Developer, Code Reviewer, QA
 
@@ -819,10 +819,10 @@ Timing logs from Phase 1 complete become baseline. Phase 2 (deferred) can measur
   - [x] Fixture names descriptive
   - [x] Composed fixtures documented
   - [x] Tests pass
-- [ ] 1.2 – Redact auth logs
-  - [ ] Create `_sanitize_headers_for_logging()`
-  - [ ] Update all header log calls
-  - [ ] No credentials in logs
+- [x] 1.2 – Redact auth logs
+  - [x] Create `_sanitize_headers_for_logging()` in angel_utils.py
+  - [x] Update all header log calls in angel_interface.py and angel_authentication.py
+  - [x] No credentials in logs
 - [ ] 1.3 – Improve GraphQL error logging
   - [ ] Error messages logged with details
   - [ ] Operation name in logs

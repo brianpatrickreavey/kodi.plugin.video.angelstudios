@@ -8,6 +8,7 @@ from unittest.mock import patch, MagicMock, mock_open, PropertyMock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "resources", "lib"))
 
 from angel_interface import AngelStudiosInterface, angel_graphql_url  # noqa: E402
+import angel_utils  # noqa: E402
 from .unittest_data import MOCK_PROJECT_DATA, MOCK_EPISODE_DATA, MOCK_GRAPHQL_RESPONSE  # noqa: E402
 
 
@@ -262,7 +263,7 @@ class TestAngelStudiosInterface:
             # Assert error logging occurred and raise_for_status was called
             mock_response.raise_for_status.assert_called_once()
             angel_interface.log.error.assert_any_call("GraphQL errors: ['GraphQL error occurred']")
-            angel_interface.log.error.assert_any_call(f"session headers: {angel_interface.session.headers}")
+            angel_interface.log.error.assert_any_call(f"session headers: {angel_utils.sanitize_headers_for_logging(angel_interface.session.headers)}")
 
     def test_graphql_query_request_failure(self, angel_interface):
         """Test _graphql_query handles request exceptions."""

@@ -16,6 +16,7 @@ from typing import Any, Optional
 
 import angel_authentication
 import requests
+import angel_utils
 
 # Backwards-compat alias used by some tests to patch at module level
 AngelStudioSession = angel_authentication.AngelStudioSession
@@ -175,7 +176,7 @@ class AngelStudiosInterface:
             self._debug_log(f"GraphQL response data: {json.dumps(result, indent=2)}", category="api")
             if "errors" in result:
                 self.log.error(f"GraphQL errors: {result['errors']}")
-                self.log.error(f"session headers: {self.session.headers}")
+                self.log.error(f"session headers: {angel_utils.sanitize_headers_for_logging(self.session.headers)}")
                 self.angel_studios_session.authenticate(force_reauthentication=True)
                 data = {}
             else:

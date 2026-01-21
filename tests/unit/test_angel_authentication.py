@@ -11,7 +11,8 @@ import pytest
 import requests
 from bs4 import Tag
 
-from resources.lib.angel_authentication import AngelStudioSession, _sanitize_headers_for_logging
+from resources.lib.angel_authentication import AngelStudioSession
+import resources.lib.angel_utils as angel_utils
 
 
 def test_sanitize_headers_for_logging():
@@ -26,7 +27,7 @@ def test_sanitize_headers_for_logging():
         "User-Agent": "test-agent",
     }
 
-    result = _sanitize_headers_for_logging(headers)
+    result = angel_utils.sanitize_headers_for_logging(headers)
 
     # Sensitive headers should be redacted
     assert result["Authorization"] == "[REDACTED]"

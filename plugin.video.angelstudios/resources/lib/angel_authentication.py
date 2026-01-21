@@ -8,28 +8,7 @@ import urllib.parse
 import base64
 import json
 from datetime import datetime, timezone, timedelta
-
-
-def _sanitize_headers_for_logging(headers):
-    """Remove sensitive headers before logging for security.
-
-    Filters out Authorization, Cookie, and X-API-Key headers that may
-    contain credentials or session tokens. Returns a safe dict for logging.
-
-    Args:
-        headers (dict): Headers dict (from requests Response or Session)
-
-    Returns:
-        dict: Headers with sensitive values redacted
-    """
-    safe_headers = {}
-    for key, val in headers.items():
-        key_lower = str(key).lower()
-        if key_lower in ("authorization", "cookie", "x-api-key"):
-            safe_headers[key] = "[REDACTED]"
-        else:
-            safe_headers[key] = val
-    return safe_headers
+import angel_utils
 
 
 class AngelStudioSession:
@@ -129,7 +108,7 @@ class AngelStudioSession:
             raise Exception("Failed to fetch the login page")
         self.log.info("Successfully fetched the login page.")
         self.log.info(f"Login page response: {login_page_response.status_code} {login_page_response.reason}")
-        self.log.info(f"Login page headers: {_sanitize_headers_for_logging(dict(login_page_response.headers))}")
+        self.log.info(f"Login page headers: {angel_utils.sanitize_headers_for_logging(dict(login_page_response.headers))}")
         self.log.info(f"Login page content: {login_page_response.content[:100]}...")  # Log first 100 chars for brevity
         self.log.info("Login page cookies: [REDACTED] (not logged for security)")
 
