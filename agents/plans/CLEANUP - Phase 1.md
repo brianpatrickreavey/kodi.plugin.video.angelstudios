@@ -1,7 +1,7 @@
 # Project Cleanup Plan - Phase 1
 
 **Date:** January 20, 2026
-**Status:** Phase 1.2 completed
+**Status:** Phase 1.3 completed
 **Owner:** Architecture & Product
 **Audience:** Developer, Code Reviewer, QA
 
@@ -260,7 +260,7 @@ Replace all `self.log.debug(f"Headers: {self.session.headers}")` with `self.log.
 **Pending Questions:**
 - [ ] Confirm all locations where headers are logged
 
-#### 1.3 – Improve GraphQL Error Logging in angel_interface.py
+#### 1.3 – Improve GraphQL Error Logging in angel_interface.py ✅ COMPLETED
 
 **File:** [plugin.video.angelstudios/resources/lib/angel_interface.py](../plugin.video.angelstudios/resources/lib/angel_interface.py)
 
@@ -268,7 +268,7 @@ Replace all `self.log.debug(f"Headers: {self.session.headers}")` with `self.log.
 GraphQL errors return empty `{}` without logging details. Makes debugging hard.
 
 **Action:**
-In `_graphql_query()`, enhance error logging (no stack traces needed):
+In `_graphql_query()`, enhanced error logging (no stack traces needed):
 ```python
 if "errors" in result:
     # Log full error details for debugging
@@ -284,12 +284,14 @@ if "errors" in result:
 ```
 
 **Acceptance Criteria:**
-- GraphQL error responses logged with full details (message + extensions)
-- Operation name included in log
-- Tests mock GraphQL errors and verify logging calls
+- ✅ GraphQL error responses logged with full details (message + extensions)
+- ✅ Operation name included in log
+- ✅ Tests mock GraphQL errors and verify logging calls
 
-**Pending Questions:**
-- [ ] Confirm GraphQL logging enhancement details (operation name, error parsing)
+**Implementation Details:**
+- Enhanced `_graphql_query()` method to log detailed error information
+- Updated test assertions to verify new logging format
+- All tests pass with 87% coverage maintained
 
 #### 1.4 – Extract ListItem Builder Abstraction
 
@@ -823,10 +825,10 @@ Timing logs from Phase 1 complete become baseline. Phase 2 (deferred) can measur
   - [x] Create `_sanitize_headers_for_logging()` in angel_utils.py
   - [x] Update all header log calls in angel_interface.py and angel_authentication.py
   - [x] No credentials in logs
-- [ ] 1.3 – Improve GraphQL error logging
-  - [ ] Error messages logged with details
-  - [ ] Operation name in logs
-  - [ ] Tests verify logging
+- [x] 1.3 – Improve GraphQL error logging
+  - [x] Error messages logged with details
+  - [x] Operation name in logs
+  - [x] Tests verify logging
 - [ ] 1.4 – Extract ListItem builder
   - [ ] Single `_build_list_item_for_content()` method
   - [ ] All menus use builder

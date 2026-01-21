@@ -175,7 +175,15 @@ class AngelStudiosInterface:
             result = response.json()
             self._debug_log(f"GraphQL response data: {json.dumps(result, indent=2)}", category="api")
             if "errors" in result:
-                self.log.error(f"GraphQL errors: {result['errors']}")
+                # Log full error details for debugging
+                self.log.error(f"GraphQL errors for operation '{operation}':")
+                for error in result.get("errors", []):
+                    if isinstance(error, dict):
+                        self.log.error(f"  - {error.get('message', 'Unknown error')}")
+                        if "extensions" in error:
+                            self.log.debug(f"    Extensions: {error['extensions']}")
+                    else:
+                        self.log.error(f"  - {error}")
                 self.log.error(f"session headers: {angel_utils.sanitize_headers_for_logging(self.session.headers)}")
                 self.angel_studios_session.authenticate(force_reauthentication=True)
                 data = {}

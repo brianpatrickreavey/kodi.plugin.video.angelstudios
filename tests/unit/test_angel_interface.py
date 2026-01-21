@@ -262,7 +262,8 @@ class TestAngelStudiosInterface:
 
             # Assert error logging occurred and raise_for_status was called
             mock_response.raise_for_status.assert_called_once()
-            angel_interface.log.error.assert_any_call("GraphQL errors: ['GraphQL error occurred']")
+            angel_interface.log.error.assert_any_call("GraphQL errors for operation 'test_operation':")
+            angel_interface.log.error.assert_any_call("  - GraphQL error occurred")
             angel_interface.log.error.assert_any_call(f"session headers: {angel_utils.sanitize_headers_for_logging(angel_interface.session.headers)}")
 
     def test_graphql_query_request_failure(self, angel_interface):
