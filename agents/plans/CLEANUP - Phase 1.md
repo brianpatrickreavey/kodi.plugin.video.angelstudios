@@ -1,7 +1,7 @@
 # Project Cleanup Plan - Phase 1
 
 **Date:** January 20, 2026
-**Status:** Phase 1 not started
+**Status:** Phase 1.1 completed
 **Owner:** Architecture & Product
 **Audience:** Developer, Code Reviewer, QA
 
@@ -9,11 +9,11 @@
 
 ## Executive Summary
 
-This cleanup plan addresses code organization, import strategy, caching patterns, authentication, UI consistency, error handling, logging, tests, and documentation accumulated during multi-feature development. The goal is to establish a clean, maintainable baseline before committing these features.
+This cleanup plan addresses code organization, import strategy, caching patterns, authentication, UI consistency, error handling, logging, tests, and documentation accumulated during multi-feature development. The goal is to establish a clean, maintainable baseline before committing these features. This also addresses regressions from previous work, such as if-chain structures that were accidentally altered and needed reconstitution.
 
-**Scope:**
-- **In Scope:** Code readability, consistency, import normalization, redundancy removal, fixture clarity, docs alignment, minor performance wins (logging optimization).
-- **Out of Scope (defer to next feature):** Session refresh token strategy, resumeWatching caching, integration tests, major architectural shifts.
+**Design Principles:**
+- Prioritize verbose, readable code for human readers (given agent-generated code in the codebase).
+- Maintain separation of concerns, especially between Kodi UI interface and Angel Studios API interface.
 
 **Risk Profile:**
 - **Phase 1:** Low-to-medium risk (refactors with comprehensive test coverage validation).
@@ -22,9 +22,9 @@ This cleanup plan addresses code organization, import strategy, caching patterns
 - Phase 1: 3–6 hours
 
 **Success Criteria:**
-1. All phases complete with test coverage maintained (aim for 100% where practical; edge cases deferred to future testing revamp)
+1. All phases complete with test coverage maintained (deferring 100% goal to Phase 2 or beyond; losing some coverage for better fixtures is acceptable)
 2. All code passes black + flake8 formatting.
-3. Fixture refactoring improves readability (verified via code review).
+3. Fixture refactoring improves readability (verified via code review and UI spot-checks).
 4. No user-visible behavior changes (seamless UX preserved).
 5. All docs updated/archived.
 
@@ -137,7 +137,7 @@ Refactor `conftest.py` to use descriptive fixture names, add comprehensive docst
 ## ============================================================================
 
 @pytest.fixture
-def kodi_addon_mock():
+def mock_kodi_addon():
     """Mock Kodi addon with common settings.
 
     Returns:
@@ -154,12 +154,12 @@ def kodi_addon_mock():
     return addon
 
 @pytest.fixture
-def kodi_handle():
+def mock_kodi_handle():
     """Kodi plugin handle (typically integer 1)."""
     return 1
 
 @pytest.fixture
-def kodi_xbmcplugin_mock():
+def mock_kodi_xbmcplugin():
     """Mock xbmcplugin module with common methods.
 
     Yields:
@@ -268,7 +268,7 @@ Replace all `self.log.debug(f"Headers: {self.session.headers}")` with `self.log.
 GraphQL errors return empty `{}` without logging details. Makes debugging hard.
 
 **Action:**
-In `_graphql_query()`, enhance error logging:
+In `_graphql_query()`, enhance error logging (no stack traces needed):
 ```python
 if "errors" in result:
     # Log full error details for debugging
@@ -358,9 +358,10 @@ def episodes_menu(self, ...):
 - 100% test coverage maintained
 
 **Pending Questions:**
+- [ ] Assess pros & cons of ListItem builder abstraction
 - [ ] Confirm all menu locations that need the builder
 
-#### 1.5 – Review Infotag Field Mapping (DO NOT REFACTOR TO LOOPS)
+#### 1.5 – Review Infotag Field Mapping (VALIDATE ONLY - DO NOT REFACTOR)
 
 **File:** [plugin.video.angelstudios/resources/lib/kodi_ui_interface.py](../plugin.video.angelstudios/resources/lib/kodi_ui_interface.py)
 
@@ -376,27 +377,22 @@ def episodes_menu(self, ...):
 - Some redundant comments that could be consolidated
 - Structure could be documented more clearly for maintainability
 
-**Strategy:**
-1. Review current `_process_attributes_to_infotags()` implementation (lines ~1550-1700) to understand optimizations
+**Action:**
+1. Review current `_process_attributes_to_infotags()` implementation (lines ~1550-1700) to validate if-chains are intact and optimized
 2. **KEEP the if-chain structure** (performance-critical)
-3. **Reduce debug logging** in production by using fewer log levels or conditional logging
+3. **Validate debug logging** can be suppressed via settings.xml (no code changes needed)
 4. **Add comments** explaining WHY this structure is optimized (architectural decisions, not performance tricks)
 5. Verify no new redundancies introduced in recent changes
 
-**Action:**
-- Audit current function for any new redundancies or dead code
-- Document the optimization strategy in code comments
-- Consider extracting logging level to a constant or debug flag
-
 **Acceptance Criteria:**
 - Current if-chain structure preserved (performance confirmed)
-- Unnecessary debug logging reduced (production log volume lower)
+- Debug logging suppression validated (via settings)
 - Code comments explain optimization rationale
 - 100% test coverage maintained
 - Rendering performance unchanged or improved
 
 **Pending Questions:**
-- [ ] Any exceptions to keeping infotag if-chain?
+- [ ] Validate if-chains are intact and optimized
 
 #### 1.6 – Consolidate Progress Bar Logic
 
@@ -423,9 +419,7 @@ def episodes_menu(self, ...):
 **File:** [docs/features/continue-watching.md](../docs/features/continue-watching.md)
 
 **Action:**
-1. Verify implementation matches docs (feature state, query structure, merge logic)
-2. Update example data if outdated
-3. Add reference to deferred writes pattern
+Verify if updates are needed to continue-watching.md; may already be completed as part of other work. If needed, update examples and references.
 
 **Acceptance Criteria:**
 - Docs match current implementation
@@ -439,12 +433,10 @@ def episodes_menu(self, ...):
 
 **Files:**
 - [plugin.video.angelstudios/resources/lib/angel_interface.py](../plugin.video.angelstudios/resources/lib/angel_interface.py) — search for deprecated methods
-- [docs/data_structure.md](../docs/data_structure.md) — update/remove deprecated refs
+- [docs/dev/data-structure.md](../docs/dev/data-structure.md) — update/remove deprecated refs
 
 **Action:**
-1. Identify any `# TODO` or `@deprecated` markers in code
-2. Either implement or remove
-3. Update docs to reflect current API surface
+Audit codebase for deprecated markers (`# TODO`, `@deprecated`); implement, remove, or update as needed. Update docs to reflect current API surface.
 
 **Acceptance Criteria:**
 - No deprecated references in active code
@@ -461,7 +453,7 @@ def episodes_menu(self, ...):
 
 **Requirement:** Maintain test coverage (aim for 100% where practical; edge cases and comprehensive testing revamp deferred to future project)
 
-**Testing Philosophy:** Focus on behavior preservation and practical coverage improvement. Exhaustive edge case testing and full 100% coverage restoration deferred to dedicated future testing project.
+**Testing Philosophy:** Focus on behavior preservation and practical coverage improvement. Exhaustive edge case testing and full 100% coverage restoration deferred to Phase 2 or beyond. Losing some coverage for better fixtures is acceptable if it improves maintainability. Include UI spot-checks after each subphase.
 
 **Approach:**
 1. **After each phase**, run full test suite to confirm coverage is maintained or improved where possible
@@ -664,7 +656,7 @@ def kodi_xbmcplugin_mock():
         }
 
 @pytest.fixture
-def kodi_xbmcgui_mock():
+def mock_kodi_xbmcgui():
     """Mock xbmcgui module (ListItem, Dialog, etc).
 
     Yields:
@@ -770,7 +762,7 @@ def kodi_ui_interface(kodi_addon_mock, kodi_handle, kodi_xbmcplugin_mock,
 
 | File | Action |
 |------|--------|
-| [data_structure.md](../docs/data_structure.md) | Keep as-is (current) ✅ |
+| [docs/dev/data-structure.md](../docs/dev/data-structure.md) | Keep as-is (current) ✅ |
 | [metadata-mapping.md](../docs/metadata-mapping.md) | Keep as-is (current) ✅ |
 | [DEFERRED_CACHE_WRITES.md](../docs/DEFERRED_CACHE_WRITES.md) | **Update**: Remove SimpleCache references; note caching happens in UI layer |
 | [features/continue-watching.md](../docs/features/continue-watching.md) | **Update**: Verify implementation; refresh examples |
@@ -780,7 +772,7 @@ def kodi_ui_interface(kodi_addon_mock, kodi_handle, kodi_xbmcplugin_mock,
 
 ## Timing Capture (Performance Baseline)
 
-**Goal:** Establish pre-cleanup menu performance baseline for later measurement.
+**Goal:** Performance timing is already implemented following existing patterns. Validate and leverage as needed for Phase 1 changes.
 
 **Implementation:**
 Add timing instrumentation to key menus in Phase 1 (leveraging existing pattern in DEFERRED_CACHE_WRITES.md):
@@ -822,11 +814,11 @@ Timing logs from Phase 1 complete become baseline. Phase 2 (deferred) can measur
 
 ### Phase 1 Checklist
 
-- [ ] 1.1 – Refactor test fixtures (conftest.py)
-  - [ ] All fixtures have docstrings
-  - [ ] Fixture names descriptive
-  - [ ] Composed fixtures documented
-  - [ ] Tests pass
+- [x] 1.1 – Refactor test fixtures (conftest.py)
+  - [x] All fixtures have docstrings
+  - [x] Fixture names descriptive
+  - [x] Composed fixtures documented
+  - [x] Tests pass
 - [ ] 1.2 – Redact auth logs
   - [ ] Create `_sanitize_headers_for_logging()`
   - [ ] Update all header log calls
@@ -839,11 +831,10 @@ Timing logs from Phase 1 complete become baseline. Phase 2 (deferred) can measur
   - [ ] Single `_build_list_item_for_content()` method
   - [ ] All menus use builder
   - [ ] No duplication in list item creation
-- [ ] 1.5 – Refactor infotag field mapping
-  - [ ] `CONTENT_INFOTAG_MAPPING` constant
-  - [ ] Loop replaces if-chains
-  - [ ] Type checking in loop
-  - [ ] Tests parametrized for all content types
+- [ ] 1.5 – Review infotag field mapping
+  - [ ] If-chains validated as intact and optimized
+  - [ ] Debug logging suppression via settings validated
+  - [ ] Comments added explaining optimization rationale
 - [ ] 1.6 – Consolidate progress bar logic
   - [ ] Single `_apply_progress_bar()` implementation
   - [ ] Used in `_build_list_item_for_content()`
@@ -865,7 +856,7 @@ Timing logs from Phase 1 complete become baseline. Phase 2 (deferred) can measur
 ### Phase 1 Risks: **Medium**
 
 **Risk:** Fixture refactoring changes mock behavior; tests pass but behavior diverges.
-**Mitigation:** Tests remain unchanged (behavior verification); only fixtures refactored; run full suite.
+**Mitigation:** Tests remain unchanged (behavior verification); only fixtures refactored; run full suite. Losing some coverage for better fixtures is acceptable.
 
 **Risk:** ListItem builder abstraction introduces bugs in list rendering.
 **Mitigation:** Parametrize tests over all content types (episode, project, season, etc.); verify artwork/infotags per type.
