@@ -1,7 +1,7 @@
 # Project Cleanup Plan - Phase 1
 
 **Date:** January 20, 2026
-**Status:** Phase 1.6 completed
+**Status:** Phase 1.7 completed
 **Owner:** Architecture & Product
 **Audience:** Developer, Code Reviewer, QA
 
@@ -867,8 +867,15 @@ Timing logs from Phase 1 complete become baseline. Phase 2 (deferred) can measur
 - Integrated into unified builder with overlay_progress parameter
 - All tests pass (436/436) with 88% coverage maintained
 - [ ] 1.7 – Update continue-watching.md
-  - [ ] Docs match implementation
-  - [ ] Examples accurate
+  - [x] Docs match implementation
+  - [x] Examples accurate
+
+**Completed:** January 21, 2026
+- Updated documentation to reflect unified builder architecture
+- Progress bars consolidated in MenuUtils with dict input handling
+- Continue watching menu uses overlay_progress option
+- Updated data flow, edge cases, and file references
+- Removed outdated implementation plans and TODOs
 - [ ] 1.8 – Remove deprecated API references
   - [ ] No `@deprecated` or stale TODOs
   - [ ] Docs updated
