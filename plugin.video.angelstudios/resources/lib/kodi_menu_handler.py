@@ -315,22 +315,16 @@ class KodiMenuHandler(MenuUtils):
 
             for episode in episodes_list:
                 try:
-                    episode_available = bool(episode.get("source"))
-                    list_item = self._create_list_item_from_episode(
+
+                    list_item = self._build_list_item_for_content(
                         episode,
+                        "episode",
                         project=project,
                         content_type=content_type,
                         stream_url=None,
                         is_playback=False,
+                        overlay_progress=bool(episode.get("watchPosition")),
                     )
-
-                    # Apply progress bar if watch position is available
-                    if episode_available and episode.get("watchPosition"):
-                        self._apply_progress_bar(
-                            list_item,
-                            episode["watchPosition"].get("position", 0),
-                            episode.get("source", {}).get("duration", 0),
-                        )
 
                     # Create URL for playback
                     url = self.create_plugin_url(
@@ -432,7 +426,7 @@ class KodiMenuHandler(MenuUtils):
                     content_type="",
                     stream_url=None,
                     is_playback=False,
-                    overlay_progress=bool(episode.get("watchPosition"))
+                    overlay_progress=bool(episode.get("watchPosition")),
                 )
 
                 # Create URL for playback
@@ -774,37 +768,3 @@ class KodiMenuHandler(MenuUtils):
             list_item.setArt(art_dict)
 
         return
-
-    def _apply_progress_bar(self, list_item, watch_position_seconds, duration_seconds):
-        """
-        Apply native Kodi resume point indicator to a ListItem.
-
-        Args:
-            list_item: xbmcgui.ListItem to apply progress to
-            watch_position_seconds: Current watch position in seconds (float)
-            duration_seconds: Total duration in seconds (float)
-
-        Returns:
-            None. Modifies list_item in place.
-        """
-        if watch_position_seconds is None or duration_seconds is None or duration_seconds == 0:
-            self.log.debug(
-                f"Skipping progress bar: watch_position={watch_position_seconds}, " f"duration={duration_seconds}"
-            )
-            return
-
-        try:
-            resume_point = float(watch_position_seconds) / float(duration_seconds)
-            # Clamp to [0.0, 1.0]
-            resume_point = max(0.0, min(1.0, resume_point))
-
-            info_tag = list_item.getVideoInfoTag()
-            info_tag.setResumePoint(resume_point)
-            self.log.debug(
-                f"Applied progress bar: {watch_position_seconds}s / {duration_seconds}s = {resume_point:.2%}"
-            )
-        except Exception as e:
-            self.log.warning(
-                f"Failed to apply progress bar: {e}. "
-                f"watch_position={watch_position_seconds}, duration={duration_seconds}"
-            )

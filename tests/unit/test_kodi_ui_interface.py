@@ -3,9 +3,6 @@ Integration tests for KodiUIInterface main class.
 Tests delegation to handlers and overall integration.
 """
 
-import sys
-import os
-
 import pytest
 from unittest.mock import MagicMock
 from resources.lib.kodi_ui_interface import KodiUIInterface

@@ -108,7 +108,9 @@ class AngelStudioSession:
             raise Exception("Failed to fetch the login page")
         self.log.info("Successfully fetched the login page.")
         self.log.info(f"Login page response: {login_page_response.status_code} {login_page_response.reason}")
-        self.log.info(f"Login page headers: {angel_utils.sanitize_headers_for_logging(dict(login_page_response.headers))}")
+        self.log.info(
+            f"Login page headers: {angel_utils.sanitize_headers_for_logging(dict(login_page_response.headers))}"
+        )
         self.log.info(f"Login page content: {login_page_response.content[:100]}...")  # Log first 100 chars for brevity
         self.log.info("Login page cookies: [REDACTED] (not logged for security)")
 

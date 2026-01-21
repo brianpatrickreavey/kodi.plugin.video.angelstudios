@@ -74,7 +74,11 @@ class MenuUtils:
                 is_playback=options.get("is_playback", False),
             )
             # Apply progress bar for directory mode episodes (like continue watching)
-            if options.get("overlay_progress") and not options.get("is_playback", False) and content.get("watchPosition"):
+            if (
+                options.get("overlay_progress")
+                and not options.get("is_playback", False)
+                and content.get("watchPosition")
+            ):
                 self._apply_progress_bar(list_item, content["watchPosition"], content.get("duration", 0))
             return list_item
 

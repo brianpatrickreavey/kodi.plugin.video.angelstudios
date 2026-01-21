@@ -832,25 +832,26 @@ class TestEpisodesMenu:
             angel_interface_mock.get_project.return_value = None
 
             with (
-                patch.object(ui.menu_handler, "_create_list_item_from_episode") as mock_create_item,
-                patch.object(ui.menu_handler, "_apply_progress_bar") as mock_progress_bar,
+                patch.object(ui.menu_handler, "_build_list_item_for_content") as mock_build_item,
                 patch("xbmcplugin.setContent"),
                 patch("xbmcplugin.addSortMethod"),
             ):
                 mock_created_item = MagicMock()
-                mock_create_item.return_value = mock_created_item
+                mock_build_item.return_value = mock_created_item
 
                 ui.episodes_menu(content_type="series", project_slug=project_data["slug"], season_id=season["id"])
 
-                # Verify _apply_progress_bar was called for each episode
-                assert mock_progress_bar.call_count == len(season["episodes"])
+                # Verify _build_list_item_for_content was called for each episode
+                assert mock_build_item.call_count == len(season["episodes"])
 
-                # Verify the calls with correct parameters
-                for i, episode in enumerate(season["episodes"]):
-                    call_args = mock_progress_bar.call_args_list[i]
-                assert call_args[0][0] is mock_created_item  # list_item
-                assert call_args[0][1] == 30.0  # watch_position
-                assert call_args[0][2] == 3600  # duration
+                # Verify the calls with correct overlay_progress parameter
+                for call_args in mock_build_item.call_args_list:
+                    args, kwargs = call_args
+                    assert args[0] in season["episodes"]  # episode data
+                    assert args[1] == "episode"  # content_type_str
+                    assert kwargs.get("overlay_progress") is True  # progress bar enabled
+                    assert kwargs.get("project") == project_data  # project data passed
+                    assert kwargs.get("content_type") == "series"  # content type passed
 
 
 class TestContinueWatchingMenu:

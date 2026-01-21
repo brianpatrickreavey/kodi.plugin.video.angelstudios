@@ -2,6 +2,7 @@
 Utility functions shared across Angel Studios modules.
 """
 
+
 def sanitize_headers_for_logging(headers):
     """Sanitize headers for logging by redacting sensitive information."""
     safe_headers = {}

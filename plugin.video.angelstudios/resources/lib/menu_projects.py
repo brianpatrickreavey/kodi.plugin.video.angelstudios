@@ -6,7 +6,6 @@ Handles all project listing and related operations.
 import json
 from urllib.parse import urlencode
 
-import xbmcgui  # type: ignore
 import xbmcplugin  # type: ignore
 
 from kodi_utils import TimedBlock

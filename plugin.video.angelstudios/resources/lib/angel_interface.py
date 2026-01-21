@@ -26,7 +26,6 @@ angel_website_url = "https://www.angel.com"
 angel_graphql_url = "https://api.angelstudios.com/graphql"
 
 
-
 class AngelStudiosInterface:
     """
     Interface for Angel Studios website HTML and GraphQL queries.
