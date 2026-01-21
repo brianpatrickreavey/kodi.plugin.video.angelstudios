@@ -5,11 +5,9 @@ Tests for KodiUIHelpers class.
 import sys
 import os
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "plugin.video.angelstudios", "resources", "lib"))
-
-import pytest  # noqa: E402
-from unittest.mock import patch, MagicMock  # noqa: E402
-from kodi_ui_helpers import KodiUIHelpers  # noqa: E402
+import pytest
+from unittest.mock import patch, MagicMock
+from resources.lib.kodi_ui_helpers import KodiUIHelpers
 
 
 @pytest.fixture
