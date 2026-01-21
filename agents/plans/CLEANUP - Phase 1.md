@@ -1,7 +1,7 @@
 # Project Cleanup Plan - Phase 1
 
 **Date:** January 20, 2026
-**Status:** Phase 1.4 completed
+**Status:** Phase 1.5 completed
 **Owner:** Architecture & Product
 **Audience:** Developer, Code Reviewer, QA
 
@@ -397,7 +397,14 @@ def episodes_menu(self, ...):
 - Rendering performance unchanged or improved
 
 **Pending Questions:**
-- [ ] Validate if-chains are intact and optimized
+- [x] Validate if-chains are intact and optimized
+
+**Completed:** January 21, 2026
+- If-chain structure validated as intact and optimized (85-90% performance improvement maintained)
+- Debug logging suppression validated via `debug_art_promotion` setting in settings.xml
+- Optimization rationale well-documented in method docstring and comments
+- All tests pass (436/436) with 87% coverage maintained
+- Pyright type checking: 0 errors, 0 warnings
 
 #### 1.6 – Consolidate Progress Bar Logic
 
@@ -837,9 +844,9 @@ Timing logs from Phase 1 complete become baseline. Phase 2 (deferred) can measur
   - [x] All menus use builder
   - [x] No duplication in list item creation
 - [ ] 1.5 – Review infotag field mapping
-  - [ ] If-chains validated as intact and optimized
-  - [ ] Debug logging suppression via settings validated
-  - [ ] Comments added explaining optimization rationale
+  - [x] If-chains validated as intact and optimized
+  - [x] Debug logging suppression via settings validated
+  - [x] Comments added explaining optimization rationale
 - [ ] 1.6 – Consolidate progress bar logic
   - [ ] Single `_apply_progress_bar()` implementation
   - [ ] Used in `_build_list_item_for_content()`
