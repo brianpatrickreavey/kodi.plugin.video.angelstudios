@@ -40,3 +40,6 @@ an actual episode, a dialog pops up asking to resume or not.
 - [resources/lib/angel_graphql/fragment_ProjectBasic.graphql](plugin.video.angelstudios/resources/lib/angel_graphql/fragment_ProjectBasic.graphql) — TODO
 - [resources/lib/angel_graphql/fragment_ContentImage.graphql](plugin.video.angelstudios/resources/lib/angel_graphql/fragment_ContentImage.graphql) — TODO
 - [resources/lib/angel_graphql/fragment_DiscoveryImages.graphql](plugin.video.angelstudios/resources/lib/angel_graphql/fragment_DiscoveryImages.graphql) — TODO
+
+## Code Consistency
+- Unify hardcoded header redaction strings to use `_sanitize_headers_for_logging()` method for consistency across the codebase.
