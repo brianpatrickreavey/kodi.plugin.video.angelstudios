@@ -110,21 +110,21 @@ class TestAngelStudiosInterface:
             mock_file.assert_called_once_with(
                 os.path.join(angel_interface.query_path, "query_test_operation.graphql"), "r"
             )
-            assert "test_operation" in angel_interface._query_cache
+            assert "test_operation" in angel_interface._query_file_cache
 
             # Second call: hit cache, cover early return
             second_result = angel_interface._load_query("test_operation")
             assert second_result == "query content"
             # open should not be called again
             mock_file.assert_called_once()  # Still only once
-            assert angel_interface._query_cache["test_operation"] == "query content"
+            assert angel_interface._query_file_cache["test_operation"] == "query content"
 
     def test_load_query_failure(self, angel_interface):
         """Test _load_query handles file loading failure."""
         with patch("builtins.open", side_effect=FileNotFoundError) as mock_file:
             result = angel_interface._load_query("test_operation")
             assert result == ""
-            assert "test_operation" not in angel_interface._query_cache
+            assert "test_operation" not in angel_interface._query_file_cache
             mock_file.assert_called_once_with(
                 os.path.join(angel_interface.query_path, "query_test_operation.graphql"), "r"
             )
@@ -141,7 +141,7 @@ class TestAngelStudiosInterface:
             mock_file.assert_called_once_with(
                 os.path.join(angel_interface.query_path, "fragment_test_fragment.graphql"), "r"
             )
-            assert "test_fragment" in angel_interface._fragment_cache
+            assert "test_fragment" in angel_interface._fragment_file_cache
 
             # Second call should hit cache and avoid re-opening the file
             second_result = angel_interface._load_fragment("test_fragment")
@@ -153,7 +153,7 @@ class TestAngelStudiosInterface:
         with patch("builtins.open", side_effect=FileNotFoundError) as mock_file:
             result = angel_interface._load_fragment("test_fragment")
             assert result == ""
-            assert "test_fragment" not in angel_interface._fragment_cache
+            assert "test_fragment" not in angel_interface._fragment_file_cache
             mock_file.assert_called_once_with(
                 os.path.join(angel_interface.query_path, "fragment_test_fragment.graphql"), "r"
             )

@@ -111,7 +111,7 @@ class AngelStudioSession:
         except requests.RequestException as e:
             self.log.error(f"Failed to fetch login page: {e}")
             raise Exception("Failed to fetch the login page")
-        
+
         if login_page_response.status_code != 200:
             self.log.error(f"Failed to fetch the login page: {login_page_response.status_code}")
             raise Exception("Failed to fetch the login page")
@@ -148,7 +148,7 @@ class AngelStudioSession:
         except requests.RequestException as e:
             self.log.error(f"Failed to fetch the post-email page: {e}")
             raise Exception("Failed to fetch the post-email page")
-        
+
         if email_response.status_code != 200:
             self.log.error(f"Failed to fetch the post-email page: {email_response.status_code}")
             raise Exception("Failed to fetch the post-email page")

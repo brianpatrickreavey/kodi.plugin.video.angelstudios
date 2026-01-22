@@ -6,8 +6,12 @@ fragment ContentSpecial on ContentSpecial {
     name
     id
     title {
-      portraitTitleImage {
-        cloudinaryPath
+      __typename
+      ... on ContentDisplayable {
+        portraitTitleImage: image(aspect: "2:3", category: TITLE_ART) {
+          cloudinaryPath
+          __typename
+        }
         __typename
       }
       __typename
@@ -29,12 +33,7 @@ fragment ContentSpecial on ContentSpecial {
     __typename
   }
   specialDescription: description(version: SHORT)
-  source {
-    url(input: {segmentFormat: TS})
-    duration
-    credits
-    __typename
-  }
+  url
   watchPosition {
     position
     __typename

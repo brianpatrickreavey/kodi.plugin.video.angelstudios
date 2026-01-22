@@ -86,8 +86,8 @@ class AngelStudiosInterface:
                 self.log.info(f"Session initialized: No JWT token, {cookie_count} cookies")
 
             self.query_path = query_path or "resources/lib/angel_graphql"
-            self._query_cache = {}
-            self._fragment_cache = {}
+            self._query_file_cache = {}
+            self._fragment_file_cache = {}
         else:
             self.log.error("Failed to initialize session: No session available")
             raise Exception("Failed to initialize session: No session available")
@@ -98,13 +98,13 @@ class AngelStudiosInterface:
 
     def _load_query(self, operation: str) -> str:
         """Load and cache a GraphQL query file by operation name."""
-        if operation in self._query_cache:
-            return self._query_cache[operation]
+        if operation in self._query_file_cache:
+            return self._query_file_cache[operation]
         query_file = os.path.join(self.query_path, f"query_{operation}.graphql")
         try:
             with open(query_file, "r") as f:
                 query = f.read()
-                self._query_cache[operation] = query
+                self._query_file_cache[operation] = query
                 return query
         except Exception as e:
             self.log.error(f"Error loading query file '{query_file}': {e}")
@@ -112,13 +112,13 @@ class AngelStudiosInterface:
 
     def _load_fragment(self, fragment_name: str) -> str:
         """Load and cache a GraphQL fragment file by fragment name."""
-        if fragment_name in self._fragment_cache:
-            return self._fragment_cache[fragment_name]
+        if fragment_name in self._fragment_file_cache:
+            return self._fragment_file_cache[fragment_name]
         fragment_path = os.path.join(self.query_path, f"fragment_{fragment_name}.graphql")
         try:
             with open(fragment_path, "r") as f:
                 fragment = f.read()
-                self._fragment_cache[fragment_name] = fragment
+                self._fragment_file_cache[fragment_name] = fragment
                 return fragment
         except Exception as e:
             self.log.error(f"Error loading fragment '{fragment_name}' from '{fragment_path}': {e}")

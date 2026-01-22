@@ -21,20 +21,19 @@ fragment ContentMovie on ContentMovie {
     name
     id
     title {
-      portraitTitleImage {
-        cloudinaryPath
+      __typename
+      ... on ContentDisplayable {
+        portraitTitleImage: image(aspect: "2:3", category: TITLE_ART) {
+          cloudinaryPath
+          __typename
+        }
         __typename
       }
       __typename
     }
     __typename
   }
-  source {
-    url(input: {segmentFormat: TS})
-    duration
-    credits
-    __typename
-  }
+  url
   watchPosition {
     position
     __typename

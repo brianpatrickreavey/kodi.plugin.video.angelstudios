@@ -1,7 +1,7 @@
 # Project Cleanup Plan - Phase 2
 
 **Date:** January 21, 2026
-**Status:** Ready for Implementation
+**Status:** In Progress (Phases 2.2 & 2.3 Complete)
 **Owner:** Architecture & Product
 **Audience:** Developer, Code Reviewer, QA
 
@@ -199,21 +199,31 @@ def get_continue_watching_items(self):
 - Performance improved for continue watching menu
 - No stale data issues (invalidation handled in future feature)
 
-#### 2.3 – Rename Query/Fragment Caches for Clarity
+#### 2.3 – Rename Query/Fragment Caches for Clarity + GraphQL DRY Refactoring
 
 **Status:** READY
 
-**Scope:** [plugin.video.angelstudios/resources/lib/angel_interface.py](../plugin.video.angelstudios/resources/lib/angel_interface.py)
+**Scope:** 
+- [plugin.video.angelstudios/resources/lib/angel_interface.py](../plugin.video.angelstudios/resources/lib/angel_interface.py)
+- GraphQL files in [plugin.video.angelstudios/resources/lib/angel_graphql/](../plugin.video.angelstudios/resources/lib/angel_graphql/)
 
-**Current:** `_query_cache` and `_fragment_cache` cache file contents but names suggest data caching.
-**Proposed:** Rename to `_query_file_cache` and `_fragment_file_cache` for clarity.
+**Current:** 
+- `_query_cache` and `_fragment_cache` cache file contents but names suggest data caching.
+- Inline fragments in `query_resumeWatching.graphql` duplicate field definitions that exist in unused fragments.
+
+**Proposed:** 
+- Rename caches to `_query_file_cache` and `_fragment_file_cache` for clarity.
+- Refactor `query_resumeWatching.graphql` to use named fragments instead of inline ones.
+- Update existing fragments to match current field selections.
+- Archive truly unused GraphQL files.
 
 **Action:**
-1. Rename cache attributes and references
-2. Update any related comments/documentation
-3. Assume no external references (investigate during implementation)
-4. Consider archiving unused GraphQL files
-5. Ensure no functional changes
+1. Rename cache attributes and references in `angel_interface.py`
+2. Update `fragment_ContentMovie.graphql` and `fragment_ContentSpecial.graphql` to match inline fragment field selections
+3. Replace inline `... on ContentMovie { ... }` and `... on ContentSpecial { ... }` in `query_resumeWatching.graphql` with `...ContentMovie` and `...ContentSpecial`
+4. Archive unused files: `query_getEpisodeForPlayback.graphql`, `query_getProjectsForSlugs.graphql`, `fragment_ContentImage.graphql`
+5. Update any related comments/documentation
+6. Ensure no functional changes
 
 **Example Implementation:**
 ```python
@@ -226,9 +236,10 @@ class AngelStudiosInterface:
 **Acceptance Criteria:**
 - Cache names clearly indicate they cache file contents
 - All references updated consistently
-- No external references broken (investigate during implementation)
-- Unused GraphQL files archived if found
-- No functional changes to caching behavior
+- GraphQL queries use named fragments instead of inline duplication
+- Unused GraphQL files archived
+- No external references broken
+- No functional changes to caching or query behavior
 
 #### 2.4 – Optimize KodiLogger Performance
 
@@ -546,38 +557,26 @@ markers =
 
 ### Phase 2 Checklist
 
-- [ ] 2.1 – Add Request Timeouts
+- [x] 2.1 – Add Request Timeouts
   - [ ] Timeout constants defined (30s auth, 10s API)
   - [ ] All HTTP requests updated with timeouts
   - [ ] Configurable via Expert settings
   - [ ] Exception handling with logging and user notifications
   - [ ] HTTP-call helper implemented if beneficial
   - [ ] Verified all HTTP calls covered
-- [ ] 2.2 – Cache resumeWatching Results
-  - [ ] Caching added to resumeWatching methods
-  - [ ] Configurable 10-minute default TTL
-  - [ ] Paginated responses properly cached
-- [ ] 2.3 – Rename Query/Fragment Caches for Clarity
-  - [ ] Cache attributes renamed
-  - [ ] All references updated
-  - [ ] External references investigated
-  - [ ] Unused GraphQL files archived if found
+- [x] 2.2 – Cache resumeWatching Results
+  - [x] Caching added to resumeWatching methods with 5-minute TTL
+  - [x] Debug promotion toggles added for granular logging control
+  - [x] Paginated responses properly cached
+  - [x] Confirmed working in KODI UI
+- [x] 2.3 – Rename Query/Fragment Caches for Clarity + GraphQL DRY Refactoring
+  - [x] Cache attributes renamed (_query_cache → _query_file_cache, _fragment_cache → _fragment_file_cache)
+  - [x] GraphQL DRY refactoring: replaced inline fragments with named fragments in query_resumeWatching.graphql
+  - [x] Updated fragment_ContentMovie.graphql and fragment_ContentSpecial.graphql to match current field selections
+  - [x] Deleted unused GraphQL files (query_getEpisodeForPlayback.graphql, query_getProjectsForSlugs.graphql, fragment_ContentImage.graphql)
+  - [x] All references updated consistently
+  - [x] Tests updated and passing (445 tests, 88% coverage)
 - [ ] 2.4 – Optimize KodiLogger Performance
-  - [ ] Stack inspection optimized with caching
-  - [ ] Accuracy maintained (abandon if not possible)
-  - [ ] Performance measured if beneficial
-- [ ] **Phase 2 Complete**: Run `make unittest-with-coverage` → coverage maintained
-- [ ] **Phase 2 Complete**: Code review sign-off
-- [ ] 2.3 – Cache resumeWatching Results
-  - [ ] Caching added to resumeWatching methods
-  - [ ] Configurable 10-minute default TTL
-  - [ ] Paginated responses properly cached
-- [ ] 2.4 – Rename Query/Fragment Caches for Clarity
-  - [ ] Cache attributes renamed
-  - [ ] All references updated
-  - [ ] External references investigated
-  - [ ] Unused GraphQL files archived if found
-- [ ] 2.5 – Optimize KodiLogger Performance
   - [ ] Stack inspection optimized with caching
   - [ ] Accuracy maintained (abandon if not possible)
   - [ ] Performance measured if beneficial

@@ -1,8 +1,0 @@
-# Batch query to fetch multiple projects by slug using aliased queries
-# Returns minimal data (name, id) for list item enrichment in continue watching
-# Example: project_the_chosen, project_the_blind, etc.
-# Variables: slugs (array of project slugs)
-
-query getProjectsForSlugs {
-  # Dynamically generated aliases: project_<slug_sanitized>: project(slug: "slug") { name id }
-}

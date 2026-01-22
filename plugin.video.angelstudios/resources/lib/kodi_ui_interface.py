@@ -112,7 +112,7 @@ class KodiUIInterface:
         """Get resume watching data with caching (5 minute TTL)."""
         cache_key = f"resume_watching_{first}_{after or 'none'}"
         cache_enabled = self._cache_enabled()
-        
+
         if cache_enabled:
             cached_data = self.cache_manager.cache.get(cache_key)
             if cached_data is not None:
@@ -120,15 +120,15 @@ class KodiUIInterface:
                 return cached_data
             else:
                 self.log.debug(f"Cache miss for {cache_key}", category="cache")
-        
+
         # Fetch from API
         self.log.info(f"Fetching resume watching data from AngelStudiosInterface: first={first}, after={after}")
         data = self.angel_interface.get_resume_watching(first=first, after=after)
-        
+
         # Cache the result
         if data and cache_enabled:
             self.cache_manager.cache.set(cache_key, data, expiration=self._resume_watching_cache_ttl())
-        
+
         return data
 
     def _get_angel_project_type(self, menu_content_type):

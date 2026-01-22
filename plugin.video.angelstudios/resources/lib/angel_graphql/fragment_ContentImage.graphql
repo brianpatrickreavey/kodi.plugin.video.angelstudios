@@ -1,8 +1,0 @@
-# ContentImage GraphQL Fragment
-
-fragment ContentImage on ContentImage {
-    aspect
-    category
-    cloudinaryPath
-    __typename
-}

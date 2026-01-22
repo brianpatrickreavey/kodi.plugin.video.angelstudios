@@ -348,35 +348,35 @@ def test_private_method_delegations(ui_interface):
 def test_get_resume_watching_caching(ui_interface):
     """Test get_resume_watching method with caching."""
     ui = ui_interface
-    
+
     # Mock cache enabled
     ui.cache_manager.cache.get.return_value = None  # Cache miss
     ui.cache_manager.cache.set = MagicMock()
     ui.cache_manager._cache_enabled.return_value = True
-    
+
     # Mock angel interface response
     resume_data = {"episodes": [{"guid": "test"}], "pageInfo": {"hasNextPage": False}}
     ui.angel_interface.get_resume_watching.return_value = resume_data
-    
+
     # First call - should fetch from API and cache
     result = ui.get_resume_watching(first=5, after="cursor")
-    
+
     assert result == resume_data
     ui.angel_interface.get_resume_watching.assert_called_once_with(first=5, after="cursor")
     ui.cache_manager.cache.get.assert_called_once_with("resume_watching_5_cursor")
     ui.cache_manager.cache.set.assert_called_once()
-    
+
     # Reset mocks
     ui.angel_interface.get_resume_watching.reset_mock()
     ui.cache_manager.cache.get.reset_mock()
     ui.cache_manager.cache.set.reset_mock()
-    
+
     # Mock cache hit
     ui.cache_manager.cache.get.return_value = resume_data
-    
+
     # Second call - should return cached data
     result = ui.get_resume_watching(first=5, after="cursor")
-    
+
     assert result == resume_data
     ui.angel_interface.get_resume_watching.assert_not_called()  # Should not call API
     ui.cache_manager.cache.get.assert_called_once_with("resume_watching_5_cursor")
@@ -386,17 +386,17 @@ def test_get_resume_watching_caching(ui_interface):
 def test_get_resume_watching_cache_disabled(ui_interface):
     """Test get_resume_watching method with cache disabled."""
     ui = ui_interface
-    
+
     # Mock cache disabled
     ui.cache_manager._cache_enabled.return_value = False
-    
+
     # Mock angel interface response
     resume_data = {"episodes": [{"guid": "test"}], "pageInfo": {"hasNextPage": False}}
     ui.angel_interface.get_resume_watching.return_value = resume_data
-    
+
     # Call with cache disabled
     result = ui.get_resume_watching(first=10)
-    
+
     assert result == resume_data
     ui.angel_interface.get_resume_watching.assert_called_once_with(first=10, after=None)
     # Cache should not be accessed when disabled

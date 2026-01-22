@@ -796,7 +796,7 @@ class TestAngelStudioSession:
         sess = MagicMock()
         sess.cookies = DummyCookies()
         sess.get.side_effect = requests.Timeout("Connection timed out")
-        
+
         with patch("resources.lib.angel_authentication.requests.Session", return_value=sess):
             with pytest.raises(Exception, match="Request timeout: Unable to connect to Angel Studios \\(timeout: 10s\\)"):
                 inst.authenticate()
@@ -808,7 +808,7 @@ class TestAngelStudioSession:
         sess = MagicMock()
         sess.cookies = DummyCookies(mapping={"angelSession": "state_cookie"})
         sess.get.side_effect = [login_page, requests.Timeout("Connection timed out")]
-        
+
         with patch("resources.lib.angel_authentication.requests.Session", return_value=sess):
             with pytest.raises(Exception, match="Request timeout: Unable to connect to Angel Studios \\(timeout: 15s\\)"):
                 inst.authenticate()
@@ -822,7 +822,7 @@ class TestAngelStudioSession:
         sess.cookies = DummyCookies(mapping={"angelSession": "state_cookie"})
         sess.get.side_effect = [login_page, email_page]
         sess.post.side_effect = requests.Timeout("Connection timed out")
-        
+
         with patch("resources.lib.angel_authentication.requests.Session", return_value=sess):
             with pytest.raises(Exception, match="Request timeout: Unable to connect to Angel Studios \\(timeout: 20s\\)"):
                 inst.authenticate()
@@ -834,12 +834,12 @@ class TestAngelStudioSession:
         email_page = MagicMock(status_code=200, reason="OK", headers={}, content=b"<html></html>")
         password_response = MagicMock(status_code=302, headers={"Location": "https://example.com/redirect"}, content=b"")
         redirect_response = MagicMock(status_code=200, url="https://example.com/redirect", headers={}, content=b"")
-        
+
         sess = MagicMock()
         sess.cookies = DummyCookies(mapping={"angelSession": "state_cookie"})
         sess.get.side_effect = [login_page, email_page, requests.Timeout("Connection timed out")]
         sess.post.return_value = password_response
-        
+
         with patch("resources.lib.angel_authentication.requests.Session", return_value=sess):
             with pytest.raises(Exception, match="Request timeout: Unable to connect to Angel Studios \\(timeout: 25s\\)"):
                 inst.authenticate()
