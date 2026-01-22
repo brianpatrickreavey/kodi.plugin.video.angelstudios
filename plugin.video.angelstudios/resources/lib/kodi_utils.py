@@ -9,11 +9,18 @@ import time
 class KodiLogger:
     """Simple logger class to log messages to Kodi log with category-based debug promotion"""
 
-    def __init__(self, promote_all_debug=False, category_promotions=None, uncategorized_promotion=False, miscategorized_promotion=False):
+    def __init__(
+        self,
+        promote_all_debug=False,
+        category_promotions=None,
+        uncategorized_promotion=False,
+        miscategorized_promotion=False,
+    ):
         self.promote_all_debug = promote_all_debug
         self.category_promotions = category_promotions or {}
         self.uncategorized_promotion = uncategorized_promotion
         self.miscategorized_promotion = miscategorized_promotion
+        self._caller_cache = {}  # Cache for caller info to improve performance
 
     def debug(self, message, category=None):
         """Log debug message with optional category-based promotion to INFO level."""
@@ -57,37 +64,65 @@ class KodiLogger:
 
     def xbmclog(self, message, level):
         """Log a message to Kodi's log with the specified level"""
-        stack = inspect.stack(context=0)
-        handler = "Unknown Handler"
-
-        for frame_info in stack[1:]:  # skip xbmclog itself
-            module = inspect.getmodule(frame_info.frame)
-            module_name = module.__name__ if module else None
-
-            # Skip frames from this helpers module to find the caller
-            if module_name and module_name.startswith(__name__):
-                continue
-
-            self_obj = frame_info.frame.f_locals.get("self")
-            if not self_obj:
-                continue
-
-            class_name = self_obj.__class__.__name__
-            function_name = frame_info.function
-
-            parts = []
-            if module_name:
-                parts.append(module_name)
-            if class_name:
-                parts.append(class_name)
-            if function_name:
-                parts.append(function_name)
-
-            if parts:
-                handler = ".".join(parts)
-            break
-
+        handler = self._get_caller_info()
         xbmc.log(f"Angel Studios: Handler: {handler}: {message}", level)
+
+    def _get_caller_info(self):
+        """Get caller info with caching to reduce stack inspection overhead."""
+        # Create cache key from current frame info
+        frame = inspect.currentframe()
+        if frame is None:
+            return "Unknown Handler"
+
+        try:
+            # Walk up stack to find the actual caller (skip xbmclog and _get_caller_info)
+            caller_frame = frame.f_back.f_back  # type: ignore  # Skip xbmclog and _get_caller_info
+
+            # Use filename and line number as cache key
+            filename = caller_frame.f_code.co_filename  # type: ignore
+            lineno = caller_frame.f_lineno  # type: ignore
+            cache_key = f"{filename}:{lineno}"
+
+            # Check cache first
+            if cache_key in self._caller_cache:
+                return self._caller_cache[cache_key]
+
+            # Not cached, compute handler info
+            handler = self._compute_caller_info(caller_frame)
+
+            # Cache the result (limit cache size to prevent memory leaks)
+            if len(self._caller_cache) < 1000:  # Reasonable limit
+                self._caller_cache[cache_key] = handler
+
+            return handler
+        finally:
+            del frame
+
+    def _compute_caller_info(self, frame_info):
+        """Compute caller info from a frame (original logic, now extracted for clarity)."""
+        module = inspect.getmodule(frame_info)
+        module_name = module.__name__ if module else None
+
+        # Skip frames from this helpers module to find the caller
+        if module_name and module_name.startswith(__name__):
+            return "Unknown Handler"
+
+        self_obj = frame_info.f_locals.get("self")
+        if not self_obj:
+            return "Unknown Handler"
+
+        class_name = self_obj.__class__.__name__
+        function_name = frame_info.f_code.co_name
+
+        parts = []
+        if module_name:
+            parts.append(module_name)
+        if class_name:
+            parts.append(class_name)
+        if function_name:
+            parts.append(function_name)
+
+        return ".".join(parts) if parts else "Unknown Handler"
 
 
 def get_session_file():

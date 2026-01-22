@@ -106,6 +106,7 @@ class KodiUIInterface:
     def _resume_watching_cache_ttl(self):
         """Return timedelta for resume watching cache expiration (5 minutes)."""
         from datetime import timedelta
+
         return timedelta(minutes=5)
 
     def get_resume_watching(self, first=10, after=None):

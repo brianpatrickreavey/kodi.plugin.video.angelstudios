@@ -177,7 +177,9 @@ class AngelStudioSession:
 
         # Step 5: Post password
         try:
-            password_response = self.session.post(password_uri, data=password_payload, allow_redirects=False, timeout=self.timeout)
+            password_response = self.session.post(
+                password_uri, data=password_payload, allow_redirects=False, timeout=self.timeout
+            )
         except requests.Timeout:
             self.log.error(f"Timeout ({self.timeout}s) posting password")
             raise Exception(f"Request timeout: Unable to connect to Angel Studios (timeout: {self.timeout}s)")

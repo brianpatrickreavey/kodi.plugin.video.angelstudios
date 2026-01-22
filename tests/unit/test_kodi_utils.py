@@ -53,9 +53,8 @@ class TestKodiLogger:
 
         logger = kodi_utils.KodiLogger()
 
-        frame = SimpleNamespace(f_locals={})
-        stack = [SimpleNamespace(function="f1", frame=frame), SimpleNamespace(function="f2", frame=frame)]
-        monkeypatch.setattr(kodi_utils.inspect, "stack", MagicMock(return_value=stack))
+        # Mock currentframe to return None (edge case)
+        monkeypatch.setattr(kodi_utils.inspect, "currentframe", MagicMock(return_value=None))
 
         logger.xbmclog("msg", xbmc.LOGINFO)
 
@@ -72,15 +71,17 @@ class TestKodiLogger:
         class Dummy:
             pass
 
-        frame0 = SimpleNamespace(f_locals={})
-        frame1 = SimpleNamespace(f_locals={})
-        frame2 = SimpleNamespace(f_locals={"self": Dummy()})
-        stack = [
-            SimpleNamespace(function="f0", frame=frame0),
-            SimpleNamespace(function="f1", frame=frame1),
-            SimpleNamespace(function="target", frame=frame2),
-        ]
-        monkeypatch.setattr(kodi_utils.inspect, "stack", MagicMock(return_value=stack))
+        # Create mock frames for the stack walking
+        # Frame structure: xbmclog -> _get_caller_info -> caller_frame
+        caller_frame = SimpleNamespace(
+            f_code=SimpleNamespace(co_filename="test.py", co_name="target"), f_lineno=42, f_locals={"self": Dummy()}
+        )
+
+        # Mock currentframe to return a frame that walks to caller_frame
+        mock_frame = SimpleNamespace(
+            f_back=SimpleNamespace(f_back=caller_frame)  # xbmclog -> _get_caller_info -> caller_frame
+        )
+        monkeypatch.setattr(kodi_utils.inspect, "currentframe", MagicMock(return_value=mock_frame))
 
         logger.xbmclog("msg", xbmc.LOGWARNING)
 

@@ -938,7 +938,9 @@ class TestContinueWatchingMenu:
 
         with (
             patch.object(ui, "show_notification") as mock_notify,
-            patch.object(ui, "get_resume_watching", return_value={"episodes": [], "pageInfo": {"hasNextPage": False}}) as mock_get_resume,
+            patch.object(
+                ui, "get_resume_watching", return_value={"episodes": [], "pageInfo": {"hasNextPage": False}}
+            ) as mock_get_resume,
         ):
             ui.continue_watching_menu()
 
@@ -1142,7 +1144,11 @@ class TestContinueWatchingMenu:
 
         with (
             patch.object(ui, "show_notification") as mock_notify,
-            patch.object(ui, "get_resume_watching", return_value={"episodes": [], "pageInfo": {"endCursor": None, "hasNextPage": False}}) as mock_get_resume,
+            patch.object(
+                ui,
+                "get_resume_watching",
+                return_value={"episodes": [], "pageInfo": {"endCursor": None, "hasNextPage": False}},
+            ) as mock_get_resume,
         ):
             ui.continue_watching_menu()
 

@@ -403,7 +403,6 @@ def test_get_resume_watching_cache_disabled(ui_interface):
     ui.cache_manager.cache.get.assert_not_called()
     ui.cache_manager.cache.set.assert_not_called()
 
-
     # Test UI helpers delegations
     ui.ui_helpers._normalize_contentseries_episode.return_value = {"normalized": True}
     assert ui._normalize_contentseries_episode({"raw": "data"}) == {"normalized": True}
