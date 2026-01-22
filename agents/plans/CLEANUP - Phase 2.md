@@ -1,7 +1,7 @@
 # Project Cleanup Plan - Phase 2
 
 **Date:** January 21, 2026
-**Status:** In Progress (Phases 2.2 & 2.3 Complete)
+**Status:** In Progress (Phases 2.1, 2.2 & 2.3 Complete)
 **Owner:** Architecture & Product
 **Audience:** Developer, Code Reviewer, QA
 
@@ -558,12 +558,12 @@ markers =
 ### Phase 2 Checklist
 
 - [x] 2.1 – Add Request Timeouts
-  - [ ] Timeout constants defined (30s auth, 10s API)
-  - [ ] All HTTP requests updated with timeouts
-  - [ ] Configurable via Expert settings
-  - [ ] Exception handling with logging and user notifications
-  - [ ] HTTP-call helper implemented if beneficial
-  - [ ] Verified all HTTP calls covered
+  - [x] Timeout constants defined (30s auth, 10s API)
+  - [x] All HTTP requests updated with timeouts
+  - [x] Configurable via Expert settings
+  - [x] Exception handling with logging and user notifications
+  - [x] HTTP-call helper implemented if beneficial
+  - [x] Verified all HTTP calls covered
 - [x] 2.2 – Cache resumeWatching Results
   - [x] Caching added to resumeWatching methods with 5-minute TTL
   - [x] Debug promotion toggles added for granular logging control
