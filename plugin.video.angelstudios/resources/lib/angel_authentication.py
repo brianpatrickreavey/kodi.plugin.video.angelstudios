@@ -9,7 +9,17 @@ import base64
 import json
 from datetime import datetime, timezone, timedelta
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Optional, Callable
 import angel_utils
+
+
+@dataclass
+class AuthResult:
+    """Result of an authentication operation"""
+    success: bool
+    token: Optional[str] = None
+    error_message: Optional[str] = None
 
 
 class SessionStore(ABC):
@@ -49,6 +59,251 @@ class KodiSessionStore(SessionStore):
     def clear_token(self) -> None:
         """Clear JWT token from Kodi addon settings"""
         self.addon.setSettingString("jwt_token", "")
+
+
+class AuthenticationCore:
+    """Pure authentication logic - no UI dependencies"""
+
+    def __init__(self,
+                 session_store: SessionStore,
+                 error_callback: Optional[Callable[[str, str], None]] = None,
+                 logger=None,
+                 timeout=30):
+        self.session_store = session_store
+        self.error_callback = error_callback
+        self.timeout = timeout
+        self.session = requests.Session()
+        
+        # Use the provided logger, or default to the module logger
+        if logger is not None:
+            self.log = logger
+        else:
+            logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+            self.log = logging.getLogger("AuthenticationCore")
+        
+        self.web_url = "https://www.angel.com"
+        self.auth_url = "https://auth.angel.com"
+
+    def authenticate(self, username: str, password: str) -> AuthResult:
+        """Authenticate with Angel Studios and return result"""
+        try:
+            # Try to get existing token first
+            existing_token = self.session_store.get_token()
+            if existing_token and self._validate_token(existing_token):
+                self.log.info("Using existing valid token")
+                return AuthResult(success=True, token=existing_token)
+            
+            # Perform full authentication flow
+            token = self._perform_authentication(username, password)
+            if token:
+                self.session_store.save_token(token)
+                return AuthResult(success=True, token=token)
+            else:
+                error_msg = "Authentication failed: No token received"
+                if self.error_callback:
+                    self.error_callback("auth_failed", error_msg)
+                return AuthResult(success=False, error_message=error_msg)
+                
+        except Exception as e:
+            error_msg = f"Authentication error: {str(e)}"
+            self.log.error(error_msg)
+            if self.error_callback:
+                self.error_callback("auth_error", error_msg)
+            return AuthResult(success=False, error_message=error_msg)
+
+    def validate_session(self) -> bool:
+        """Check if current session/token is valid"""
+        token = self.session_store.get_token()
+        if not token:
+            return False
+        return self._validate_token(token)
+
+    def refresh_token(self) -> bool:
+        """Attempt to refresh the authentication token"""
+        # For now, this is a placeholder - refresh token support would be implemented here
+        # According to the plan, this should attempt to refresh using refresh tokens
+        # If refresh fails, return False (fail and reauth as per plan)
+        self.log.warning("Token refresh not yet implemented")
+        return False
+
+    def logout(self) -> None:
+        """Clear authentication state"""
+        self.session_store.clear_token()
+        try:
+            self.session.close()
+        except Exception:
+            pass
+        self.session = requests.Session()
+
+    def _validate_token(self, token: str) -> bool:
+        """Validate JWT token expiration"""
+        try:
+            exp_timestamp = self._get_jwt_expiration_timestamp(token)
+            if exp_timestamp:
+                now_timestamp = int(datetime.now(timezone.utc).timestamp())
+                return exp_timestamp > now_timestamp
+        except Exception:
+            pass
+        return False
+
+    def _get_jwt_expiration_timestamp(self, jwt_token: str) -> Optional[int]:
+        """Extract expiration timestamp from JWT token"""
+        try:
+            header, payload, signature = jwt_token.split(".")
+            payload_decoded = base64.urlsafe_b64decode(payload + "==")
+            claims = json.loads(payload_decoded)
+            return claims.get("exp")
+        except Exception:
+            return None
+
+    def _perform_authentication(self, username: str, password: str) -> Optional[str]:
+        """Perform the full OAuth authentication flow"""
+        self.log.info("Starting full authentication flow")
+        
+        login_url = f"{self.web_url}/auth/login"
+        self.log.info(f"Login URL: {login_url}")
+        self.session.headers.update(
+            {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/58.0.3029.110 Safari/537.3"
+                )
+            }
+        )
+
+        # Ensure no stale Authorization header for login fetch
+        self.session.headers.pop("Authorization", None)
+
+        # Clear cookies to avoid cached responses based on session state
+        self.session.cookies.clear()
+
+        # Step 1: Get login page
+        self.log.info(f"Fetching login page: {login_url}")
+        try:
+            login_page_response = self.session.get(login_url, timeout=self.timeout)
+        except requests.Timeout:
+            self.log.error(f"Timeout ({self.timeout}s) fetching login page")
+            raise Exception(f"Request timeout: Unable to connect to Angel Studios (timeout: {self.timeout}s)")
+        except requests.RequestException as e:
+            self.log.error(f"Failed to fetch login page: {e}")
+            raise Exception("Failed to fetch the login page")
+
+        if login_page_response.status_code != 200:
+            self.log.error(f"Failed to fetch the login page: {login_page_response.status_code}")
+            raise Exception("Failed to fetch the login page")
+        self.log.info("Successfully fetched the login page.")
+
+        # Step 2: Parse state from login page
+        soup = BeautifulSoup(login_page_response.content, "html.parser")
+        state = self.session.cookies.get("angelSession", "")
+        for element in soup.find_all("input"):
+            if not isinstance(element, Tag):
+                continue
+            if element.get("id") == "state" and element.get("name") == "state":
+                state = element.get("value")
+
+        email_payload = {"email": username, "state": state}
+        email_uri = f"{self.auth_url}/u/login/password?{urllib.parse.urlencode(email_payload)}"
+
+        # Step 3: Get post-email page
+        self.log.info(f"Fetching post-email page: {email_uri}")
+        try:
+            email_response = self.session.get(email_uri, headers={'Cache-Control': 'no-cache'}, timeout=self.timeout)
+        except requests.Timeout:
+            self.log.error(f"Timeout ({self.timeout}s) fetching post-email page")
+            raise Exception(f"Request timeout: Unable to connect to Angel Studios (timeout: {self.timeout}s)")
+        except requests.RequestException as e:
+            self.log.error(f"Failed to fetch the post-email page: {e}")
+            raise Exception("Failed to fetch the post-email page")
+
+        if email_response.status_code != 200:
+            self.log.error(f"Failed to fetch the post-email page: {email_response.status_code}")
+            raise Exception("Failed to fetch the post-email page")
+        self.log.info("Successfully fetched the post-email page.")
+
+        # Step 4: Parse state and csrf_token from post-email page
+        soup = BeautifulSoup(email_response.content, "html.parser")
+        state2 = None
+        csrf_token = None
+        for input_element in soup.find_all("input"):
+            if not isinstance(input_element, Tag):
+                continue
+            if input_element.get("id") == "state" and input_element.get("name") == "state":
+                state2 = input_element.get("value")
+            elif input_element.get("name") == "_csrf_token":
+                csrf_token = input_element.get("value")
+
+        password_uri = f"{self.auth_url}/u/login?{urllib.parse.urlencode({'state': state2})}"
+        password_payload = {
+            "email": username,
+            "password": password,
+            "state": state2,
+            "_csrf_token": csrf_token,
+            "has_agreed": "true",
+        }
+
+        # Step 5: Post password
+        try:
+            password_response = self.session.post(
+                password_uri, data=password_payload, allow_redirects=False, timeout=self.timeout
+            )
+        except requests.Timeout:
+            self.log.error(f"Timeout ({self.timeout}s) posting password")
+            raise Exception(f"Request timeout: Unable to connect to Angel Studios (timeout: {self.timeout}s)")
+        except requests.RequestException as e:
+            self.log.error(f"Password post failed: {e}")
+            raise Exception("Login failed")
+
+        if password_response.status_code in (302, 303):
+            redirect_url = password_response.headers.get("Location")
+            if not redirect_url:
+                self.log.error("Redirect response missing Location header")
+                raise Exception("Login redirect missing Location header")
+            self.log.info(f"Following redirect to: {redirect_url}")
+            # Follow the redirect - required to complete the login process
+            try:
+                redirect_response = self.session.get(redirect_url, allow_redirects=True, timeout=self.timeout)
+            except requests.Timeout:
+                self.log.error(f"Timeout ({self.timeout}s) following login redirect")
+                raise Exception(f"Request timeout: Unable to connect to Angel Studios (timeout: {self.timeout}s)")
+            except requests.RequestException as e:
+                self.log.error(f"Redirect follow failed: {e}")
+                raise Exception("Login failed after redirect")
+
+            if redirect_response.status_code == 200:
+                self.log.info("Login successful!")
+            else:
+                self.log.error(
+                    f"Login failed after redirect: {redirect_response.status_code} {redirect_response.reason}"
+                )
+                raise Exception("Login failed after redirect")
+        elif password_response.status_code == 200:
+            self.log.info("Login successful!")
+        else:
+            self.log.error(f"Login failed: {password_response.status_code} {password_response.reason}")
+            raise Exception("Login failed")
+
+        # Step 6: Check for error message in response
+        soup = BeautifulSoup(password_response.content, "html.parser")
+        if soup.find("div", class_="error-message"):
+            self.log.error("Login failed: Invalid username or password")
+            raise Exception("Login failed: Invalid username or password")
+
+        # Step 7: Extract JWT token from cookies
+        jwt_token = ""
+        for cookie in self.session.cookies:
+            if cookie.name == "angel_jwt":
+                jwt_token = str(cookie.value)
+                self.log.debug(f"Found JWT token in cookies: {jwt_token[:10]}...")
+                break
+
+        if jwt_token:
+            self.log.info("Found JWT token in cookies")
+            return jwt_token
+        else:
+            self.log.warning("No JWT token found in cookies")
+            return None
 
 
 class AngelStudioSession:
