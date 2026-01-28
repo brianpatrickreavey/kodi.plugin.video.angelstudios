@@ -242,7 +242,7 @@ class TestAngelStudioSession:
         sess.cookies = cookies
         sess.headers = {}
         sess.get.side_effect = [login_page, email_page, redirect_response]
-        sess.post.return_value = password_response
+        sess.post.side_effect = [password_response]
 
         with (
             patch("resources.lib.angel_authentication.requests.Session", return_value=sess),
@@ -282,7 +282,7 @@ class TestAngelStudioSession:
         sess.cookies = cookies
         sess.headers = {"Authorization": "Bearer old"}
         sess.get.side_effect = [login_page, email_page]
-        sess.post.return_value = password_response
+        sess.post.side_effect = [password_response]
 
         with (
             patch("resources.lib.angel_authentication.requests.Session", return_value=sess),
@@ -343,7 +343,7 @@ class TestAngelStudioSession:
         sess = MagicMock()
         sess.cookies = DummyCookies()
         sess.get.side_effect = [login_page, email_page, redirect_response]
-        sess.post.return_value = password_response
+        sess.post.side_effect = [password_response]
         with (
             patch("resources.lib.angel_authentication.requests.Session", return_value=sess),
             patch("resources.lib.angel_authentication.BeautifulSoup") as mock_bs,
@@ -385,7 +385,7 @@ class TestAngelStudioSession:
         sess = MagicMock()
         sess.cookies = DummyCookies()
         sess.get.side_effect = [login_page, email_page]
-        sess.post.return_value = password_response
+        sess.post.side_effect = [password_response]
         with (
             patch("resources.lib.angel_authentication.requests.Session", return_value=sess),
             patch("resources.lib.angel_authentication.BeautifulSoup") as mock_bs,
@@ -413,7 +413,7 @@ class TestAngelStudioSession:
         sess.cookies = DummyCookies(mapping={"angelSession": "state_cookie"})
         sess.headers = {}
         sess.get.side_effect = [login_page, email_page]
-        sess.post.return_value = password_response
+        sess.post.side_effect = [password_response]
 
         with (
             patch("resources.lib.angel_authentication.requests.Session", return_value=sess),
@@ -844,8 +844,8 @@ class TestAngelStudioSession:
 
         sess = MagicMock()
         sess.cookies = DummyCookies(mapping={"angelSession": "state_cookie"})
-        sess.get.side_effect = [login_page, email_page, requests.Timeout("Connection timed out")]
-        sess.post.return_value = password_response
+        sess.get.side_effect = [login_page, requests.Timeout("Connection timed out")]
+        sess.post.side_effect = [email_page, password_response]
 
         with patch("resources.lib.angel_authentication.requests.Session", return_value=sess):
             with pytest.raises(

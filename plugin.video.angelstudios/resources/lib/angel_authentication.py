@@ -8,7 +8,47 @@ import urllib.parse
 import base64
 import json
 from datetime import datetime, timezone, timedelta
+from abc import ABC, abstractmethod
 import angel_utils
+
+
+class SessionStore(ABC):
+    """Abstract base class for session persistence"""
+
+    @abstractmethod
+    def save_token(self, token: str) -> None:
+        """Save the JWT token to persistent storage"""
+        pass
+
+    @abstractmethod
+    def get_token(self) -> str | None:
+        """Retrieve the JWT token from persistent storage"""
+        pass
+
+    @abstractmethod
+    def clear_token(self) -> None:
+        """Clear the stored JWT token"""
+        pass
+
+
+class KodiSessionStore(SessionStore):
+    """Kodi addon settings-based session store"""
+
+    def __init__(self, addon):
+        self.addon = addon
+
+    def save_token(self, token: str) -> None:
+        """Save JWT token to Kodi addon settings"""
+        self.addon.setSettingString("jwt_token", token)
+
+    def get_token(self) -> str | None:
+        """Get JWT token from Kodi addon settings"""
+        token = self.addon.getSettingString("jwt_token")
+        return token if token else None
+
+    def clear_token(self) -> None:
+        """Clear JWT token from Kodi addon settings"""
+        self.addon.setSettingString("jwt_token", "")
 
 
 class AngelStudioSession:
@@ -102,7 +142,15 @@ class AngelStudioSession:
             }
         )
 
+        # Ensure no stale Authorization header for login fetch
+        self.session.headers.pop("Authorization", None)
+
+        # Clear cookies to avoid cached responses based on session state
+        self.session.cookies.clear()
+
         # Step 1: Get login page
+        self.log.info(f"Fetching login page: {login_url}")
+        self.log.info(f"Authorization header present before login fetch: {'Authorization' in self.session.headers}")
         try:
             login_page_response = self.session.get(login_url, timeout=self.timeout)
         except requests.Timeout:
@@ -120,13 +168,13 @@ class AngelStudioSession:
         self.log.info(
             f"Login page headers: {angel_utils.sanitize_headers_for_logging(dict(login_page_response.headers))}"
         )
-        self.log.info(f"Login page content: {login_page_response.content[:100]}...")  # Log first 100 chars for brevity
-        self.log.info("Login page cookies: [REDACTED] (not logged for security)")
+        self.log.info(f"Login page content: {login_page_response.content[:500]}...") # Log first 500 chars for brevity
+        self.log.info(f"Login page cookies: {login_page_response.cookies.get_dict()}")
 
         # Step 2: Parse state from login page
         soup = BeautifulSoup(login_page_response.content, "html.parser")
 
-        state = self.session.cookies.get("angelSession", "asdfasdf")
+        state = self.session.cookies.get("angelSession", "")
         for element in soup.find_all("input"):
             if not isinstance(element, Tag):
                 continue
@@ -140,8 +188,10 @@ class AngelStudioSession:
 
         # Step 3: Get post-email page
         self.log.info(f"Fetching post-email page: {email_uri}")
+        self.log.debug(f"Request method: GET")
+        self.log.debug(f"Request headers: {angel_utils.sanitize_headers_for_logging(dict(self.session.headers))}")
         try:
-            email_response = self.session.get(email_uri, timeout=self.timeout)
+            email_response = self.session.get(email_uri, headers={'Cache-Control': 'no-cache'}, timeout=self.timeout)
         except requests.Timeout:
             self.log.error(f"Timeout ({self.timeout}s) fetching post-email page")
             raise Exception(f"Request timeout: Unable to connect to Angel Studios (timeout: {self.timeout}s)")
@@ -151,6 +201,9 @@ class AngelStudioSession:
 
         if email_response.status_code != 200:
             self.log.error(f"Failed to fetch the post-email page: {email_response.status_code}")
+            self.log.error(f"Post-email page response: {email_response.status_code} {email_response.reason}")
+            self.log.error(f"Post-email response headers: {angel_utils.sanitize_headers_for_logging(dict(email_response.headers))}")
+            self.log.error(f"Post-email response content: {email_response.text}")
             raise Exception("Failed to fetch the post-email page")
         self.log.info("Successfully fetched the post-email page.")
 
@@ -384,8 +437,16 @@ class AngelStudioSession:
                         break
 
                 if jwt_token:
-                    self.session.headers.update({"Authorization": f"Bearer {jwt_token}"})
-                    self.log.info("Session cookies loaded successfully.")
+                    try:
+                        exp_timestamp = self.__get_jwt_expiration_timestamp(jwt_token)
+                    except Exception:
+                        exp_timestamp = None
+                    now_timestamp = int(datetime.now(timezone.utc).timestamp())
+                    if exp_timestamp is None or exp_timestamp > now_timestamp:
+                        self.session.headers.update({"Authorization": f"Bearer {jwt_token}"})
+                        self.log.info("Session cookies loaded successfully.")
+                    else:
+                        self.log.info("JWT token in cookies is expired, not setting Authorization header.")
                 else:
                     self.log.warning("No JWT token found in loaded cookies.")
                 return True
