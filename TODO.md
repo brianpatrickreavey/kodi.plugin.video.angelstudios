@@ -18,7 +18,6 @@ an actual episode, a dialog pops up asking to resume or not.
 - Consider switching test fixtures to use a fresh `xbmcaddon.Addon` mock per test to avoid state leakage when toggling cache settings. — COMPLETE
 
 ## Authentication
-* Implement remote logout endpoint call when available (currently only clears local session state)
 
 # Code Review
 - [addon.xml](plugin.video.angelstudios/addon.xml) — COMPLETE
