@@ -144,14 +144,14 @@ class AngelStudiosInterface:
 
     def _graphql_query(self, operation: str, variables=None, raw_query=None) -> dict:
         """Generalized GraphQL query executor with automatic fragment loading and caching.
-        
+
         Args:
             operation: Name of the operation (for loading from file) or operation name for raw queries
             variables: Query variables
             raw_query: Raw GraphQL query string (if provided, operation is used as operationName)
         """
         variables = variables or {}
-        
+
         # Proactive session validation - refresh token if expiring soon
         try:
             self.auth_core.ensure_valid_session()
@@ -162,7 +162,7 @@ class AngelStudiosInterface:
         except AuthenticationRequiredError:
             # If proactive validation fails, re-raise for UI layer to handle
             raise
-        
+
         if raw_query:
             query = raw_query
         else:

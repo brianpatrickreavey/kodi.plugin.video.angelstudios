@@ -862,9 +862,9 @@ class TestKodiSessionStore:
         """Test saving a token to addon settings"""
         mock_addon = MagicMock()
         store = KodiSessionStore(mock_addon)
-        
+
         store.save_token("test_token_123")
-        
+
         mock_addon.setSettingString.assert_called_once_with("jwt_token", "test_token_123")
 
     def test_get_token_existing(self):
@@ -872,9 +872,9 @@ class TestKodiSessionStore:
         mock_addon = MagicMock()
         mock_addon.getSettingString.return_value = "existing_token_456"
         store = KodiSessionStore(mock_addon)
-        
+
         result = store.get_token()
-        
+
         assert result == "existing_token_456"
         mock_addon.getSettingString.assert_called_once_with("jwt_token")
 
@@ -883,9 +883,9 @@ class TestKodiSessionStore:
         mock_addon = MagicMock()
         mock_addon.getSettingString.return_value = ""
         store = KodiSessionStore(mock_addon)
-        
+
         result = store.get_token()
-        
+
         assert result is None
         mock_addon.getSettingString.assert_called_once_with("jwt_token")
 
@@ -893,18 +893,18 @@ class TestKodiSessionStore:
         """Test clearing the stored token"""
         mock_addon = MagicMock()
         store = KodiSessionStore(mock_addon)
-        
+
         store.clear_token()
-        
+
         mock_addon.setSettingString.assert_called_once_with("jwt_token", "")
 
     def test_save_credentials(self):
         """Test saving credentials to addon settings"""
         mock_addon = MagicMock()
         store = KodiSessionStore(mock_addon)
-        
+
         store.save_credentials("testuser", "testpass")
-        
+
         mock_addon.setSettingString.assert_has_calls([
             (("username", "testuser"), {}),
             (("password", "testpass"), {})
@@ -918,9 +918,9 @@ class TestKodiSessionStore:
             "password": "existing_pass"
         }.get(key, "")
         store = KodiSessionStore(mock_addon)
-        
+
         username, password = store.get_credentials()
-        
+
         assert username == "existing_user"
         assert password == "existing_pass"
 
@@ -929,9 +929,9 @@ class TestKodiSessionStore:
         mock_addon = MagicMock()
         mock_addon.getSettingString.return_value = ""
         store = KodiSessionStore(mock_addon)
-        
+
         username, password = store.get_credentials()
-        
+
         assert username is None
         assert password is None
 
@@ -939,9 +939,9 @@ class TestKodiSessionStore:
         """Test clearing stored credentials"""
         mock_addon = MagicMock()
         store = KodiSessionStore(mock_addon)
-        
+
         store.clear_credentials()
-        
+
         mock_addon.setSettingString.assert_has_calls([
             (("username", ""), {}),
             (("password", ""), {})
@@ -952,9 +952,9 @@ class TestKodiSessionStore:
         mock_addon = MagicMock()
         mock_addon.getSettingString.return_value = ""
         store = KodiSessionStore(mock_addon)
-        
+
         result = store.get_expiry_buffer_hours()
-        
+
         assert result == 1
 
     def test_get_expiry_buffer_hours_custom(self):
@@ -962,9 +962,9 @@ class TestKodiSessionStore:
         mock_addon = MagicMock()
         mock_addon.getSettingString.return_value = "2"
         store = KodiSessionStore(mock_addon)
-        
+
         result = store.get_expiry_buffer_hours()
-        
+
         assert result == 2
 
     def test_get_expiry_buffer_hours_invalid(self):
@@ -972,9 +972,9 @@ class TestKodiSessionStore:
         mock_addon = MagicMock()
         mock_addon.getSettingString.return_value = "invalid"
         store = KodiSessionStore(mock_addon)
-        
+
         result = store.get_expiry_buffer_hours()
-        
+
         assert result == 1
 
 
@@ -986,9 +986,9 @@ class TestAuthenticationCore:
         """Test AuthenticationCore initialization"""
         mock_store = MagicMock()
         mock_logger = MagicMock()
-        
+
         core = AuthenticationCore(session_store=mock_store, logger=mock_logger, timeout=45)
-        
+
         assert core.session_store == mock_store
         assert core.timeout == 45
         assert core.log == mock_logger
@@ -997,11 +997,11 @@ class TestAuthenticationCore:
         """Test validate_session when no token exists"""
         mock_store = MagicMock()
         mock_store.get_token.return_value = None
-        
+
         core = AuthenticationCore(session_store=mock_store)
-        
+
         result = core.validate_session()
-        
+
         assert result is False
         mock_store.get_token.assert_called_once()
 
@@ -1012,11 +1012,11 @@ class TestAuthenticationCore:
         future_ts = int((datetime.now(timezone.utc) + timedelta(hours=1)).timestamp())
         valid_token = _make_jwt(future_ts)
         mock_store.get_token.return_value = valid_token
-        
+
         core = AuthenticationCore(session_store=mock_store)
-        
+
         result = core.validate_session()
-        
+
         assert result is True
         mock_store.get_token.assert_called_once()
 
@@ -1027,11 +1027,11 @@ class TestAuthenticationCore:
         past_ts = int((datetime.now(timezone.utc) - timedelta(hours=1)).timestamp())
         expired_token = _make_jwt(past_ts)
         mock_store.get_token.return_value = expired_token
-        
+
         core = AuthenticationCore(session_store=mock_store)
-        
+
         result = core.validate_session()
-        
+
         assert result is False
         mock_store.get_token.assert_called_once()
 
@@ -1039,12 +1039,12 @@ class TestAuthenticationCore:
         """Test logout functionality"""
         mock_store = MagicMock()
         mock_session = MagicMock()
-        
+
         core = AuthenticationCore(session_store=mock_store)
         core.session = mock_session
-        
+
         core.logout()
-        
+
         mock_store.clear_token.assert_called_once()
         mock_store.clear_credentials.assert_called_once()
         mock_session.close.assert_called_once()
@@ -1053,9 +1053,9 @@ class TestAuthenticationCore:
         """Test refresh_token placeholder (not implemented yet)"""
         mock_store = MagicMock()
         core = AuthenticationCore(session_store=mock_store)
-        
+
         result = core.refresh_token()
-        
+
         assert result is False
 
     @patch("resources.lib.angel_authentication.requests.Session")
@@ -1065,11 +1065,11 @@ class TestAuthenticationCore:
         future_ts = int((datetime.now(timezone.utc) + timedelta(hours=1)).timestamp())
         valid_token = _make_jwt(future_ts)
         mock_store.get_token.return_value = valid_token
-        
+
         core = AuthenticationCore(session_store=mock_store)
-        
+
         result = core.authenticate("user", "pass")
-        
+
         assert result.success is True
         assert result.token == valid_token
         # Should not save token again since it already exists
@@ -1082,44 +1082,44 @@ class TestAuthenticationCore:
         mock_store.get_token.return_value = None
         mock_session = MagicMock()
         mock_session_class.return_value = mock_session
-        
+
         # Mock the login page response
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.content = b'<html><input id="state" name="state" value="test_state"></html>'
         mock_response.cookies.get.return_value = "session_cookie"
         mock_session.get.return_value = mock_response
-        
+
         core = AuthenticationCore(session_store=mock_store)
-        
+
         # This will fail because _perform_authentication is not fully mocked
         # but we can test that it attempts authentication
         result = core.authenticate("user", "pass")
-        
+
         assert result.success is False  # Will fail due to incomplete mocking
         assert "Authentication error" in result.error_message
 
     def test_ensure_valid_session_no_token(self):
         """Test ensure_valid_session raises error when no token exists"""
         from resources.lib.angel_authentication import AuthenticationRequiredError
-        
+
         mock_store = MagicMock()
         mock_store.get_token.return_value = None
-        
+
         core = AuthenticationCore(session_store=mock_store)
-        
+
         with pytest.raises(AuthenticationRequiredError, match="No authentication token available"):
             core.ensure_valid_session()
 
     def test_ensure_valid_session_invalid_token(self):
         """Test ensure_valid_session raises error for invalid token"""
         from resources.lib.angel_authentication import AuthenticationRequiredError
-        
+
         mock_store = MagicMock()
         mock_store.get_token.return_value = "invalid.jwt.token"
-        
+
         core = AuthenticationCore(session_store=mock_store)
-        
+
         with pytest.raises(AuthenticationRequiredError, match="Invalid authentication token"):
             core.ensure_valid_session()
 
@@ -1131,16 +1131,16 @@ class TestAuthenticationCore:
         valid_token = _make_jwt(future_ts)
         mock_store.get_token.return_value = valid_token
         mock_store.get_expiry_buffer_hours.return_value = 1
-        
+
         core = AuthenticationCore(session_store=mock_store)
-        
+
         # Should not raise any exception
         core.ensure_valid_session()
 
     def test_ensure_valid_session_expiring_no_credentials(self):
         """Test ensure_valid_session raises error when token expiring and no credentials"""
         from resources.lib.angel_authentication import AuthenticationRequiredError
-        
+
         mock_store = MagicMock()
         # Token expires in 30 minutes, within 1 hour buffer
         soon_ts = int((datetime.now(timezone.utc) + timedelta(minutes=30)).timestamp())
@@ -1148,9 +1148,9 @@ class TestAuthenticationCore:
         mock_store.get_token.return_value = expiring_token
         mock_store.get_credentials.return_value = (None, None)
         mock_store.get_expiry_buffer_hours.return_value = 1
-        
+
         core = AuthenticationCore(session_store=mock_store)
-        
+
         with pytest.raises(AuthenticationRequiredError, match="Token expiring and no stored credentials"):
             core.ensure_valid_session()
 
@@ -1164,17 +1164,17 @@ class TestAuthenticationCore:
         mock_store.get_token.return_value = expiring_token
         mock_store.get_credentials.return_value = ("user", "pass")
         mock_store.get_expiry_buffer_hours.return_value = 1
-        
+
         # Mock successful authentication
         new_token = "new.jwt.token"
         mock_store.save_token.return_value = None
-        
+
         core = AuthenticationCore(session_store=mock_store)
         # Mock the authenticate method to return success
         with patch.object(core, 'authenticate', return_value=AuthResult(success=True, token=new_token)):
             # Should not raise any exception
             core.ensure_valid_session()
-            
+
             # Should have called authenticate with stored credentials
             core.authenticate.assert_called_once_with("user", "pass")
 
@@ -1182,7 +1182,7 @@ class TestAuthenticationCore:
     def test_ensure_valid_session_expiring_failed_refresh(self, mock_session_class):
         """Test ensure_valid_session raises error when refresh fails"""
         from resources.lib.angel_authentication import AuthenticationRequiredError
-        
+
         mock_store = MagicMock()
         # Token expires in 30 minutes, within 1 hour buffer
         soon_ts = int((datetime.now(timezone.utc) + timedelta(minutes=30)).timestamp())
@@ -1190,7 +1190,7 @@ class TestAuthenticationCore:
         mock_store.get_token.return_value = expiring_token
         mock_store.get_credentials.return_value = ("user", "pass")
         mock_store.get_expiry_buffer_hours.return_value = 1
-        
+
         core = AuthenticationCore(session_store=mock_store)
         # Mock failed authentication
         with patch.object(core, 'authenticate', return_value=AuthResult(success=False, error_message="Auth failed")):

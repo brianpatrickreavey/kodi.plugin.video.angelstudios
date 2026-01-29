@@ -24,7 +24,7 @@ This document outlines the authentication and session management architecture fo
 ### GraphQL Request Flow
 
 1. Method calls `_graphql_query(operation, variables)`
-2. **Proactive Check**: `auth_core.validate_session()` 
+2. **Proactive Check**: `auth_core.validate_session()`
    - If invalid/expiring: Attempt refresh via `auth_core.ensure_valid_session()`
    - If refresh fails: Raise `AuthenticationRequiredError`
    - If refresh succeeds: Update session headers, continue

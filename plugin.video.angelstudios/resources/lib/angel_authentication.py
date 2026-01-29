@@ -138,14 +138,14 @@ class AuthenticationCore:
         self.error_callback = error_callback
         self.timeout = timeout
         self.session = requests.Session()
-        
+
         # Use the provided logger, or default to the module logger
         if logger is not None:
             self.log = logger
         else:
             logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
             self.log = logging.getLogger("AuthenticationCore")
-        
+
         self.web_url = "https://www.angel.com"
         self.auth_url = "https://auth.angel.com"
 
@@ -157,7 +157,7 @@ class AuthenticationCore:
             if existing_token and self._validate_token(existing_token):
                 self.log.info("Using existing valid token")
                 return AuthResult(success=True, token=existing_token)
-            
+
             # Perform full authentication flow
             token = self._perform_authentication(username, password)
             if token:
@@ -169,7 +169,7 @@ class AuthenticationCore:
                 if self.error_callback:
                     self.error_callback("auth_failed", error_msg)
                 return AuthResult(success=False, error_message=error_msg)
-                
+
         except Exception as e:
             error_msg = f"Authentication error: {str(e)}"
             self.log.error(error_msg)
@@ -197,31 +197,31 @@ class AuthenticationCore:
         token = self.session_store.get_token()
         if not token:
             raise AuthenticationRequiredError("No authentication token available")
-        
+
         # Check if token is expiring soon
         exp_timestamp = self._get_jwt_expiration_timestamp(token)
         if exp_timestamp is None:
             raise AuthenticationRequiredError("Invalid authentication token")
-        
+
         buffer_hours = 1  # Default buffer
         if hasattr(self.session_store, 'get_expiry_buffer_hours'):
             buffer_hours = self.session_store.get_expiry_buffer_hours()
-        
+
         buffer_seconds = buffer_hours * 3600
         now_timestamp = int(datetime.now(timezone.utc).timestamp())
-        
+
         if exp_timestamp <= (now_timestamp + buffer_seconds):
             self.log.info(f"Token expiring soon (within {buffer_hours}h), attempting refresh")
             # Try to refresh using stored credentials
             username, password = self.session_store.get_credentials()
             if not username or not password:
                 raise AuthenticationRequiredError("Token expiring and no stored credentials for refresh")
-            
+
             # Attempt authentication with stored credentials
             result = self.authenticate(username, password)
             if not result.success:
                 raise AuthenticationRequiredError(f"Automatic refresh failed: {result.error_message}")
-            
+
             self.log.info("Token successfully refreshed")
         else:
             self.log.debug("Token is still valid")
@@ -260,7 +260,7 @@ class AuthenticationCore:
     def _perform_authentication(self, username: str, password: str) -> Optional[str]:
         """Perform the full OAuth authentication flow"""
         self.log.info("Starting full authentication flow")
-        
+
         login_url = f"{self.web_url}/auth/login"
         self.log.info(f"Login URL: {login_url}")
         self.session.headers.update(

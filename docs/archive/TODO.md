@@ -1,12 +1,6 @@
 # Tracking features for Angel Studios KODI Plugin
 
 # Angel Studios Features
-## Watched Progress Tracking
-This seems to be tracked within Angel Studios, so there must be progressive API
-calls taht we can make to update our progress on the Angel Studios Servers.
-This is then served back to us when loading a project and when we go to play
-an actual episode, a dialog pops up asking to resume or not.
-
 ## GraphQL Fragments
 - Episode type does not expose `project { name }`; batch continue-watching cannot set TV show title without separate project fetch. — COMPLETE
 
