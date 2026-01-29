@@ -1,23 +1,33 @@
 # Feature: Angel Auth Token Refresh
 
 **Date:** January 21, 2026
-**Status:** Planning
+**Status:** ❌ OBSOLETED
 **Owner:** Architecture & Product
 **Audience:** Developer
+**Obsoleted By:** feature-refactor-authentication-module.md (2026-01-28)
+**Reason:** Superseded by comprehensive authentication refactor that implemented proactive session validation with automatic token refresh using stored credentials.
 
 ---
 
 ## Executive Summary
 
-This feature implements automatic session refresh using refresh tokens to improve user experience by avoiding full re-authentication when access tokens expire. Users currently need to log in again when tokens expire (~1 hour), but refresh tokens would allow seamless continued usage.
+❌ **OBSOLETED**: This feature was planned to implement automatic session refresh using refresh tokens, but was superseded by the comprehensive authentication module refactor which implemented a superior solution.
 
-**Scope:**
+### Original Scope (No Longer Applicable)
 - Investigate Angel Studios refresh token API support
 - Implement refresh token storage and management
 - Modify session validation to attempt refresh before full re-auth
 - Add refresh token expiry handling
 
-**Risk Profile:** Medium (auth flow changes)
+### Why Obsoleted
+The authentication refactor implemented a more robust solution:
+- ✅ **Proactive session validation** before every GraphQL request
+- ✅ **Automatic token refresh** using stored credentials (no refresh tokens needed)
+- ✅ **Configurable expiry buffer** (default 1 hour before expiry)
+- ✅ **Seamless user experience** without login interruptions
+- ✅ **Clean architecture** with proper separation of concerns
+
+**Risk Profile:** N/A (superseded)
 
 **Timeline Estimate:** 6-8 hours
 
