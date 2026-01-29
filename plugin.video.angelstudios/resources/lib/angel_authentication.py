@@ -195,46 +195,146 @@ class AuthenticationCore:
     def ensure_valid_session(self) -> None:
         """Ensure the session is valid, refreshing if necessary"""
         token = self.session_store.get_token()
-        if not token:
-            raise AuthenticationRequiredError("No authentication token available")
+        if token:
+            # Check if token is expiring soon
+            exp_timestamp = self._get_jwt_expiration_timestamp(token)
+            if exp_timestamp is None:
+                raise AuthenticationRequiredError("Invalid authentication token")
 
-        # Check if token is expiring soon
-        exp_timestamp = self._get_jwt_expiration_timestamp(token)
-        if exp_timestamp is None:
-            raise AuthenticationRequiredError("Invalid authentication token")
+            buffer_hours = 1  # Default buffer
+            if hasattr(self.session_store, 'get_expiry_buffer_hours'):
+                buffer_hours = self.session_store.get_expiry_buffer_hours()
 
-        buffer_hours = 1  # Default buffer
-        if hasattr(self.session_store, 'get_expiry_buffer_hours'):
-            buffer_hours = self.session_store.get_expiry_buffer_hours()
+            buffer_seconds = buffer_hours * 3600
+            now_timestamp = int(datetime.now(timezone.utc).timestamp())
 
-        buffer_seconds = buffer_hours * 3600
-        now_timestamp = int(datetime.now(timezone.utc).timestamp())
+            if exp_timestamp <= (now_timestamp + buffer_seconds):
+                self.log.info(f"Token expiring soon (within {buffer_hours}h), attempting refresh")
+                # Try to refresh using stored credentials
+                username, password = self.session_store.get_credentials()
+                if not username or not password:
+                    raise AuthenticationRequiredError("Token expiring and no stored credentials for refresh")
 
-        if exp_timestamp <= (now_timestamp + buffer_seconds):
-            self.log.info(f"Token expiring soon (within {buffer_hours}h), attempting refresh")
-            # Try to refresh using stored credentials
+                # Attempt authentication with stored credentials
+                result = self.authenticate(username, password)
+                if not result.success:
+                    raise AuthenticationRequiredError(f"Automatic refresh failed: {result.error_message}")
+
+                self.log.info("Token successfully refreshed")
+            else:
+                self.log.debug("Token is still valid")
+        else:
+            # No token available, try to authenticate with stored credentials
+            self.log.info("No token available, attempting authentication with stored credentials")
             username, password = self.session_store.get_credentials()
             if not username or not password:
-                raise AuthenticationRequiredError("Token expiring and no stored credentials for refresh")
+                raise AuthenticationRequiredError("No authentication token available and no stored credentials")
 
             # Attempt authentication with stored credentials
             result = self.authenticate(username, password)
             if not result.success:
-                raise AuthenticationRequiredError(f"Automatic refresh failed: {result.error_message}")
+                raise AuthenticationRequiredError(f"Authentication failed: {result.error_message}")
 
-            self.log.info("Token successfully refreshed")
-        else:
-            self.log.debug("Token is still valid")
+            self.log.info("Successfully authenticated with stored credentials")
 
     def logout(self) -> None:
-        """Clear authentication state"""
+        """Clear authentication state (token only, preserves credentials for re-auth)"""
         self.session_store.clear_token()
-        self.session_store.clear_credentials()
         try:
             self.session.close()
         except Exception:
             pass
         self.session = requests.Session()
+
+    def get_session_details(self):
+        """Return session diagnostics for UI display without exposing token contents."""
+        details = {
+            "login_email": "Unknown",
+            "account_id": None,
+            "authenticated": False,
+            "expires_at_utc": None,
+            "expires_at_local": None,
+            "expires_in_seconds": None,
+            "expires_in_human": None,
+            "issued_at_utc": None,
+            "issued_at_local": None,
+            "jwt_present": False,
+            "cookie_names": [],
+        }
+
+        try:
+            # Get credentials for login email
+            username, password = self.session_store.get_credentials()
+            if username:
+                details["login_email"] = username
+
+            # Check if we have a valid token
+            token = self.session_store.get_token()
+            if token and self._validate_token(token):
+                details["authenticated"] = True
+
+                # Parse JWT token for details
+                try:
+                    header, payload, signature = token.split(".")
+                    payload_decoded = base64.urlsafe_b64decode(payload + "==")
+                    claims = json.loads(payload_decoded)
+
+                    exp_timestamp = claims.get("exp")
+                    iat_timestamp = claims.get("iat")
+                    email_claim = claims.get("email")
+                    sub_claim = claims.get("sub")
+
+                    if email_claim:
+                        details["login_email"] = email_claim
+                    if sub_claim:
+                        details["account_id"] = sub_claim
+
+                    if exp_timestamp:
+                        exp_datetime_utc = datetime.fromtimestamp(exp_timestamp, tz=timezone.utc)
+                        exp_datetime_local = exp_datetime_utc.astimezone()
+                        details["expires_at_utc"] = exp_datetime_utc.isoformat()
+                        details["expires_at_local"] = exp_datetime_local.strftime("%Y-%m-%d %H:%M:%S %Z")
+
+                        now_timestamp = int(datetime.now(timezone.utc).timestamp())
+                        expires_in_seconds = exp_timestamp - now_timestamp
+                        details["expires_in_seconds"] = expires_in_seconds
+
+                        if expires_in_seconds > 0:
+                            days, rem = divmod(expires_in_seconds, 86400)
+                            hours, rem = divmod(rem, 3600)
+                            minutes, seconds = divmod(rem, 60)
+                            parts = []
+                            if days:
+                                parts.append(f"{days}d")
+                            if hours:
+                                parts.append(f"{hours}h")
+                            if minutes:
+                                parts.append(f"{minutes}m")
+                            if seconds or not parts:
+                                parts.append(f"{seconds}s")
+                            details["expires_in_human"] = " ".join(parts)
+                        else:
+                            details["expires_in_human"] = "Expired"
+
+                    if iat_timestamp:
+                        iat_datetime_utc = datetime.fromtimestamp(iat_timestamp, tz=timezone.utc)
+                        iat_datetime_local = iat_datetime_utc.astimezone()
+                        details["issued_at_utc"] = iat_datetime_utc.isoformat()
+                        details["issued_at_local"] = iat_datetime_local.strftime("%Y-%m-%d %H:%M:%S %Z")
+
+                    details["jwt_present"] = True
+
+                except Exception as e:
+                    self.log.debug(f"Failed to parse JWT token: {e}")
+
+            # Get cookie information
+            if self.session and self.session.cookies:
+                details["cookie_names"] = [c.name for c in self.session.cookies]
+
+        except Exception as e:
+            self.log.error(f"Error getting session details: {e}")
+
+        return details
 
     def _validate_token(self, token: str) -> bool:
         """Validate JWT token expiration"""
@@ -394,9 +494,15 @@ class AuthenticationCore:
         # Step 7: Extract JWT token from cookies
         jwt_token = ""
         for cookie in self.session.cookies:
-            if cookie.name == "angel_jwt":
+            # Check for the current JWT cookie name
+            if cookie.name == "angel_jwt_v2":
                 jwt_token = str(cookie.value)
-                self.log.debug(f"Found JWT token in cookies: {jwt_token[:10]}...")
+                self.log.debug(f"Found JWT token in cookie '{cookie.name}': {jwt_token[:20]}...")
+                break
+            # Fallback to old cookie name for backward compatibility
+            elif cookie.name == "angel_jwt":
+                jwt_token = str(cookie.value)
+                self.log.debug(f"Found JWT token in legacy cookie '{cookie.name}': {jwt_token[:20]}...")
                 break
 
         if jwt_token:
@@ -641,9 +747,14 @@ class AngelStudioSession:
         # Look for the JWT token in cookies
         jwt_token = ""
         for cookie in self.session.cookies:
-            if cookie.name == "angel_jwt":
+            if cookie.name == "angel_jwt_v2":
                 jwt_token = str(cookie.value)
-                self.log.debug(f"Found JWT token in cookies: {jwt_token[:10]}...")  # Log first 10 chars for brevity
+                self.log.debug(f"Found JWT token in cookie '{cookie.name}': {jwt_token[:10]}...")  # Log first 10 chars for brevity
+                break
+            # Fallback to old cookie name for backward compatibility
+            elif cookie.name == "angel_jwt":
+                jwt_token = str(cookie.value)
+                self.log.debug(f"Found JWT token in legacy cookie '{cookie.name}': {jwt_token[:10]}...")  # Log first 10 chars for brevity
                 break
 
         if jwt_token:
@@ -661,7 +772,7 @@ class AngelStudioSession:
 
     def _validate_session(self):
         """Check if the current session is valid"""
-        jwt_token = self.session.cookies.get("angel_jwt")
+        jwt_token = self.session.cookies.get("angel_jwt_v2") or self.session.cookies.get("angel_jwt")
         if not jwt_token:
             self.log.warning("No JWT token present in session cookies.")
             return False
@@ -727,7 +838,7 @@ class AngelStudioSession:
             jwt_token = None
             if self.session and self.session.cookies:
                 details["cookie_names"] = [c.name for c in self.session.cookies]
-                jwt_token = self.session.cookies.get("angel_jwt")
+                jwt_token = self.session.cookies.get("angel_jwt_v2") or self.session.cookies.get("angel_jwt")
 
             if not jwt_token:
                 return details
@@ -787,7 +898,13 @@ class AngelStudioSession:
             try:
                 jwt_token = ""
                 for cookie in self.session.cookies:
-                    if cookie.name == "angel_jwt":
+                    if cookie.name == "angel_jwt_v2":
+                        jwt_token = str(cookie.value)
+                        break
+                    # Fallback to old cookie name for backward compatibility
+                    elif cookie.name == "angel_jwt":
+                        jwt_token = str(cookie.value)
+                        break
                         jwt_token = str(cookie.value)
                         self.log.info(f"Loaded JWT token from cookies: {jwt_token[:10]}...")
                         break

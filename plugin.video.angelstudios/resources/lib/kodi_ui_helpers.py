@@ -50,12 +50,12 @@ class KodiUIHelpers:
 
     def show_auth_details_dialog(self):
         """Show authentication/session details in a dialog."""
-        if not self.parent.angel_interface or not getattr(self.parent.angel_interface, "angel_studios_session", None):
+        if not self.parent.angel_interface or not getattr(self.parent.angel_interface, "auth_core", None):
             xbmcgui.Dialog().ok("Angel Studios Session Details", "No session available.")
             return
 
         try:
-            details = self.parent.angel_interface.angel_studios_session.get_session_details()
+            details = self.parent.angel_interface.auth_core.get_session_details()
         except Exception:
             xbmcgui.Dialog().ok("Angel Studios Session Details", "Unable to read session details.")
             return
@@ -139,10 +139,13 @@ class KodiUIHelpers:
             raise ValueError("Angel interface not initialized")
         result = self.parent.angel_interface.force_logout()
         if result:
-            self.show_notification("Logged out locally.")
+            xbmcgui.Dialog().ok(
+                "Angel Studios - Force Logout",
+                "Successfully logged out.\n\nSession details may not update immediately.\nRestart the addon to see changes."
+            )
             self.parent.log.info("Logged out locally via settings")
         else:
-            self.show_notification("Logout failed; please try again.")
+            xbmcgui.Dialog().ok("Angel Studios - Force Logout", "Logout failed; please try again.")
             self.parent.log.error("Logout failed via settings")
 
     def _get_debug_mode(self):

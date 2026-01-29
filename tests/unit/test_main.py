@@ -242,8 +242,8 @@ class TestMain:
         dialog = MagicMock()
         monkeypatch.setattr("kodi_ui_interface.xbmcgui.Dialog", MagicMock(return_value=dialog))
 
-        session = MagicMock()
-        session.get_session_details.return_value = {
+        auth_core = MagicMock()
+        auth_core.get_session_details.return_value = {
             "login_email": "user@example.com",
             "account_id": "uuid-123",
             "authenticated": True,
@@ -253,14 +253,14 @@ class TestMain:
             "expires_in_seconds": 93784,
             "issued_at_local": "2026-01-04 10:00:00 PST",
             "issued_at_utc": "2026-01-04 18:00:00 UTC",
-            "cookie_names": ["angel_jwt", "other"],
+            "cookie_names": ["angel_jwt_v2", "other"],
             "session_file": "/tmp/session.pkl",
         }
-        ui.angel_interface = MagicMock(angel_studios_session=session)
+        ui.angel_interface = MagicMock(auth_core=auth_core)
 
         ui.show_auth_details_dialog()
 
-        session.get_session_details.assert_called_once()
+        auth_core.get_session_details.assert_called_once()
         dialog.textviewer.assert_called_once()
         content = dialog.textviewer.call_args[0][1]
         assert "user@example.com" in content
@@ -286,9 +286,9 @@ class TestMain:
         dialog = MagicMock()
         monkeypatch.setattr("kodi_ui_interface.xbmcgui.Dialog", MagicMock(return_value=dialog))
 
-        session = MagicMock()
-        session.get_session_details.side_effect = RuntimeError("boom")
-        ui.angel_interface = MagicMock(angel_studios_session=session)
+        auth_core = MagicMock()
+        auth_core.get_session_details.side_effect = RuntimeError("boom")
+        ui.angel_interface = MagicMock(auth_core=auth_core)
 
         ui.show_auth_details_dialog()
 
@@ -300,8 +300,8 @@ class TestMain:
         dialog = MagicMock()
         monkeypatch.setattr("kodi_ui_interface.xbmcgui.Dialog", MagicMock(return_value=dialog))
 
-        session = MagicMock()
-        session.get_session_details.return_value = {
+        auth_core = MagicMock()
+        auth_core.get_session_details.return_value = {
             "login_email": "user@example.com",
             "account_id": "uuid-123",
             "authenticated": True,
@@ -314,7 +314,7 @@ class TestMain:
             "cookie_names": [],
             "session_file": "/tmp/session.pkl",
         }
-        ui.angel_interface = MagicMock(angel_studios_session=session)
+        ui.angel_interface = MagicMock(auth_core=auth_core)
 
         ui.show_auth_details_dialog()
 

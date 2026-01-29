@@ -81,9 +81,12 @@ def test_force_logout_with_notification(ui_helpers):
     """Test force_logout_with_notification."""
     ui_helpers.parent.angel_interface = MagicMock()
     ui_helpers.parent.angel_interface.force_logout.return_value = True
-    with patch.object(ui_helpers, "show_notification") as mock_show:
+    with patch("xbmcgui.Dialog") as mock_dialog:
         ui_helpers.force_logout_with_notification()
-        mock_show.assert_called_once_with("Logged out locally.")
+        mock_dialog.return_value.ok.assert_called_once_with(
+            "Angel Studios - Force Logout",
+            "Successfully logged out.\n\nSession details may not update immediately.\nRestart the addon to see changes."
+        )
 
 
 def test_get_debug_mode(ui_helpers):

@@ -203,11 +203,14 @@ class TestSettingsCallbacks:
 
         angel_interface_mock.force_logout.return_value = True
 
-        with patch.object(ui.ui_helpers, "show_notification") as mock_notify:
+        with patch("xbmcgui.Dialog") as mock_dialog:
             ui.force_logout_with_notification()
 
             angel_interface_mock.force_logout.assert_called_once()
-            mock_notify.assert_called_once_with("Logged out locally.")
+            mock_dialog.return_value.ok.assert_called_once_with(
+                "Angel Studios - Force Logout",
+                "Successfully logged out.\n\nSession details may not update immediately.\nRestart the addon to see changes."
+            )
             logger_mock.info.assert_any_call("Logged out locally via settings")
 
     def test_force_logout_with_notification_failure(self, ui_interface, mock_xbmc):
@@ -216,11 +219,11 @@ class TestSettingsCallbacks:
 
         angel_interface_mock.force_logout.return_value = False
 
-        with patch.object(ui.ui_helpers, "show_notification") as mock_notify:
+        with patch("xbmcgui.Dialog") as mock_dialog:
             ui.force_logout_with_notification()
 
             angel_interface_mock.force_logout.assert_called_once()
-            mock_notify.assert_called_once_with("Logout failed; please try again.")
+            mock_dialog.return_value.ok.assert_called_once_with("Angel Studios - Force Logout", "Logout failed; please try again.")
             logger_mock.error.assert_any_call("Logout failed via settings")
 
     def test_force_logout_without_angel_interface(self, ui_interface, mock_xbmc):

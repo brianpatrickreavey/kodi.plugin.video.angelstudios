@@ -1036,7 +1036,7 @@ class TestAuthenticationCore:
         mock_store.get_token.assert_called_once()
 
     def test_logout(self):
-        """Test logout functionality"""
+        """Test logout functionality (clears token only, preserves credentials)"""
         mock_store = MagicMock()
         mock_session = MagicMock()
 
@@ -1046,7 +1046,8 @@ class TestAuthenticationCore:
         core.logout()
 
         mock_store.clear_token.assert_called_once()
-        mock_store.clear_credentials.assert_called_once()
+        # Should NOT clear credentials - they should be preserved for re-auth
+        mock_store.clear_credentials.assert_not_called()
         mock_session.close.assert_called_once()
 
     def test_refresh_token_placeholder(self):
@@ -1100,16 +1101,36 @@ class TestAuthenticationCore:
         assert "Authentication error" in result.error_message
 
     def test_ensure_valid_session_no_token(self):
-        """Test ensure_valid_session raises error when no token exists"""
+        """Test ensure_valid_session raises error when no token exists and no credentials"""
         from resources.lib.angel_authentication import AuthenticationRequiredError
 
         mock_store = MagicMock()
         mock_store.get_token.return_value = None
+        mock_store.get_credentials.return_value = (None, None)
 
         core = AuthenticationCore(session_store=mock_store)
 
-        with pytest.raises(AuthenticationRequiredError, match="No authentication token available"):
+        with pytest.raises(AuthenticationRequiredError, match="No authentication token available and no stored credentials"):
             core.ensure_valid_session()
+
+    def test_ensure_valid_session_no_token_with_credentials(self):
+        """Test ensure_valid_session authenticates when no token but credentials exist"""
+        mock_store = MagicMock()
+        mock_store.get_token.return_value = None
+        mock_store.get_credentials.return_value = ("user@example.com", "password")
+        mock_store.save_token = MagicMock()
+
+        core = AuthenticationCore(session_store=mock_store)
+        
+        # Mock the authenticate method to return success
+        with patch.object(core, 'authenticate') as mock_auth:
+            mock_auth.return_value = MagicMock(success=True, token="new.jwt.token")
+            
+            # Should not raise an exception
+            core.ensure_valid_session()
+            
+            # Should have called authenticate with credentials
+            mock_auth.assert_called_once_with("user@example.com", "password")
 
     def test_ensure_valid_session_invalid_token(self):
         """Test ensure_valid_session raises error for invalid token"""
