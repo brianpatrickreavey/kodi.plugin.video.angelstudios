@@ -1,7 +1,7 @@
 # Remote Logout Feature
 
 ## Overview
-The Remote Logout feature would call an Angel Studios API endpoint to invalidate JWT tokens server-side, providing immediate security benefits beyond local session cleanup.
+The Remote Logout feature would call an Angel Studios API endpoint to invalidate JWT tokens server-side, providing immediate security benefits beyond local session cleanup. Technical details documented in LOGOUT_PROCEDURE.md.
 
 ## Current Implementation Status
 
@@ -11,9 +11,9 @@ The Remote Logout feature would call an Angel Studios API endpoint to invalidate
 - **User Interface**: Logout option available in addon settings with user notification
 
 ### 🔄 Planned Features
-- **Remote Token Revocation**: API call to invalidate JWT token server-side when available
+- **Remote Token Revocation**: API call to invalidate JWT token server-side using Angel Studios logout endpoint
 - **Immediate Security**: Prevent token reuse even if compromised locally
-- **Cross-Device Logout**: Invalidate sessions across all user devices (if supported by Angel Studios)
+- **Cross-Device Logout**: Invalidate sessions across all user devices via server-side session termination
 
 ## Technical Implementation
 
@@ -28,8 +28,13 @@ The Remote Logout feature would call an Angel Studios API endpoint to invalidate
   - Creates fresh session object
 
 ### Planned Remote Logout Enhancement
-- **API Endpoint**: GraphQL mutation or REST endpoint (when available from Angel Studios)
-- **Token Submission**: Send current JWT token for server-side invalidation
+- **API Endpoint**: `https://auth.angel.com/logout`
+- **HTTP Method**: GET request
+- **Required Parameters**:
+  - `client_id=angel_web`
+  - `return_to=<optional_redirect_url>`
+- **Response**: `302 Found` redirect with `Set-Cookie` headers that clear all session cookies
+- **Cookies Cleared**: `_ellis_island_session`, `_ellis_island_web_user_remember_me`, `angelSession_v2.0`, `angel_jwt_v2`
 - **Fallback**: Graceful degradation to local-only logout if remote endpoint unavailable
 - **Error Handling**: Continue with local logout even if remote call fails
 
@@ -48,14 +53,17 @@ The Remote Logout feature would call an Angel Studios API endpoint to invalidate
 ## Implementation Requirements
 
 ### Angel Studios API
-- **Endpoint Availability**: Remote logout endpoint must be exposed by Angel Studios
-- **Authentication**: Likely requires valid JWT token for revocation
-- **Response**: Confirmation of successful token invalidation
+- **Endpoint Available**: `https://auth.angel.com/logout` (documented in LOGOUT_PROCEDURE.md)
+- **Authentication**: Uses current session cookies (no additional auth required)
+- **Response Validation**: Check for 302 status and Set-Cookie headers with expired dates
+- **Cookie Clearing**: Server automatically clears all session/JWT cookies via Set-Cookie headers
 
 ### Code Changes
-- **New Method**: `remote_logout()` in authentication classes
-- **Integration**: Call remote logout before/after local cleanup
-- **Error Handling**: Continue with local logout if remote call fails
+- **New Method**: `remote_logout()` in `AngelStudioSession` class
+- **Integration**: Call remote logout before local cleanup to ensure server-side invalidation
+- **HTTP Request**: GET request with `client_id=angel_web` parameter
+- **Response Handling**: Don't follow redirects (`allow_redirects=False`) to inspect 302 response
+- **Error Handling**: Continue with local logout if remote call fails or times out
 - **Testing**: Unit tests for remote logout success/failure scenarios
 
 ## User Experience Impact
@@ -71,4 +79,4 @@ The Remote Logout feature would call an Angel Studios API endpoint to invalidate
 - **Progressive Enhancement**: Adds security benefits when available
 
 ## Status
-**Waiting on Angel Studios API**: Implementation blocked until remote logout endpoint is available from Angel Studios. Current local logout provides basic functionality while maintaining security best practices for token storage and session management.
+**Ready for Implementation**: Angel Studios logout endpoint is available and documented in LOGOUT_PROCEDURE.md. Implementation involves adding remote logout call to existing `logout()` method with proper error handling and fallback to local-only logout.
