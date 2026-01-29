@@ -142,6 +142,18 @@ msgctxt "#30207"
 msgid "Display current login status in a dialog"
 msgstr "Display current login status in a dialog"
 
+msgctxt "#30208"
+msgid "Token refresh buffer (hours)"
+msgstr "Token refresh buffer (hours)"
+
+msgctxt "#30209"
+msgid "Automatically refresh authentication token before it expires"
+msgstr "Automatically refresh authentication token before it expires"
+
+msgctxt "#30210"
+msgid "{} hours"
+msgstr "{} hours"
+
 # ============================================================================
 # 30300-30399: Folders & Content Types
 # ============================================================================

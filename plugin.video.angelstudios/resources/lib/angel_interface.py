@@ -142,10 +142,31 @@ class AngelStudiosInterface:
             # Tracing must never break main flow
             pass
 
-    def _graphql_query(self, operation: str, variables=None) -> dict:
-        """Generalized GraphQL query executor with automatic fragment loading and caching."""
+    def _graphql_query(self, operation: str, variables=None, raw_query=None) -> dict:
+        """Generalized GraphQL query executor with automatic fragment loading and caching.
+        
+        Args:
+            operation: Name of the operation (for loading from file) or operation name for raw queries
+            variables: Query variables
+            raw_query: Raw GraphQL query string (if provided, operation is used as operationName)
+        """
         variables = variables or {}
-        query = self._load_query(operation)
+        
+        # Proactive session validation - refresh token if expiring soon
+        try:
+            self.auth_core.ensure_valid_session()
+            # Update session headers in case token was refreshed
+            token = self.auth_core.session_store.get_token()
+            if token:
+                self.session.headers.update({"Authorization": f"Bearer {token}"})
+        except AuthenticationRequiredError:
+            # If proactive validation fails, re-raise for UI layer to handle
+            raise
+        
+        if raw_query:
+            query = raw_query
+        else:
+            query = self._load_query(operation)
 
         # Find all fragment references in the query
         # This regex captures fragment names after '...'
@@ -331,46 +352,22 @@ class AngelStudiosInterface:
                 query += "  }\n"
             query += "}\n"
 
-            query_dict = {
-                "operationName": "getProjectsForSlugs",
-                "query": query,
-                "variables": {},
-            }
+            result = self._graphql_query("getProjectsForSlugs", variables={}, raw_query=query)
 
-            self._debug_log(f"Batch projects query for {len(slugs)} slugs", category="api")
-            self._debug_log(f"Batch projects query:\n{query}", category="api")
+            # Map responses back from sanitized aliases to original slugs
+            data = result
+            remapped_data = {}
+            for slug in slugs:
+                sanitized_key = f"project_{slug.replace('-', '_')}"
+                if sanitized_key in data:
+                    remapped_data[slug] = data[sanitized_key]
 
-            try:
-                response = self.session.post(angel_graphql_url, json=query_dict, timeout=self.timeout)
-                response.raise_for_status()
-                result = response.json()
+            self.log.info(f"Batch query returned {len(remapped_data)} projects")
+            return remapped_data
 
-                self._debug_log(f"Batch projects response: {json.dumps(result, indent=2)}", category="api")
-
-                if "errors" in result:
-                    self.log.error(f"GraphQL errors: {result['errors']}")
-                    raise AuthenticationRequiredError("Authentication required - session may have expired")
-
-                # Map responses back from sanitized aliases to original slugs
-                data = result.get("data", {})
-                remapped_data = {}
-                for slug in slugs:
-                    sanitized_key = f"project_{slug.replace('-', '_')}"
-                    if sanitized_key in data:
-                        remapped_data[slug] = data[sanitized_key]
-
-                self.log.info(f"Batch query returned {len(remapped_data)} projects")
-                return remapped_data
-
-            except requests.Timeout:
-                self.log.error(f"Batch projects request timeout ({self.timeout}s)")
-                raise Exception(f"Request timeout: Unable to connect to Angel Studios (timeout: {self.timeout}s)")
-            except requests.RequestException as e:
-                self.log.error(f"Batch projects request failed: {e}")
-                if hasattr(e, "response") and e.response is not None and hasattr(e.response, "text"):
-                    self.log.error(f"GraphQL response body: {e.response.text}")
-                return {}
-
+        except AuthenticationRequiredError:
+            # Re-raise auth errors for UI layer
+            raise
         except Exception as e:
             self.log.error(f"Error fetching batch projects: {e}")
             # Re-raise timeout exceptions to allow UI to handle them

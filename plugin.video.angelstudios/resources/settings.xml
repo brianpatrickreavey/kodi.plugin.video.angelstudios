@@ -67,6 +67,19 @@
                         <hidden>true</hidden>
                     </control>
                 </setting>
+                <setting id="expiry_buffer_hours" type="integer" label="30208" help="30209">
+                    <level>0</level>
+                    <default>1</default>
+                    <constraints>
+                        <minimum>0</minimum>
+                        <step>1</step>
+                        <maximum>24</maximum>
+                    </constraints>
+                    <control format="integer" type="slider">
+                        <popup>false</popup>
+                        <formatlabel>30210</formatlabel>
+                    </control>
+                </setting>
                 <setting id="show_auth_details" type="action" label="30206" help="30207">
                     <level>0</level>
                     <data>RunPlugin(plugin://plugin.video.angelstudios/?action=show_information)</data>

@@ -60,6 +60,25 @@ class SessionStore(ABC):
         """Clear the stored JWT token"""
         pass
 
+    @abstractmethod
+    def save_credentials(self, username: str, password: str) -> None:
+        """Save username and password to persistent storage"""
+        pass
+
+    @abstractmethod
+    def get_credentials(self) -> tuple[str | None, str | None]:
+        """Retrieve username and password from persistent storage"""
+        pass
+
+    @abstractmethod
+    def clear_credentials(self) -> None:
+        """Clear stored username and password"""
+        pass
+
+    def get_expiry_buffer_hours(self) -> int:
+        """Get the expiry buffer in hours (default implementation returns 1)"""
+        return 1
+
 
 class KodiSessionStore(SessionStore):
     """Kodi addon settings-based session store"""
@@ -79,6 +98,32 @@ class KodiSessionStore(SessionStore):
     def clear_token(self) -> None:
         """Clear JWT token from Kodi addon settings"""
         self.addon.setSettingString("jwt_token", "")
+
+    def save_credentials(self, username: str, password: str) -> None:
+        """Save username and password to Kodi addon settings"""
+        self.addon.setSettingString("username", username)
+        self.addon.setSettingString("password", password)
+
+    def get_credentials(self) -> tuple[str | None, str | None]:
+        """Get username and password from Kodi addon settings"""
+        username = self.addon.getSettingString("username")
+        password = self.addon.getSettingString("password")
+        return (username if username else None, password if password else None)
+
+    def clear_credentials(self) -> None:
+        """Clear username and password from Kodi addon settings"""
+        self.addon.setSettingString("username", "")
+        self.addon.setSettingString("password", "")
+
+    def get_expiry_buffer_hours(self) -> int:
+        """Get the expiry buffer in hours from addon settings (default 1 hour)"""
+        try:
+            buffer_str = self.addon.getSettingString("expiry_buffer_hours")
+            if buffer_str:
+                return int(buffer_str)
+            return 1  # Default 1 hour
+        except (ValueError, TypeError):
+            return 1
 
 
 class AuthenticationCore:
@@ -117,6 +162,7 @@ class AuthenticationCore:
             token = self._perform_authentication(username, password)
             if token:
                 self.session_store.save_token(token)
+                self.session_store.save_credentials(username, password)
                 return AuthResult(success=True, token=token)
             else:
                 error_msg = "Authentication failed: No token received"
@@ -146,9 +192,44 @@ class AuthenticationCore:
         self.log.warning("Token refresh not yet implemented")
         return False
 
+    def ensure_valid_session(self) -> None:
+        """Ensure the session is valid, refreshing if necessary"""
+        token = self.session_store.get_token()
+        if not token:
+            raise AuthenticationRequiredError("No authentication token available")
+        
+        # Check if token is expiring soon
+        exp_timestamp = self._get_jwt_expiration_timestamp(token)
+        if exp_timestamp is None:
+            raise AuthenticationRequiredError("Invalid authentication token")
+        
+        buffer_hours = 1  # Default buffer
+        if hasattr(self.session_store, 'get_expiry_buffer_hours'):
+            buffer_hours = self.session_store.get_expiry_buffer_hours()
+        
+        buffer_seconds = buffer_hours * 3600
+        now_timestamp = int(datetime.now(timezone.utc).timestamp())
+        
+        if exp_timestamp <= (now_timestamp + buffer_seconds):
+            self.log.info(f"Token expiring soon (within {buffer_hours}h), attempting refresh")
+            # Try to refresh using stored credentials
+            username, password = self.session_store.get_credentials()
+            if not username or not password:
+                raise AuthenticationRequiredError("Token expiring and no stored credentials for refresh")
+            
+            # Attempt authentication with stored credentials
+            result = self.authenticate(username, password)
+            if not result.success:
+                raise AuthenticationRequiredError(f"Automatic refresh failed: {result.error_message}")
+            
+            self.log.info("Token successfully refreshed")
+        else:
+            self.log.debug("Token is still valid")
+
     def logout(self) -> None:
         """Clear authentication state"""
         self.session_store.clear_token()
+        self.session_store.clear_credentials()
         try:
             self.session.close()
         except Exception:
