@@ -179,8 +179,8 @@ class TestMain:
         sys.argv = ["plugin://", "1", "?"]
 
         kodi_ui_mock = MagicMock()
-        monkeypatch.setattr('kodi_ui_interface.KodiUIInterface', MagicMock(return_value=kodi_ui_mock))
-        monkeypatch.setattr('angel_interface.AngelStudiosInterface', MagicMock())
+        monkeypatch.setattr("kodi_ui_interface.KodiUIInterface", MagicMock(return_value=kodi_ui_mock))
+        monkeypatch.setattr("angel_interface.AngelStudiosInterface", MagicMock())
 
         sys.path.insert(0, str(MAIN_PATH.parent))
         sys.path.insert(0, str(RES_LIB))
@@ -199,9 +199,9 @@ class TestMain:
         monkeypatch.setattr(sys.modules["xbmcvfs"], "exists", MagicMock(return_value=True))
 
         asi = MagicMock()
-        monkeypatch.setattr('angel_interface.AngelStudiosInterface', MagicMock(return_value=asi))
+        monkeypatch.setattr("angel_interface.AngelStudiosInterface", MagicMock(return_value=asi))
         ui_mock = MagicMock()
-        monkeypatch.setattr('kodi_ui_interface.KodiUIInterface', MagicMock(return_value=ui_mock))
+        monkeypatch.setattr("kodi_ui_interface.KodiUIInterface", MagicMock(return_value=ui_mock))
 
         sys.argv = ["plugin://", "1", "?action=movies_menu"]
 
@@ -222,11 +222,9 @@ class TestMain:
         monkeypatch.setattr(sys.modules["xbmcvfs"], "translatePath", MagicMock(side_effect=lambda p: p))
         monkeypatch.setattr(sys.modules["xbmcvfs"], "exists", MagicMock(return_value=True))
 
-        monkeypatch.setattr(
-            'angel_interface.AngelStudiosInterface', MagicMock(side_effect=RuntimeError("boom"))
-        )
+        monkeypatch.setattr("angel_interface.AngelStudiosInterface", MagicMock(side_effect=RuntimeError("boom")))
         ui_mock = MagicMock()
-        monkeypatch.setattr('kodi_ui_interface.KodiUIInterface', MagicMock(return_value=ui_mock))
+        monkeypatch.setattr("kodi_ui_interface.KodiUIInterface", MagicMock(return_value=ui_mock))
 
         sys.argv = ["plugin://", "1", "?action=movies_menu"]
 

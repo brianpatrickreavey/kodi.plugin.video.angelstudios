@@ -1,0 +1,53 @@
+# Makefile for auth0-ciam-client package
+SHELL := /bin/bash
+
+# Package directories
+PACKAGE_DIR := .
+SOURCE_DIR := auth0_ciam_client
+TEST_DIR := tests
+
+.PHONY: help install install-dev lint format test test-coverage build clean
+
+help:
+	@echo "Available targets:"
+	@echo "  install       - Install package in development mode"
+	@echo "  install-dev   - Install package with development dependencies"
+	@echo "  lint          - Run linting (black, flake8, mypy)"
+	@echo "  format        - Format code with black"
+	@echo "  test          - Run tests"
+	@echo "  test-coverage - Run tests with coverage"
+	@echo "  build         - Build distribution packages"
+	@echo "  clean         - Clean build artifacts"
+
+install:
+	pip install -e .
+
+install-dev:
+	pip install -e ".[dev]"
+
+lint:
+	black --check --line-length=120 $(SOURCE_DIR) $(TEST_DIR)
+	flake8 $(SOURCE_DIR) $(TEST_DIR) --max-line-length=120
+	mypy $(SOURCE_DIR)
+
+format:
+	black --line-length=120 $(SOURCE_DIR) $(TEST_DIR)
+
+test:
+	pytest $(TEST_DIR) -v
+
+test-coverage:
+	pytest --cov=$(SOURCE_DIR) --cov-report=term-missing $(TEST_DIR)
+
+build:
+	python setup.py sdist bdist_wheel
+
+clean:
+	rm -rf build/
+	rm -rf dist/
+	rm -rf *.egg-info/
+	rm -rf .coverage
+	rm -rf htmlcov/
+	find . -type d -name __pycache__ -exec rm -rf {} +
+	find . -type f -name "*.pyc" -delete</content>
+<parameter name="filePath">/home/bpreavey/Code/kodi.plugin.video.angelstudios/auth0-ciam-client/Makefile

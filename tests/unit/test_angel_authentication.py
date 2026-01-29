@@ -11,7 +11,13 @@ import pytest
 import requests
 from bs4 import Tag
 
-from resources.lib.angel_authentication import AngelStudioSession, SessionStore, KodiSessionStore, AuthenticationCore, AuthResult
+from resources.lib.angel_authentication import (
+    AngelStudioSession,
+    SessionStore,
+    KodiSessionStore,
+    AuthenticationCore,
+    AuthResult,
+)
 import resources.lib.angel_utils as angel_utils
 
 
@@ -905,17 +911,14 @@ class TestKodiSessionStore:
 
         store.save_credentials("testuser", "testpass")
 
-        mock_addon.setSettingString.assert_has_calls([
-            (("username", "testuser"), {}),
-            (("password", "testpass"), {})
-        ])
+        mock_addon.setSettingString.assert_has_calls([(("username", "testuser"), {}), (("password", "testpass"), {})])
 
     def test_get_credentials_existing(self):
         """Test getting existing credentials from addon settings"""
         mock_addon = MagicMock()
         mock_addon.getSettingString.side_effect = lambda key: {
             "username": "existing_user",
-            "password": "existing_pass"
+            "password": "existing_pass",
         }.get(key, "")
         store = KodiSessionStore(mock_addon)
 
@@ -942,10 +945,7 @@ class TestKodiSessionStore:
 
         store.clear_credentials()
 
-        mock_addon.setSettingString.assert_has_calls([
-            (("username", ""), {}),
-            (("password", ""), {})
-        ])
+        mock_addon.setSettingString.assert_has_calls([(("username", ""), {}), (("password", ""), {})])
 
     def test_get_expiry_buffer_hours_default(self):
         """Test getting expiry buffer with default value"""
@@ -1110,7 +1110,9 @@ class TestAuthenticationCore:
 
         core = AuthenticationCore(session_store=mock_store)
 
-        with pytest.raises(AuthenticationRequiredError, match="No authentication token available and no stored credentials"):
+        with pytest.raises(
+            AuthenticationRequiredError, match="No authentication token available and no stored credentials"
+        ):
             core.ensure_valid_session()
 
     def test_ensure_valid_session_no_token_with_credentials(self):
@@ -1121,14 +1123,14 @@ class TestAuthenticationCore:
         mock_store.save_token = MagicMock()
 
         core = AuthenticationCore(session_store=mock_store)
-        
+
         # Mock the authenticate method to return success
-        with patch.object(core, 'authenticate') as mock_auth:
+        with patch.object(core, "authenticate") as mock_auth:
             mock_auth.return_value = MagicMock(success=True, token="new.jwt.token")
-            
+
             # Should not raise an exception
             core.ensure_valid_session()
-            
+
             # Should have called authenticate with credentials
             mock_auth.assert_called_once_with("user@example.com", "password")
 
@@ -1192,7 +1194,7 @@ class TestAuthenticationCore:
 
         core = AuthenticationCore(session_store=mock_store)
         # Mock the authenticate method to return success
-        with patch.object(core, 'authenticate', return_value=AuthResult(success=True, token=new_token)):
+        with patch.object(core, "authenticate", return_value=AuthResult(success=True, token=new_token)):
             # Should not raise any exception
             core.ensure_valid_session()
 
@@ -1214,6 +1216,6 @@ class TestAuthenticationCore:
 
         core = AuthenticationCore(session_store=mock_store)
         # Mock failed authentication
-        with patch.object(core, 'authenticate', return_value=AuthResult(success=False, error_message="Auth failed")):
+        with patch.object(core, "authenticate", return_value=AuthResult(success=False, error_message="Auth failed")):
             with pytest.raises(AuthenticationRequiredError, match="Automatic refresh failed: Auth failed"):
                 core.ensure_valid_session()

@@ -188,10 +188,7 @@ if __name__ == "__main__":
             logger.info(f"Using query path: {query_path}")
 
             # Initialize AuthenticationCore with Kodi session store
-            auth_core = AuthenticationCore(
-                session_store=KodiSessionStore(ADDON),
-                logger=logger
-            )
+            auth_core = AuthenticationCore(session_store=KodiSessionStore(ADDON), logger=logger)
 
             # Initialize Angel Studios interface with authentication core
             asi = AngelStudiosInterface(

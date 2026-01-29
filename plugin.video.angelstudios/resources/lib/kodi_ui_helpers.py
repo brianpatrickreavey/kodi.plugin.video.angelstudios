@@ -141,7 +141,7 @@ class KodiUIHelpers:
         if result:
             xbmcgui.Dialog().ok(
                 "Angel Studios - Force Logout",
-                "Successfully logged out.\n\nSession details may not update immediately.\nRestart the addon to see changes."
+                "Successfully logged out.\n\nSession details may not update immediately.\nRestart the addon to see changes.",
             )
             self.parent.log.info("Logged out locally via settings")
         else:

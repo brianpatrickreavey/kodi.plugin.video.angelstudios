@@ -2,7 +2,8 @@
 
 import logging
 import sys
-from datetime import datetime, timezone, timedelta
+import urllib.parse
+from datetime import datetime, timezone
 from typing import Optional, Callable
 from dataclasses import dataclass
 
@@ -22,6 +23,7 @@ from .exceptions import (
 @dataclass
 class AuthResult:
     """Result of an authentication operation."""
+
     success: bool
     token: Optional[str] = None
     error_message: Optional[str] = None
@@ -187,7 +189,7 @@ class AuthenticationCore:
         """
         try:
             # Basic JWT structure validation
-            parts = token.split('.')
+            parts = token.split(".")
             if len(parts) != 3:
                 return False
 
@@ -197,13 +199,13 @@ class AuthenticationCore:
 
             # Add padding if needed
             payload_b64 = parts[1]
-            payload_b64 += '=' * (4 - len(payload_b64) % 4)
+            payload_b64 += "=" * (4 - len(payload_b64) % 4)
 
             payload_bytes = base64.urlsafe_b64decode(payload_b64)
-            payload = json.loads(payload_bytes.decode('utf-8'))
+            payload = json.loads(payload_bytes.decode("utf-8"))
 
             # Check expiration
-            exp = payload.get('exp')
+            exp = payload.get("exp")
             if not exp:
                 return False
 
@@ -226,17 +228,17 @@ class AuthenticationCore:
             import base64
             import json
 
-            parts = token.split('.')
+            parts = token.split(".")
             if len(parts) != 3:
                 return None
 
             payload_b64 = parts[1]
-            payload_b64 += '=' * (4 - len(payload_b64) % 4)
+            payload_b64 += "=" * (4 - len(payload_b64) % 4)
 
             payload_bytes = base64.urlsafe_b64decode(payload_b64)
-            payload = json.loads(payload_bytes.decode('utf-8'))
+            payload = json.loads(payload_bytes.decode("utf-8"))
 
-            return payload.get('exp')
+            return payload.get("exp")
 
         except Exception:
             return None
@@ -244,8 +246,8 @@ class AuthenticationCore:
     def _perform_authentication(self, username: str, password: str) -> Optional[str]:
         """Perform the full Auth0 authentication flow.
 
-        This is a placeholder implementation that needs to be adapted
-        from the original angel_authentication.py logic.
+        This method implements the web scraping approach to Auth0 authentication,
+        which is necessary when proper OAuth PKCE flows are not available.
 
         Args:
             username: User email/username
@@ -253,14 +255,186 @@ class AuthenticationCore:
 
         Returns:
             Optional[str]: JWT token if successful, None otherwise
-        """
-        # TODO: Extract and adapt the authentication flow from angel_authentication.py
-        # This will include:
-        # 1. Get login page
-        # 2. Parse state/CSRF tokens
-        # 3. Submit credentials
-        # 4. Extract JWT from cookies
-        # 5. Handle redirects and errors
 
-        self.log.warning("_perform_authentication not yet implemented")
-        return None
+        Raises:
+            NetworkError: For network-related failures
+            InvalidCredentialsError: For authentication failures
+            AuthenticationError: For other authentication errors
+        """
+        self.log.info("Starting full authentication flow")
+
+        # Derive URLs from base_url (assuming Auth0 subdomain pattern)
+        # This can be made more configurable later if needed
+        base_url = self.config.base_url.rstrip("/")
+        web_url = base_url
+        # For now, assume auth subdomain - this could be configurable
+        auth_url = base_url.replace("://www.", "://auth.").replace("://", "://auth.")
+
+        login_url = f"{web_url}/auth/login"
+        self.log.info(f"Login URL: {login_url}")
+
+        # Set User-Agent from config or use default
+        user_agent = self.config.user_agent or (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/58.0.3029.110 Safari/537.3"
+        )
+        self.session.headers.update({"User-Agent": user_agent})
+
+        # Ensure no stale Authorization header for login fetch
+        self.session.headers.pop("Authorization", None)
+
+        # Clear cookies to avoid cached responses based on session state
+        self.session.cookies.clear()
+
+        # Step 1: Get login page
+        self.log.info(f"Fetching login page: {login_url}")
+        try:
+            login_page_response = self.session.get(login_url, timeout=self.config.request_timeout)
+        except requests.Timeout:
+            error_msg = f"Request timeout: Unable to connect to {base_url} (timeout: {self.config.request_timeout}s)"
+            self.log.error(error_msg)
+            raise NetworkError(error_msg)
+        except requests.RequestException as e:
+            error_msg = f"Failed to fetch login page: {e}"
+            self.log.error(error_msg)
+            raise NetworkError(error_msg)
+
+        if login_page_response.status_code != 200:
+            error_msg = f"Failed to fetch login page: HTTP {login_page_response.status_code}"
+            self.log.error(error_msg)
+            raise NetworkError(error_msg)
+
+        self.log.info("Successfully fetched login page.")
+
+        # Step 2: Parse state from login page
+        soup = BeautifulSoup(login_page_response.content, "html.parser")
+        state = self.session.cookies.get("angelSession", "")  # This might be Auth0-specific
+        for element in soup.find_all("input"):
+            if not isinstance(element, Tag):
+                continue
+            if element.get("id") == "state" and element.get("name") == "state":
+                state = element.get("value")
+
+        email_payload = {"email": username, "state": state}
+        email_uri = f"{auth_url}/u/login/password?{urllib.parse.urlencode(email_payload)}"
+
+        # Step 3: Get post-email page
+        self.log.info(f"Fetching post-email page: {email_uri}")
+        try:
+            email_response = self.session.get(
+                email_uri, headers={"Cache-Control": "no-cache"}, timeout=self.config.request_timeout
+            )
+        except requests.Timeout:
+            error_msg = f"Request timeout: Unable to connect to {auth_url} (timeout: {self.config.request_timeout}s)"
+            self.log.error(error_msg)
+            raise NetworkError(error_msg)
+        except requests.RequestException as e:
+            error_msg = f"Failed to fetch post-email page: {e}"
+            self.log.error(error_msg)
+            raise NetworkError(error_msg)
+
+        if email_response.status_code != 200:
+            error_msg = f"Failed to fetch post-email page: HTTP {email_response.status_code}"
+            self.log.error(error_msg)
+            raise NetworkError(error_msg)
+
+        self.log.info("Successfully fetched post-email page.")
+
+        # Step 4: Parse state and csrf_token from post-email page
+        soup = BeautifulSoup(email_response.content, "html.parser")
+        state2 = None
+        csrf_token = None
+        for input_element in soup.find_all("input"):
+            if not isinstance(input_element, Tag):
+                continue
+            if input_element.get("id") == "state" and input_element.get("name") == "state":
+                state2 = input_element.get("value")
+            elif input_element.get("name") == "_csrf_token":
+                csrf_token = input_element.get("value")
+
+        password_uri = f"{auth_url}/u/login?{urllib.parse.urlencode({'state': state2})}"
+        password_payload = {
+            "email": username,
+            "password": password,
+            "state": state2,
+            "_csrf_token": csrf_token,
+            "has_agreed": "true",
+        }
+
+        # Step 5: Post password
+        try:
+            password_response = self.session.post(
+                password_uri, data=password_payload, allow_redirects=False, timeout=self.config.request_timeout
+            )
+        except requests.Timeout:
+            error_msg = f"Request timeout: Unable to connect to {auth_url} (timeout: {self.config.request_timeout}s)"
+            self.log.error(error_msg)
+            raise NetworkError(error_msg)
+        except requests.RequestException as e:
+            error_msg = f"Password submission failed: {e}"
+            self.log.error(error_msg)
+            raise NetworkError(error_msg)
+
+        # Handle authentication response
+        if password_response.status_code in (302, 303):
+            redirect_url = password_response.headers.get("Location")
+            if not redirect_url:
+                error_msg = "Login redirect missing Location header"
+                self.log.error(error_msg)
+                raise AuthenticationError(error_msg)
+
+            self.log.info(f"Following redirect to: {redirect_url}")
+            # Follow the redirect - required to complete the login process
+            try:
+                redirect_response = self.session.get(
+                    redirect_url, allow_redirects=True, timeout=self.config.request_timeout
+                )
+            except requests.Timeout:
+                error_msg = f"Request timeout following login redirect (timeout: {self.config.request_timeout}s)"
+                self.log.error(error_msg)
+                raise NetworkError(error_msg)
+            except requests.RequestException as e:
+                error_msg = f"Redirect follow failed: {e}"
+                self.log.error(error_msg)
+                raise NetworkError(error_msg)
+
+            if redirect_response.status_code == 200:
+                self.log.info("Login successful!")
+            else:
+                error_msg = f"Login failed after redirect: HTTP {redirect_response.status_code}"
+                self.log.error(error_msg)
+                raise InvalidCredentialsError(error_msg)
+
+        elif password_response.status_code == 200:
+            self.log.info("Login successful!")
+        else:
+            error_msg = f"Login failed: HTTP {password_response.status_code}"
+            self.log.error(error_msg)
+            raise InvalidCredentialsError(error_msg)
+
+        # Step 6: Check for error message in response
+        soup = BeautifulSoup(password_response.content, "html.parser")
+        if soup.find("div", class_="error-message"):
+            error_msg = "Login failed: Invalid username or password"
+            self.log.error(error_msg)
+            raise InvalidCredentialsError(error_msg)
+
+        # Step 7: Extract JWT token from cookies
+        jwt_token = ""
+        for cookie in self.session.cookies:
+            # Check for configured JWT cookie names in priority order
+            for cookie_name in self.config.jwt_cookie_names:
+                if cookie.name == cookie_name:
+                    jwt_token = str(cookie.value)
+                    self.log.debug(f"Found JWT token in cookie '{cookie.name}': {jwt_token[:20]}...")
+                    break
+            if jwt_token:
+                break
+
+        if jwt_token:
+            self.log.info("Successfully extracted JWT token from cookies")
+            return jwt_token
+        else:
+            self.log.warning("No JWT token found in cookies")
+            return None

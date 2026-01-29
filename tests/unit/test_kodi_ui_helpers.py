@@ -85,7 +85,7 @@ def test_force_logout_with_notification(ui_helpers):
         ui_helpers.force_logout_with_notification()
         mock_dialog.return_value.ok.assert_called_once_with(
             "Angel Studios - Force Logout",
-            "Successfully logged out.\n\nSession details may not update immediately.\nRestart the addon to see changes."
+            "Successfully logged out.\n\nSession details may not update immediately.\nRestart the addon to see changes.",
         )
 
 

@@ -13,24 +13,29 @@ class AuthenticationError(Exception):
 
 class AuthenticationRequiredError(AuthenticationError):
     """Raised when authentication is required but not available."""
+
     pass
 
 
 class SessionExpiredError(AuthenticationError):
     """Raised when the current session has expired."""
+
     pass
 
 
 class InvalidCredentialsError(AuthenticationError):
     """Raised when provided credentials are invalid."""
+
     pass
 
 
 class NetworkError(AuthenticationError):
     """Raised when network-related errors occur during authentication."""
+
     pass
 
 
 class ConfigurationError(AuthenticationError):
     """Raised when configuration is invalid or incomplete."""
+
     pass

@@ -608,9 +608,7 @@ class TestAngelStudiosInterface:
 
         mock_response = {"errors": [{"message": "Invalid query"}]}
 
-        with (
-            patch.object(angel_interface, "_load_fragment", return_value="...fragment"),
-        ):
+        with (patch.object(angel_interface, "_load_fragment", return_value="...fragment"),):
             mock_post_response = MagicMock()
             mock_post_response.json = MagicMock(return_value=mock_response)
             angel_interface.session.post.return_value = mock_post_response

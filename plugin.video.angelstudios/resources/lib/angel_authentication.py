@@ -16,27 +16,32 @@ import angel_utils
 
 class AuthenticationError(Exception):
     """Base class for authentication-related errors"""
+
     pass
 
 
 class AuthenticationRequiredError(AuthenticationError):
     """Raised when authentication is required but not available"""
+
     pass
 
 
 class SessionExpiredError(AuthenticationError):
     """Raised when the current session has expired"""
+
     pass
 
 
 class InvalidCredentialsError(AuthenticationError):
     """Raised when provided credentials are invalid"""
+
     pass
 
 
 @dataclass
 class AuthResult:
     """Result of an authentication operation"""
+
     success: bool
     token: Optional[str] = None
     error_message: Optional[str] = None
@@ -129,11 +134,13 @@ class KodiSessionStore(SessionStore):
 class AuthenticationCore:
     """Pure authentication logic - no UI dependencies"""
 
-    def __init__(self,
-                 session_store: SessionStore,
-                 error_callback: Optional[Callable[[str, str], None]] = None,
-                 logger=None,
-                 timeout=30):
+    def __init__(
+        self,
+        session_store: SessionStore,
+        error_callback: Optional[Callable[[str, str], None]] = None,
+        logger=None,
+        timeout=30,
+    ):
         self.session_store = session_store
         self.error_callback = error_callback
         self.timeout = timeout
@@ -202,7 +209,7 @@ class AuthenticationCore:
                 raise AuthenticationRequiredError("Invalid authentication token")
 
             buffer_hours = 1  # Default buffer
-            if hasattr(self.session_store, 'get_expiry_buffer_hours'):
+            if hasattr(self.session_store, "get_expiry_buffer_hours"):
                 buffer_hours = self.session_store.get_expiry_buffer_hours()
 
             buffer_seconds = buffer_hours * 3600
@@ -410,7 +417,7 @@ class AuthenticationCore:
         # Step 3: Get post-email page
         self.log.info(f"Fetching post-email page: {email_uri}")
         try:
-            email_response = self.session.get(email_uri, headers={'Cache-Control': 'no-cache'}, timeout=self.timeout)
+            email_response = self.session.get(email_uri, headers={"Cache-Control": "no-cache"}, timeout=self.timeout)
         except requests.Timeout:
             self.log.error(f"Timeout ({self.timeout}s) fetching post-email page")
             raise Exception(f"Request timeout: Unable to connect to Angel Studios (timeout: {self.timeout}s)")
@@ -630,7 +637,7 @@ class AngelStudioSession:
         self.log.info(
             f"Login page headers: {angel_utils.sanitize_headers_for_logging(dict(login_page_response.headers))}"
         )
-        self.log.info(f"Login page content: {login_page_response.content[:500]}...") # Log first 500 chars for brevity
+        self.log.info(f"Login page content: {login_page_response.content[:500]}...")  # Log first 500 chars for brevity
         self.log.info(f"Login page cookies: {login_page_response.cookies.get_dict()}")
 
         # Step 2: Parse state from login page
@@ -653,7 +660,7 @@ class AngelStudioSession:
         self.log.debug(f"Request method: GET")
         self.log.debug(f"Request headers: {angel_utils.sanitize_headers_for_logging(dict(self.session.headers))}")
         try:
-            email_response = self.session.get(email_uri, headers={'Cache-Control': 'no-cache'}, timeout=self.timeout)
+            email_response = self.session.get(email_uri, headers={"Cache-Control": "no-cache"}, timeout=self.timeout)
         except requests.Timeout:
             self.log.error(f"Timeout ({self.timeout}s) fetching post-email page")
             raise Exception(f"Request timeout: Unable to connect to Angel Studios (timeout: {self.timeout}s)")
@@ -664,7 +671,9 @@ class AngelStudioSession:
         if email_response.status_code != 200:
             self.log.error(f"Failed to fetch the post-email page: {email_response.status_code}")
             self.log.error(f"Post-email page response: {email_response.status_code} {email_response.reason}")
-            self.log.error(f"Post-email response headers: {angel_utils.sanitize_headers_for_logging(dict(email_response.headers))}")
+            self.log.error(
+                f"Post-email response headers: {angel_utils.sanitize_headers_for_logging(dict(email_response.headers))}"
+            )
             self.log.error(f"Post-email response content: {email_response.text}")
             raise Exception("Failed to fetch the post-email page")
         self.log.info("Successfully fetched the post-email page.")
@@ -719,7 +728,9 @@ class AngelStudioSession:
 
             self.log.debug(f"{redirect_response.status_code=}")
             self.log.debug(f"{redirect_response.url=}")
-            self.log.debug(f"Redirect headers: {angel_utils.sanitize_headers_for_logging(dict(redirect_response.headers))}")
+            self.log.debug(
+                f"Redirect headers: {angel_utils.sanitize_headers_for_logging(dict(redirect_response.headers))}"
+            )
             if redirect_response.status_code == 200:
                 self.log.info("Login successful!")
                 self.log.debug("Login step completed with 200 OK.")
@@ -749,12 +760,16 @@ class AngelStudioSession:
         for cookie in self.session.cookies:
             if cookie.name == "angel_jwt_v2":
                 jwt_token = str(cookie.value)
-                self.log.debug(f"Found JWT token in cookie '{cookie.name}': {jwt_token[:10]}...")  # Log first 10 chars for brevity
+                self.log.debug(
+                    f"Found JWT token in cookie '{cookie.name}': {jwt_token[:10]}..."
+                )  # Log first 10 chars for brevity
                 break
             # Fallback to old cookie name for backward compatibility
             elif cookie.name == "angel_jwt":
                 jwt_token = str(cookie.value)
-                self.log.debug(f"Found JWT token in legacy cookie '{cookie.name}': {jwt_token[:10]}...")  # Log first 10 chars for brevity
+                self.log.debug(
+                    f"Found JWT token in legacy cookie '{cookie.name}': {jwt_token[:10]}..."
+                )  # Log first 10 chars for brevity
                 break
 
         if jwt_token:

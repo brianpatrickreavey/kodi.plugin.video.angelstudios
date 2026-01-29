@@ -11,6 +11,7 @@ class Auth0Config:
     This class contains all settings needed to configure authentication
     against an Auth0 tenant.
     """
+
     base_url: str
     jwt_cookie_names: List[str] = field(default_factory=lambda: ["angel_jwt_v2", "angel_jwt"])
     request_timeout: int = 30
