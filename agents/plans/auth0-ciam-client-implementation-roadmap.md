@@ -1,75 +1,103 @@
 # Auth0 CIAM Client - Implementation Roadmap
 
-## Phase 1: Package Setup (Week 1)
-**Goal**: Create basic package structure and extract core functionality
+## Project Overview & Decisions
 
-### Tasks
-- [ ] Create `auth0-ciam-client/` directory structure
-- [ ] Set up `setup.py` and `pyproject.toml`
-- [ ] Extract `AuthenticationCore` to `auth0_ciam/core.py`
-- [ ] Extract `SessionStore` interface to `auth0_ciam/session_store.py`
-- [ ] Extract exceptions to `auth0_ciam/exceptions.py`
-- [ ] Create basic configuration system
-- [ ] Set up test directory structure
-- [ ] Copy and adapt existing tests
+### Package Naming
+**Decision**: `auth0-ciam-client` - Explicitly indicates this is a client-side implementation for Auth0 CIAM, distinguishing it from server-side tools prevalent on PyPI.
 
-### Success Criteria
-- Package can be installed locally
-- Basic imports work
-- Core classes instantiate without errors
-- Existing tests pass in new structure
+### Licensing
+**Decision**: GPL-3.0-only (for now) - Maintains consistency with the current Kodi addon license. Can be adjusted to more permissive license before publishing.
 
-## Phase 2: Configuration & Angel Studios Preset (Week 2)
-**Goal**: Make authentication configurable and create Angel Studios integration
+### Versioning
+**Decision**: `0.1.0` - Provides basic functionality sufficient for Angel Studios integration, but far from a complete Auth0 CIAM implementation.
 
-### Tasks
-- [ ] Implement configuration dataclass(es)
-- [ ] Create `AngelStudiosConfig` with preset values
-- [ ] Update `AuthenticationCore` to accept config parameter
-- [ ] Modify auth flow to use configurable URLs
-- [ ] Add cookie name configuration
-- [ ] Create convenience functions for Angel Studios usage
-- [ ] Update tests for new configuration system
+### Configuration Structure
+**Decision**: Single `Auth0Config` dataclass with all settings - Simplest approach that matches current code patterns and v0.1.0 requirements.
 
-### Success Criteria
-- Can authenticate with Angel Studios using new config
-- Configuration is backward compatible
-- Tests pass with both old and new patterns
+### Configurable Settings
+**Decision**: Base URLs, cookie names, timeouts, and user agent string. May only need base URL since we should follow redirects rather than hardcoding auth.angel.com.
 
-## Phase 3: Testing & Documentation (Week 3)
+### Dependencies
+**Decision**: Python 3.8+, requests, beautifulsoup4, pytest, pytest-mock. No typing-extensions needed for modern Python.
+
+### Error Handling
+**Decision**: Align to Auth0 errors as much as possible for better interoperability and debugging.
+
+### Release Strategy
+**Decision**: Release auth0-ciam-client 0.1.0 first, then update Kodi addon. Allows testing the package independently.
+
+## Current Implementation Status
+
+### ✅ Completed Work
+- **Package Structure**: Full `auth0-ciam-client/` directory with complete package structure
+- **Authentication Logic**: Extracted and implemented from `angel_authentication.py`
+- **Configuration System**: `Auth0Config` dataclass with Angel Studios preset
+- **Exception Hierarchy**: Custom exceptions aligned with Auth0 error patterns
+- **Makefile System**: Hybrid approach with root coordination and package standalone development
+- **Code Quality**: Formatted, linted, and tested (467 tests pass, 83% coverage)
+
+### Package Structure
+```
+auth0-ciam-client/
+├── auth0_ciam_client/
+│   ├── __init__.py      # API exports
+│   ├── config.py        # Auth0Config dataclass
+│   ├── core.py          # AuthenticationCore implementation
+│   ├── exceptions.py    # Custom exception hierarchy
+│   └── session_store.py # SessionStore interface + InMemorySessionStore
+├── tests/
+│   └── __init__.py      # Ready for test migration
+├── requirements.txt     # Runtime dependencies
+├── requirements-dev.txt # Development dependencies
+├── setup.py            # Package configuration
+├── README.md           # Package documentation
+└── Makefile            # Standalone development targets
+```
+
+### Makefile Restructuring
+- **Root Makefile**: Reorganized with variables, coordination targets (`lint-all`, `test-all`)
+- **Package Makefile**: Standalone development support using shared virtual environment
+- **Benefits**: Package can be developed independently while maintaining coordination
+
+## Phase 3: Testing & Documentation (Current Phase)
 **Goal**: Comprehensive testing and documentation
 
 ### Tasks
-- [ ] Migrate all authentication tests
+- [ ] Migrate authentication tests to `auth0-ciam-client/tests/`
+- [ ] Create package-specific unit tests
 - [ ] Add configuration-specific tests
-- [ ] Create integration tests
-- [ ] Write README with usage examples
-- [ ] Create API documentation
+- [ ] Create integration tests for end-to-end flows
+- [ ] Write comprehensive README with usage examples
+- [ ] Create API documentation and docstrings
 - [ ] Add Angel Studios integration example
 - [ ] Set up CI/CD pipeline (GitHub Actions)
+- [ ] Ensure 100% test coverage for package code
 
 ### Success Criteria
-- 100% test coverage maintained
+- 100% test coverage maintained for package
 - Documentation covers all public APIs
 - CI/CD passes on all pushes
 - Examples work end-to-end
+- Package can be tested independently
 
-## Phase 4: Packaging & Release (Week 4)
-**Goal**: Prepare for PyPI release and Kodi integration
+## Phase 4: Packaging & Kodi Integration
+**Goal**: Prepare for PyPI release and complete Kodi integration
 
 ### Tasks
-- [ ] Finalize package metadata
-- [ ] Test PyPI upload process
-- [ ] Create release notes
-- [ ] Update Kodi addon to use new package
-- [ ] Test Kodi integration
+- [ ] Finalize package metadata and dependencies
+- [ ] Test PyPI upload process (test.pypi.org)
+- [ ] Create release notes and changelog
+- [ ] Update Kodi addon to use auth0-ciam-client package
+- [ ] Test Kodi integration and backward compatibility
+- [ ] Update Kodi addon.xml dependencies
 - [ ] Publish v0.1.0 to PyPI
-- [ ] Update Kodi addon dependency
+- [ ] Remove extracted code from angel_authentication.py
 
 ### Success Criteria
-- Package available on PyPI
+- Package available on PyPI (or test PyPI)
 - Kodi addon works with new dependency
 - No regressions in functionality
+- Backward compatibility maintained
 - Documentation accessible online
 
 ## Risk Mitigation
