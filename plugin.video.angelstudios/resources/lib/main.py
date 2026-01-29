@@ -24,6 +24,7 @@ import xbmcgui  # type: ignore
 import xbmcvfs  # type: ignore
 
 from angel_interface import AngelStudiosInterface
+from angel_authentication import AuthenticationCore, KodiSessionStore
 from kodi_utils import KodiLogger, get_session_file
 from kodi_ui_interface import KodiUIInterface
 
@@ -65,7 +66,7 @@ logger = KodiLogger(
 # Create Angel Studios interface
 angel_interface = None
 
-ui_interface = KodiUIInterface(HANDLE, URL, logger=logger, angel_interface=angel_interface)
+# ui_interface will be created in main guard
 
 # Get credentials from addon settings once at module load
 USERNAME = ADDON.getSettingString("username")
@@ -73,7 +74,7 @@ PASSWORD = ADDON.getSettingString("password")
 TIMEOUT = ADDON.getSettingInt("request_timeout")
 
 
-def router(paramstring):
+def router(paramstring, ui_interface):
     """
     Router function that calls other functions based on the provided paramstring
     Main menu offers content browsing options and special menus mimicing the Angel.com website:
@@ -166,29 +167,36 @@ def router(paramstring):
 
 
 if __name__ == "__main__":
-    try:
-        logger.info(f"Addon invoked with argv: {sys.argv}")
+    logger.info(f"Addon invoked with argv: {sys.argv}")
 
-        if not USERNAME or not PASSWORD:
-            # Show error if credentials are not set
-            xbmcgui.Dialog().ok(
-                "Angel Studios",
-                "Please configure your Angel.com username and password in the addon settings.",
-            )
-        else:
+    if not USERNAME or not PASSWORD:
+        # Show error if credentials are not set
+        xbmcgui.Dialog().ok(
+            "Angel Studios",
+            "Please configure your Angel.com username and password in the addon settings.",
+        )
+    else:
+        try:
             # Call the router function with plugin parameters
             # Initialize Angel Studios authentication with session management
+
+            # Initialize UI interface
+            ui_interface = KodiUIInterface(HANDLE, URL, logger=logger, angel_interface=None)
 
             # Get the query path for GraphQL queries (relatvie to the addon path)
             query_path = xbmcvfs.translatePath(ADDON.getAddonInfo("path") + "/resources/lib/angel_graphql/")
             logger.info(f"Using query path: {query_path}")
 
-            # Initialize Angel Studios interface with session management
+            # Initialize AuthenticationCore with Kodi session store
+            auth_core = AuthenticationCore(
+                session_store=KodiSessionStore(ADDON),
+                logger=logger
+            )
+
+            # Initialize Angel Studios interface with authentication core
             asi = AngelStudiosInterface(
-                username=USERNAME,
-                password=PASSWORD,
-                session_file=get_session_file(),  # Use session file for persistent authentication
                 logger=logger,
+                auth_core=auth_core,
                 query_path=query_path,
                 tracer=ui_interface.get_trace_callback(),
                 timeout=TIMEOUT,
@@ -199,8 +207,8 @@ if __name__ == "__main__":
 
             # Call the router with parameters from the command line
             logger.info(f"Calling router with params: {sys.argv[2][1:]}")
-            router(sys.argv[2][1:])
+            router(sys.argv[2][1:], ui_interface)
 
-    except Exception as e:
-        logger.error(f"Addon initialization error: {e}")
-        ui_interface.show_error(f"Addon failed to start: {str(e)}")
+        except Exception as e:
+            logger.error(f"Addon initialization error: {e}")
+            ui_interface.show_error(f"Addon failed to start: {str(e)}")

@@ -31,9 +31,8 @@ class TestMain:
         """Routes with no params call main_menu."""
         main = _fresh_main_module()
         ui_mock = MagicMock()
-        monkeypatch.setattr(main, "ui_interface", ui_mock)
 
-        main.router("")
+        main.router("", ui_mock)
 
         ui_mock.main_menu.assert_called_once()
 
@@ -42,10 +41,9 @@ class TestMain:
         """Dispatch actions to correct UI methods; ensure no-op on all_content_menu."""
         main = _fresh_main_module()
         ui_mock = MagicMock()
-        monkeypatch.setattr(main, "ui_interface", ui_mock)
         paramstring = urlencode({"action": action, **extra})
 
-        main.router(paramstring)
+        main.router(paramstring, ui_mock)
 
         if method:
             getattr(ui_mock, method).assert_called_once()
@@ -57,9 +55,8 @@ class TestMain:
         """Info action surfaces message via show_error."""
         main = _fresh_main_module()
         ui_mock = MagicMock()
-        monkeypatch.setattr(main, "ui_interface", ui_mock)
 
-        main.router(urlencode({"action": "info", "message": "hi"}))
+        main.router(urlencode({"action": "info", "message": "hi"}), ui_mock)
 
         ui_mock.show_error.assert_called_once_with("hi")
 
@@ -67,9 +64,8 @@ class TestMain:
         """Unknown action is reported via show_error."""
         main = _fresh_main_module()
         ui_mock = MagicMock()
-        monkeypatch.setattr(main, "ui_interface", ui_mock)
 
-        main.router(urlencode({"action": "bad"}))
+        main.router(urlencode({"action": "bad"}), ui_mock)
 
         ui_mock.show_error.assert_called_once()
         assert "Invalid action" in ui_mock.show_error.call_args[0][0]
@@ -78,9 +74,8 @@ class TestMain:
         """clear_cache triggers cache clear and notification."""
         main = _fresh_main_module()
         ui_mock = MagicMock()
-        monkeypatch.setattr(main, "ui_interface", ui_mock)
 
-        main.router(urlencode({"action": "clear_cache"}))
+        main.router(urlencode({"action": "clear_cache"}), ui_mock)
 
         ui_mock.clear_cache_with_notification.assert_called_once()
 
@@ -88,9 +83,8 @@ class TestMain:
         """clear_cache failure surfaces failure notification."""
         main = _fresh_main_module()
         ui_mock = MagicMock()
-        monkeypatch.setattr(main, "ui_interface", ui_mock)
 
-        main.router(urlencode({"action": "clear_cache"}))
+        main.router(urlencode({"action": "clear_cache"}), ui_mock)
 
         ui_mock.clear_cache_with_notification.assert_called_once()
 
@@ -98,9 +92,8 @@ class TestMain:
         """clear_debug_data triggers cleanup and notification messaging."""
         main = _fresh_main_module()
         ui_mock = MagicMock()
-        monkeypatch.setattr(main, "ui_interface", ui_mock)
 
-        main.router(urlencode({"action": "clear_debug_data"}))
+        main.router(urlencode({"action": "clear_debug_data"}), ui_mock)
 
         ui_mock.clear_debug_data_with_notification.assert_called_once()
 
@@ -108,9 +101,8 @@ class TestMain:
         """clear_debug_data failure surfaces failure notification."""
         main = _fresh_main_module()
         ui_mock = MagicMock()
-        monkeypatch.setattr(main, "ui_interface", ui_mock)
 
-        main.router(urlencode({"action": "clear_debug_data"}))
+        main.router(urlencode({"action": "clear_debug_data"}), ui_mock)
 
         ui_mock.clear_debug_data_with_notification.assert_called_once()
 
@@ -118,9 +110,8 @@ class TestMain:
         """force_logout triggers interface logout and notification."""
         main = _fresh_main_module()
         ui_mock = MagicMock()
-        monkeypatch.setattr(main, "ui_interface", ui_mock)
 
-        main.router(urlencode({"action": "force_logout"}))
+        main.router(urlencode({"action": "force_logout"}), ui_mock)
 
         ui_mock.force_logout_with_notification.assert_called_once()
 
@@ -128,9 +119,8 @@ class TestMain:
         """force_logout failure surfaces failure notification."""
         main = _fresh_main_module()
         ui_mock = MagicMock()
-        monkeypatch.setattr(main, "ui_interface", ui_mock)
 
-        main.router(urlencode({"action": "force_logout"}))
+        main.router(urlencode({"action": "force_logout"}), ui_mock)
 
         ui_mock.force_logout_with_notification.assert_called_once()
 
@@ -139,9 +129,8 @@ class TestMain:
         main = _fresh_main_module()
         ui_mock = MagicMock()
         ui_mock.force_logout_with_notification.side_effect = ValueError("Angel interface not initialized")
-        monkeypatch.setattr(main, "ui_interface", ui_mock)
 
-        main.router(urlencode({"action": "force_logout"}))
+        main.router(urlencode({"action": "force_logout"}), ui_mock)
 
         ui_mock.show_error.assert_called_once()
         assert "navigation error" in ui_mock.show_error.call_args[0][0].lower()
@@ -150,9 +139,8 @@ class TestMain:
         """show_information action calls auth details dialog."""
         main = _fresh_main_module()
         ui_mock = MagicMock()
-        monkeypatch.setattr(main, "ui_interface", ui_mock)
 
-        main.router(urlencode({"action": "show_information"}))
+        main.router(urlencode({"action": "show_information"}), ui_mock)
 
         ui_mock.show_auth_details_dialog.assert_called_once()
 
@@ -160,11 +148,10 @@ class TestMain:
         """settings action opens addon settings."""
         main = _fresh_main_module()
         ui_mock = MagicMock()
-        monkeypatch.setattr(main, "ui_interface", ui_mock)
         addon_mock = MagicMock()
         monkeypatch.setattr(main, "ADDON", addon_mock)
 
-        main.router(urlencode({"action": "settings"}))
+        main.router(urlencode({"action": "settings"}), ui_mock)
 
         addon_mock.openSettings.assert_called_once()
 
@@ -172,9 +159,8 @@ class TestMain:
         """Missing required params triggers error handling."""
         main = _fresh_main_module()
         ui_mock = MagicMock()
-        monkeypatch.setattr(main, "ui_interface", ui_mock)
 
-        main.router(urlencode({"action": "seasons_menu", "content_type": "series"}))
+        main.router(urlencode({"action": "seasons_menu", "content_type": "series"}), ui_mock)
 
         ui_mock.show_error.assert_called_once()
         assert "project_slug" in ui_mock.show_error.call_args[0][0]
@@ -193,10 +179,8 @@ class TestMain:
         sys.argv = ["plugin://", "1", "?"]
 
         kodi_ui_mock = MagicMock()
-        monkeypatch.setitem(
-            sys.modules, "kodi_ui_interface", MagicMock(KodiUIInterface=MagicMock(return_value=kodi_ui_mock))
-        )
-        monkeypatch.setitem(sys.modules, "angel_interface", MagicMock(AngelStudiosInterface=MagicMock()))
+        monkeypatch.setattr('kodi_ui_interface.KodiUIInterface', MagicMock(return_value=kodi_ui_mock))
+        monkeypatch.setattr('angel_interface.AngelStudiosInterface', MagicMock())
 
         sys.path.insert(0, str(MAIN_PATH.parent))
         sys.path.insert(0, str(RES_LIB))
@@ -215,13 +199,9 @@ class TestMain:
         monkeypatch.setattr(sys.modules["xbmcvfs"], "exists", MagicMock(return_value=True))
 
         asi = MagicMock()
-        monkeypatch.setitem(
-            sys.modules, "angel_interface", MagicMock(AngelStudiosInterface=MagicMock(return_value=asi))
-        )
+        monkeypatch.setattr('angel_interface.AngelStudiosInterface', MagicMock(return_value=asi))
         ui_mock = MagicMock()
-        monkeypatch.setitem(
-            sys.modules, "kodi_ui_interface", MagicMock(KodiUIInterface=MagicMock(return_value=ui_mock))
-        )
+        monkeypatch.setattr('kodi_ui_interface.KodiUIInterface', MagicMock(return_value=ui_mock))
 
         sys.argv = ["plugin://", "1", "?action=movies_menu"]
 
@@ -242,15 +222,11 @@ class TestMain:
         monkeypatch.setattr(sys.modules["xbmcvfs"], "translatePath", MagicMock(side_effect=lambda p: p))
         monkeypatch.setattr(sys.modules["xbmcvfs"], "exists", MagicMock(return_value=True))
 
-        monkeypatch.setitem(
-            sys.modules,
-            "angel_interface",
-            MagicMock(AngelStudiosInterface=MagicMock(side_effect=RuntimeError("boom"))),
+        monkeypatch.setattr(
+            'angel_interface.AngelStudiosInterface', MagicMock(side_effect=RuntimeError("boom"))
         )
         ui_mock = MagicMock()
-        monkeypatch.setitem(
-            sys.modules, "kodi_ui_interface", MagicMock(KodiUIInterface=MagicMock(return_value=ui_mock))
-        )
+        monkeypatch.setattr('kodi_ui_interface.KodiUIInterface', MagicMock(return_value=ui_mock))
 
         sys.argv = ["plugin://", "1", "?action=movies_menu"]
 

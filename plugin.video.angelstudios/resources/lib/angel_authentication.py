@@ -14,6 +14,26 @@ from typing import Optional, Callable
 import angel_utils
 
 
+class AuthenticationError(Exception):
+    """Base class for authentication-related errors"""
+    pass
+
+
+class AuthenticationRequiredError(AuthenticationError):
+    """Raised when authentication is required but not available"""
+    pass
+
+
+class SessionExpiredError(AuthenticationError):
+    """Raised when the current session has expired"""
+    pass
+
+
+class InvalidCredentialsError(AuthenticationError):
+    """Raised when provided credentials are invalid"""
+    pass
+
+
 @dataclass
 class AuthResult:
     """Result of an authentication operation"""

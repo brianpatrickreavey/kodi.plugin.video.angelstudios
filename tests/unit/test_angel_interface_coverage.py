@@ -13,25 +13,18 @@ class TestNormalizerCoverage:
     def angel_interface(self):
         """Fixture for a mocked AngelStudiosInterface instance."""
         with (
-            patch("angel_authentication.AngelStudioSession") as mock_session_class,
+            patch("angel_authentication.AuthenticationCore") as mock_auth_core_class,
             patch("angel_authentication.requests.Session") as mock_requests_session,
         ):
-            # Mock requests.Session instance with valid JWT
+            # Mock requests.Session instance
             mock_requests_instance = MagicMock()
-            mock_jwt_token = (
-                "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTksInN1YiI6InRlc3QtdXNlciJ9.test-signature"
-            )
-            mock_requests_instance.cookies.get.return_value = mock_jwt_token
             mock_requests_session.return_value = mock_requests_instance
 
-            mock_session_instance = MagicMock()
-            mock_session_instance.headers.get.return_value = None
-            mock_session_instance.cookies = []
-            mock_session_class.return_value.authenticate.return_value = None
-            mock_session_class.return_value.get_session.return_value = mock_session_instance
-            mock_session_class.return_value._validate_session.return_value = True
+            mock_auth_core_instance = MagicMock()
+            mock_auth_core_instance.session_store.get_token.return_value = "test-jwt-token"
+            mock_auth_core_class.return_value = mock_auth_core_instance
 
-            interface = AngelStudiosInterface(logger=MagicMock())
+            interface = AngelStudiosInterface(logger=MagicMock(), auth_core=mock_auth_core_instance)
             return interface
 
     def test_normalize_with_missing_season_dict(self, angel_interface):
@@ -126,25 +119,18 @@ class TestQueryFragmentParsing:
     def angel_interface(self):
         """Fixture for a mocked AngelStudiosInterface instance for fragment parsing tests."""
         with (
-            patch("angel_authentication.AngelStudioSession") as mock_session_class,
+            patch("angel_authentication.AuthenticationCore") as mock_auth_core_class,
             patch("angel_authentication.requests.Session") as mock_requests_session,
         ):
-            # Mock requests.Session with valid JWT
+            # Mock requests.Session instance
             mock_requests_instance = MagicMock()
-            mock_jwt_token = (
-                "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTksInN1YiI6InRlc3QtdXNlciJ9.test-signature"
-            )
-            mock_requests_instance.cookies.get.return_value = mock_jwt_token
             mock_requests_session.return_value = mock_requests_instance
 
-            mock_session_instance = MagicMock()
-            mock_session_instance.headers.get.return_value = None
-            mock_session_instance.cookies = []
-            mock_session_class.return_value.authenticate.return_value = None
-            mock_session_class.return_value.get_session.return_value = mock_session_instance
-            mock_session_class.return_value._validate_session.return_value = True
+            mock_auth_core_instance = MagicMock()
+            mock_auth_core_instance.session_store.get_token.return_value = "test-jwt-token"
+            mock_auth_core_class.return_value = mock_auth_core_instance
 
-            interface = AngelStudiosInterface(logger=MagicMock())
+            interface = AngelStudiosInterface(logger=MagicMock(), auth_core=mock_auth_core_instance)
             return interface
 
     def test_get_resume_watching_edge_missing_content(self, angel_interface):
@@ -186,24 +172,18 @@ class TestUnwrapRelayPagination:
     @pytest.fixture
     def angel_interface(self):
         with (
-            patch("angel_authentication.AngelStudioSession") as mock_session_class,
+            patch("angel_authentication.AuthenticationCore") as mock_auth_core_class,
             patch("angel_authentication.requests.Session") as mock_requests_session,
         ):
-            # Mock requests.Session with valid JWT
+            # Mock requests.Session instance
             mock_requests_instance = MagicMock()
-            mock_jwt_token = (
-                "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTksInN1YiI6InRlc3QtdXNlciJ9.test-signature"
-            )
-            mock_requests_instance.cookies.get.return_value = mock_jwt_token
             mock_requests_session.return_value = mock_requests_instance
 
-            mock_session_instance = MagicMock()
-            mock_session_instance.headers.get.return_value = None
-            mock_session_instance.cookies = []
-            mock_session_class.return_value.authenticate.return_value = None
-            mock_session_class.return_value.get_session.return_value = mock_session_instance
-            mock_session_class.return_value._validate_session.return_value = True
-            interface = AngelStudiosInterface(logger=MagicMock())
+            mock_auth_core_instance = MagicMock()
+            mock_auth_core_instance.session_store.get_token.return_value = "test-jwt-token"
+            mock_auth_core_class.return_value = mock_auth_core_instance
+
+            interface = AngelStudiosInterface(logger=MagicMock(), auth_core=mock_auth_core_instance)
             return interface
 
     def test_unwrap_with_none_input(self, angel_interface):
@@ -243,24 +223,18 @@ class TestNormalizeContentseriesEpisode:
     @pytest.fixture
     def angel_interface(self):
         with (
-            patch("angel_authentication.AngelStudioSession") as mock_session_class,
+            patch("angel_authentication.AuthenticationCore") as mock_auth_core_class,
             patch("angel_authentication.requests.Session") as mock_requests_session,
         ):
-            # Mock requests.Session with valid JWT
+            # Mock requests.Session instance
             mock_requests_instance = MagicMock()
-            mock_jwt_token = (
-                "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTksInN1YiI6InRlc3QtdXNlciJ9.test-signature"
-            )
-            mock_requests_instance.cookies.get.return_value = mock_jwt_token
             mock_requests_session.return_value = mock_requests_instance
 
-            mock_session_instance = MagicMock()
-            mock_session_instance.headers.get.return_value = None
-            mock_session_instance.cookies = []
-            mock_session_class.return_value.authenticate.return_value = None
-            mock_session_class.return_value.get_session.return_value = mock_session_instance
-            mock_session_class.return_value._validate_session.return_value = True
-            interface = AngelStudiosInterface(logger=MagicMock())
+            mock_auth_core_instance = MagicMock()
+            mock_auth_core_instance.session_store.get_token.return_value = "test-jwt-token"
+            mock_auth_core_class.return_value = mock_auth_core_instance
+
+            interface = AngelStudiosInterface(logger=MagicMock(), auth_core=mock_auth_core_instance)
             return interface
 
     def test_normalize_with_none_input(self, angel_interface):
@@ -299,24 +273,18 @@ class TestMergeEpisodeData:
     @pytest.fixture
     def angel_interface(self):
         with (
-            patch("angel_authentication.AngelStudioSession") as mock_session_class,
+            patch("angel_authentication.AuthenticationCore") as mock_auth_core_class,
             patch("angel_authentication.requests.Session") as mock_requests_session,
         ):
-            # Mock requests.Session with valid JWT
+            # Mock requests.Session instance
             mock_requests_instance = MagicMock()
-            mock_jwt_token = (
-                "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTksInN1YiI6InRlc3QtdXNlciJ9.test-signature"
-            )
-            mock_requests_instance.cookies.get.return_value = mock_jwt_token
             mock_requests_session.return_value = mock_requests_instance
 
-            mock_session_instance = MagicMock()
-            mock_session_instance.headers.get.return_value = None
-            mock_session_instance.cookies = []
-            mock_session_class.return_value.authenticate.return_value = None
-            mock_session_class.return_value.get_session.return_value = mock_session_instance
-            mock_session_class.return_value._validate_session.return_value = True
-            interface = AngelStudiosInterface(logger=MagicMock())
+            mock_auth_core_instance = MagicMock()
+            mock_auth_core_instance.session_store.get_token.return_value = "test-jwt-token"
+            mock_auth_core_class.return_value = mock_auth_core_instance
+
+            interface = AngelStudiosInterface(logger=MagicMock(), auth_core=mock_auth_core_instance)
             return interface
 
     def test_merge_with_none_playback(self, angel_interface):
@@ -347,28 +315,21 @@ class TestGetProjectContentSeriesMerge:
     def angel_interface(self):
         """Fixture for a mocked AngelStudiosInterface instance."""
         with (
-            patch("angel_authentication.AngelStudioSession") as mock_session_class,
+            patch("angel_authentication.AuthenticationCore") as mock_auth_core_class,
             patch("angel_authentication.requests.Session") as mock_requests_session,
         ):
-            # Mock requests.Session with valid JWT
+            # Mock requests.Session instance
             mock_requests_instance = MagicMock()
-            mock_jwt_token = (
-                "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTksInN1YiI6InRlc3QtdXNlciJ9.test-signature"
-            )
-            mock_requests_instance.cookies.get.return_value = mock_jwt_token
             mock_requests_session.return_value = mock_requests_instance
 
-            mock_session_instance = MagicMock()
-            mock_session_instance.headers.get.return_value = None
-            mock_session_instance.cookies = []
-            mock_session_class.return_value.authenticate.return_value = None
-            mock_session_class.return_value.get_session.return_value = mock_session_instance
-            mock_session_class.return_value._validate_session.return_value = True
+            mock_auth_core_instance = MagicMock()
+            mock_auth_core_instance.session_store.get_token.return_value = "test-jwt-token"
+            mock_auth_core_class.return_value = mock_auth_core_instance
 
-            interface = AngelStudiosInterface(logger=MagicMock())
+            interface = AngelStudiosInterface(logger=MagicMock(), auth_core=mock_auth_core_instance)
             # Store the mock session for use in tests
-            interface._session = mock_session_instance
-            return interface, mock_session_instance
+            interface._session = mock_requests_instance
+            return interface, mock_requests_instance
 
     def test_get_project_merges_contentseries_with_stills(self, angel_interface):
         """Test get_project() merges ContentSeries display data and STILLs into playback episodes"""

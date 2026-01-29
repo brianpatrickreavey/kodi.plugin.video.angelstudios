@@ -18,8 +18,10 @@ import angel_authentication
 import requests
 import angel_utils
 
-# Backwards-compat alias used by some tests to patch at module level
-AngelStudioSession = angel_authentication.AngelStudioSession
+# Import Authentication exceptions
+AuthenticationRequiredError = angel_authentication.AuthenticationRequiredError
+SessionExpiredError = angel_authentication.SessionExpiredError
+InvalidCredentialsError = angel_authentication.InvalidCredentialsError
 
 # Library constants
 angel_website_url = "https://www.angel.com"
@@ -35,9 +37,7 @@ class AngelStudiosInterface:
 
     def __init__(
         self,
-        username=None,
-        password=None,
-        session_file="",
+        auth_core: angel_authentication.AuthenticationCore,
         logger: Optional[Any] = None,
         query_path=None,
         tracer=None,
@@ -60,37 +60,29 @@ class AngelStudiosInterface:
         # Set the tracer function provided by the calling function
         self.tracer = tracer
 
-        # No cache in the KODI-agnostic interface; rely on callers to cache
+        # Store the authentication core for session validation
+        self.auth_core = auth_core
 
-        # Use provided session file or get authenticated session
-        # Instantiate via angel_authentication so tests can patch angel_authentication.AngelStudioSession
-        self.angel_studios_session = angel_authentication.AngelStudioSession(
-            username=username,
-            password=password,
-            session_file=session_file,
-            logger=self.log,
-            timeout=self.timeout,
-        )
-        self.angel_studios_session.authenticate()
+        # Create a requests session for GraphQL calls
+        # The auth core handles token management separately
+        self.session = requests.Session()
 
-        self.session = self.angel_studios_session.get_session()
+        # Initialize query path and caches
+        self.query_path = query_path or "resources/lib/angel_graphql"
+        self._query_file_cache = {}
+        self._fragment_file_cache = {}
 
-        # Test if session is authenticated and valid:
-        # Log authentication status more meaningfully
-        if self.session:
-            auth_header = self.session.headers.get("Authorization")
-            cookie_count = len(self.session.cookies) if self.session.cookies else 0
-            if auth_header:
-                self.log.info(f"Authenticated Session: JWT token present, {cookie_count} cookies")
-            else:
-                self.log.info(f"Session initialized: No JWT token, {cookie_count} cookies")
+        # Prepare session with authentication
+        self._prepare_authenticated_session()
 
-            self.query_path = query_path or "resources/lib/angel_graphql"
-            self._query_file_cache = {}
-            self._fragment_file_cache = {}
+    def _prepare_authenticated_session(self):
+        """Prepare the requests session with authentication headers"""
+        token = self.auth_core.session_store.get_token()
+        if token:
+            self.session.headers.update({"Authorization": f"Bearer {token}"})
+            self.log.info("Session prepared with JWT token")
         else:
-            self.log.error("Failed to initialize session: No session available")
-            raise Exception("Failed to initialize session: No session available")
+            self.log.warning("No JWT token available - session may not be authenticated")
 
     def _debug_log(self, message, category=None):
         """Helper to log debug messages with optional category support."""
@@ -189,8 +181,8 @@ class AngelStudiosInterface:
                     else:
                         self.log.error(f"  - {error}")
                 self.log.error(f"session headers: {angel_utils.sanitize_headers_for_logging(self.session.headers)}")
-                self.angel_studios_session.authenticate(force_reauthentication=True)
-                data = {}
+                # Instead of auto-reauthenticating, raise an exception for the UI layer to handle
+                raise AuthenticationRequiredError("Authentication required - session may have expired")
             else:
                 data = result.get("data", {})
 
@@ -357,8 +349,7 @@ class AngelStudiosInterface:
 
                 if "errors" in result:
                     self.log.error(f"GraphQL errors: {result['errors']}")
-                    self.angel_studios_session.authenticate(force_reauthentication=True)
-                    return {}
+                    raise AuthenticationRequiredError("Authentication required - session may have expired")
 
                 # Map responses back from sanitized aliases to original slugs
                 data = result.get("data", {})
@@ -648,8 +639,7 @@ class AngelStudiosInterface:
 
                 if "errors" in result:
                     self.log.error(f"GraphQL errors: {result['errors']}")
-                    self.angel_studios_session.authenticate(force_reauthentication=True)
-                    return {}
+                    raise AuthenticationRequiredError("Authentication required - session may have expired")
 
                 # Map responses back from sanitized aliases to original guids
                 data = result.get("data", {})
@@ -683,22 +673,19 @@ class AngelStudiosInterface:
 
     def session_check(self):
         """Check if the session is authenticated and valid"""
-        session_valid = self.angel_studios_session._validate_session()
-        if not session_valid:
-            self.log.info("Session is not valid, re-authenticating...")
-            self.angel_studios_session.authenticate(force_reauthentication=True)
-            if not self.angel_studios_session.session_valid:
-                self.log.error("Session re-authentication failed")
-                raise Exception("Session re-authentication failed")
+        if not self.auth_core.validate_session():
+            self.log.error("Session is not valid")
+            raise AuthenticationRequiredError("Session validation failed")
         else:
             self.log.info("Session is valid")
 
     def force_logout(self):
         """Force a local logout; future enhancement may call remote logout API."""
         try:
-            result = self.angel_studios_session.logout()
-            self.session = self.angel_studios_session.get_session()
-            return result
+            self.auth_core.logout()
+            # Clear session headers
+            self.session.headers.pop("Authorization", None)
+            return True
         except Exception as e:
             self.log.error(f"Logout failed: {e}")
             return False

@@ -147,6 +147,15 @@ class SessionStore(ABC):
 class KodiSessionStore(SessionStore):
     """Kodi addon settings implementation"""
     # Uses xbmcaddon.Addon().setSetting()
+    # JWT token stored in invisible setting (level 4 - Internal)
+    # Setting definition in resources/settings.xml:
+    # <setting id="jwt_token" type="string" label="JWT Token" help="Internal JWT token storage">
+    #     <level>4</level>  <!-- Internal - never shown in GUI -->
+    #     <default/>
+    #     <constraints><allowempty>true</allowempty></constraints>
+    #     <!-- No <control> element - completely invisible -->
+    # </setting>
+    # User-facing controls provided via action buttons (clear_token, show_token_info)
 ```
 
 #### `AngelInterface` (angel_interface.py - refactored)

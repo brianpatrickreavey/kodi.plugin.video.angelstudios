@@ -57,6 +57,16 @@
                         <hidden>true</hidden>
                     </control>
                 </setting>
+                <setting id="jwt_token" type="string" label="JWT Token" help="Internal JWT token storage">
+                    <level>4</level>
+                    <default/>
+                    <constraints>
+                        <allowempty>true</allowempty>
+                    </constraints>
+                    <control type="edit" format="string">
+                        <hidden>true</hidden>
+                    </control>
+                </setting>
                 <setting id="show_auth_details" type="action" label="30206" help="30207">
                     <level>0</level>
                     <data>RunPlugin(plugin://plugin.video.angelstudios/?action=show_information)</data>
