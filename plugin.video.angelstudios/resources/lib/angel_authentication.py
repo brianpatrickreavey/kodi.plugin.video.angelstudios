@@ -613,7 +613,7 @@ class AngelStudioSession:
 
             self.log.debug(f"{redirect_response.status_code=}")
             self.log.debug(f"{redirect_response.url=}")
-            self.log.debug(f"{redirect_response.headers=}")
+            self.log.debug(f"Redirect headers: {angel_utils.sanitize_headers_for_logging(dict(redirect_response.headers))}")
             if redirect_response.status_code == 200:
                 self.log.info("Login successful!")
                 self.log.debug("Login step completed with 200 OK.")

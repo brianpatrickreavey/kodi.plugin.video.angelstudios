@@ -8,14 +8,14 @@ This is then served back to us when loading a project and when we go to play
 an actual episode, a dialog pops up asking to resume or not.
 
 ## GraphQL Fragments
-- Episode type does not expose `project { name }`; batch continue-watching cannot set TV show title without separate project fetch.
+- Episode type does not expose `project { name }`; batch continue-watching cannot set TV show title without separate project fetch. — COMPLETE
 
 # Plugin Configuration Options Features
 
 ## Playback
 
 ### Test Hygiene
-- Consider switching test fixtures to use a fresh `xbmcaddon.Addon` mock per test to avoid state leakage when toggling cache settings.
+- Consider switching test fixtures to use a fresh `xbmcaddon.Addon` mock per test to avoid state leakage when toggling cache settings. — COMPLETE
 
 ## Authentication
 * Implement remote logout endpoint call when available (currently only clears local session state)
@@ -32,14 +32,14 @@ an actual episode, a dialog pops up asking to resume or not.
 - [resources/lib/angel_authentication.py](plugin.video.angelstudios/resources/lib/angel_authentication.py) — COMPLETE
 - [resources/lib/angel_interface.py](plugin.video.angelstudios/resources/lib/angel_interface.py) — COMPLETE
 - [resources/lib/inputstream_helper.py](plugin.video.angelstudios/resources/lib/inputstream_helper.py) — COMPLETE (merged into kodi_ui_interface.py)
-- [resources/lib/kodi_ui_interface.py](plugin.video.angelstudios/resources/lib/kodi_ui_interface.py) — TODO
-- [resources/lib/angel_graphql/query_getProjectsForMenu.graphql](plugin.video.angelstudios/resources/lib/angel_graphql/query_getProjectsForMenu.graphql) — TODO
-- [resources/lib/angel_graphql/query_getProject.graphql](plugin.video.angelstudios/resources/lib/angel_graphql/query_getProject.graphql) — TODO
-- [resources/lib/angel_graphql/query_getEpisodeAndUserWatchData.graphql](plugin.video.angelstudios/resources/lib/angel_graphql/query_getEpisodeAndUserWatchData.graphql) — TODO
-- [resources/lib/angel_graphql/fragment_ProjectMetadata.graphql](plugin.video.angelstudios/resources/lib/angel_graphql/fragment_ProjectMetadata.graphql) — TODO
-- [resources/lib/angel_graphql/fragment_ProjectBasic.graphql](plugin.video.angelstudios/resources/lib/angel_graphql/fragment_ProjectBasic.graphql) — TODO
-- [resources/lib/angel_graphql/fragment_ContentImage.graphql](plugin.video.angelstudios/resources/lib/angel_graphql/fragment_ContentImage.graphql) — TODO
-- [resources/lib/angel_graphql/fragment_DiscoveryImages.graphql](plugin.video.angelstudios/resources/lib/angel_graphql/fragment_DiscoveryImages.graphql) — TODO
+- [resources/lib/kodi_ui_interface.py](plugin.video.angelstudios/resources/lib/kodi_ui_interface.py) — COMPLETE
+- [resources/lib/angel_graphql/query_getProjectsForMenu.graphql](plugin.video.angelstudios/resources/lib/angel_graphql/query_getProjectsForMenu.graphql) — COMPLETE
+- [resources/lib/angel_graphql/query_getProject.graphql](plugin.video.angelstudios/resources/lib/angel_graphql/query_getProject.graphql) — COMPLETE
+- [resources/lib/angel_graphql/query_getEpisodeAndUserWatchData.graphql](plugin.video.angelstudios/resources/lib/angel_graphql/query_getEpisodeAndUserWatchData.graphql) — COMPLETE
+- [resources/lib/angel_graphql/fragment_ProjectMetadata.graphql](plugin.video.angelstudios/resources/lib/angel_graphql/fragment_ProjectMetadata.graphql) — COMPLETE
+- [resources/lib/angel_graphql/fragment_ProjectBasic.graphql](plugin.video.angelstudios/resources/lib/angel_graphql/fragment_ProjectBasic.graphql) — COMPLETE
+- [resources/lib/angel_graphql/fragment_ContentImage.graphql](plugin.video.angelstudios/resources/lib/angel_graphql/fragment_ContentImage.graphql) — COMPLETE
+- [resources/lib/angel_graphql/fragment_DiscoveryImages.graphql](plugin.video.angelstudios/resources/lib/angel_graphql/fragment_DiscoveryImages.graphql) — COMPLETE
 
 ## Code Consistency
-- Unify hardcoded header redaction strings to use `_sanitize_headers_for_logging()` method for consistency across the codebase.
+- Unify hardcoded header redaction strings to use `sanitize_headers_for_logging()` method for consistency across the codebase. — COMPLETE
