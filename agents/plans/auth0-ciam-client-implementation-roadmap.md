@@ -167,6 +167,36 @@ auth0-ciam-client/
 - Kodi addon updated
 - Release announced
 
+## Phase 5: Enhancements & Future Improvements (Post-Release)
+**Goal**: Add robustness and advanced features for broader Auth0 compatibility
+
+### Planned Enhancements
+- [ ] **Dynamic Auth URL Discovery**: Follow login redirects instead of assuming auth subdomain pattern
+  - **Benefit**: Works with any Auth0 CNAME configuration (angelstudios.us.auth0.com, login.angel.com, etc.)
+  - **Implementation**: Follow redirect from `/auth/login` to discover actual Auth0 domain
+  - **Impact**: Makes package compatible with any Auth0 tenant configuration
+
+- [ ] **Enhanced Cookie Handling**: More flexible JWT token extraction
+  - **Current**: Configurable cookie name list with priority
+  - **Enhancement**: Support regex patterns, domain-specific cookies, fallback strategies
+  - **Benefit**: Handles edge cases in Auth0 cookie naming
+
+- [ ] **OAuth PKCE Support**: Add proper OAuth 2.0 PKCE flow as alternative
+  - **Benefit**: More secure and standard authentication method
+  - **Implementation**: When available, use PKCE instead of web scraping
+  - **Fallback**: Maintain current scraping approach for legacy Auth0 setups
+
+- [ ] **Token Refresh Support**: Implement OAuth refresh tokens
+  - **Benefit**: Seamless token renewal without re-authentication
+  - **Implementation**: Store and use refresh tokens when available
+  - **Impact**: Better user experience for long sessions
+
+### Success Criteria
+- Package works with any Auth0 tenant configuration
+- Multiple authentication methods supported
+- Enhanced security and user experience
+- Backward compatibility maintained
+
 ---
 
-*This roadmap provides a structured 4-week plan for implementing the auth0-ciam-client package. Adjust timeline as needed based on actual progress and unforeseen issues.*
+*This roadmap provides a structured plan for implementing the auth0-ciam-client package. Phase 5 enhancements can be implemented in future versions (0.2.0+) after initial release.*
