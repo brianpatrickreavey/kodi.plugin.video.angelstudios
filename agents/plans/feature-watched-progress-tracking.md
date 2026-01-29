@@ -15,18 +15,44 @@ The Watched Progress Tracking feature would enable the Kodi plugin to send watch
 - **Cross-Device Sync**: Resume playback on different devices where you left off
 - **Progress Persistence**: Maintain accurate progress even after Kodi restarts
 
-## Technical Implementation
+## Implementation Approach
 
-### Current Progress Retrieval
-- **API Integration**: `getEpisodeAndUserWatchData` GraphQL query retrieves existing progress
-- **Resume Points**: `watchPosition { position }` field provides current playback position
-- **Display**: Progress bars applied via `info_tag.setResumePoint(position / duration)`
+### Dedicated Player Class
+To implement progress tracking, a dedicated `AngelPlayer` class will be created to centralize playback logic and handle continuous position updates.
 
-### Planned Progress Updates
-- **API Endpoint**: GraphQL mutation to update watch position (when available from Angel Studios)
-- **Update Triggers**: Send progress updates during playback at regular intervals
-- **Data Format**: Position in seconds, episode GUID, and user authentication
-- **Error Handling**: Graceful handling of API failures without interrupting playback
+**Core Responsibilities:**
+1. **Playback Management:** Handle video URL resolution and Kodi player setup
+2. **Progress Tracking:** Monitor current position and send updates to Angel API
+3. **Resume Functionality:** Store last position and sync with API data
+
+**Class Structure:**
+```python
+class AngelPlayer:
+    def __init__(self, angel_interface):
+        self.angel_interface = angel_interface
+        self.current_episode_guid = None
+        self.last_position = 0
+
+    def play_episode(self, episode_guid, resume=False):
+        # Resolve URL, set up player, start monitoring
+
+    def _on_playback_started(self):
+        # Start position tracking
+
+    def _on_playback_paused(self):
+        # Update position
+
+    def _on_playback_stopped(self):
+        # Final position update
+
+    def _update_watch_position(self, position):
+        # Send to Angel API
+```
+
+**API Integration:**
+- Send periodic updates every 30 seconds during playback
+- Handle API failures gracefully without interrupting playback
+- Fetch latest position from API to override cached data when resuming
 
 ## User Experience Benefits
 
