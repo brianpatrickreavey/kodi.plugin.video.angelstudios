@@ -1,0 +1,1 @@
+auth0-ciam-client @ git+https://github.com/brianpatrickreavey/auth0-ciam-client.git@main
