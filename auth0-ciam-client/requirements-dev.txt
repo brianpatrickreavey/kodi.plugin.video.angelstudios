@@ -1,6 +1,0 @@
-flake8
-black
-pyright
-pytest
-pytest-cov
-semver
