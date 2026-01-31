@@ -209,7 +209,9 @@ class TestSettingsCallbacks:
             angel_interface_mock.force_logout.assert_called_once()
             mock_dialog.return_value.ok.assert_called_once_with(
                 "Angel Studios - Force Logout",
-                "Successfully logged out.\n\nSession details may not update immediately.\nRestart the addon to see changes.",
+                "Successfully logged out.\n\n"
+                "Session details may not update immediately.\n"
+                "Restart the addon to see changes.",
             )
             logger_mock.info.assert_any_call("Logged out locally via settings")
 

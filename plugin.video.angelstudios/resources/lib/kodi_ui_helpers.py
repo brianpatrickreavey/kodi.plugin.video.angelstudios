@@ -141,7 +141,9 @@ class KodiUIHelpers:
         if result:
             xbmcgui.Dialog().ok(
                 "Angel Studios - Force Logout",
-                "Successfully logged out.\n\nSession details may not update immediately.\nRestart the addon to see changes.",
+                "Successfully logged out.\n\n"
+                "Session details may not update immediately.\n"
+                "Restart the addon to see changes.",
             )
             self.parent.log.info("Logged out locally via settings")
         else:
@@ -246,7 +248,7 @@ class KodiUIHelpers:
             # Generate filename with timestamp
             safe_payload = self._redact_sensitive(payload)
             ts = time.strftime("%Y%m%dT%H%M%S")
-            fname = f"trace_{ts}_{int(time.time()*1000) % 1000}.json"
+            fname = f"trace_{ts}_{int(time.time() * 1000) % 1000}.json"
             filepath = os.path.join(self.trace_dir, fname)
 
             # Write to file

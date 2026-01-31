@@ -1,18 +1,18 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version='1.0' encoding='UTF-8'?>
 <addon id="plugin.video.angelstudios" version="0.4.1" name="Angel Studios">
   <provider-name>Brian Reavey, Peter Reavey</provider-name>
   <requires>
-    <import addon="xbmc.python" version="3.0.1"/>
-    <import addon="script.module.beautifulsoup4" version="4.12.2"/>
-    <import addon="script.module.requests" version="2.31.0"/>
-    <import addon="script.module.simplecache" version="2.0.0"/>
-    <import addon="script.module.inputstreamhelper" version="0.5.1"/>
-    <import addon="inputstream.adaptive" version="19.0.0"/>
+    <import addon="xbmc.python" version="3.0.1" />
+    <import addon="script.module.beautifulsoup4" version="4.12.2" />
+    <import addon="script.module.requests" version="2.31.0" />
+    <import addon="script.module.simplecache" version="2.0.0" />
+    <import addon="script.module.inputstreamhelper" version="0.5.1" />
+    <import addon="inputstream.adaptive" version="19.0.0" />
   </requires>
   <extension point="xbmc.python.pluginsource" library="resources/lib/main.py">
     <provides>video</provides>
   </extension>
-  <extension point="xbmc.python.module" library="resources/lib/"/>
+  <extension point="xbmc.python.module" library="resources/lib/" />
   <extension point="xbmc.addon.metadata">
     <summary lang="en_GB">Angel Studios</summary>
     <description lang="en_GB">An app providing the Angel Studios content. CURENTLY IN DEVELOPMENT.</description>

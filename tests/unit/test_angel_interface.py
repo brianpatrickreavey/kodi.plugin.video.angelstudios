@@ -5,7 +5,6 @@ from unittest.mock import patch, MagicMock, mock_open, PropertyMock
 
 from resources.lib.angel_interface import AngelStudiosInterface, angel_graphql_url
 import resources.lib.angel_utils as angel_utils
-from resources.lib.angel_authentication import AuthenticationRequiredError
 from .unittest_data import MOCK_PROJECT_DATA, MOCK_EPISODE_DATA, MOCK_GRAPHQL_RESPONSE
 
 

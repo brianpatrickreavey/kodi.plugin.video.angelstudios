@@ -12,21 +12,32 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 """
 Angel Studios Kodi addon - Clean, modular implementation
 """
 
 import sys
+import os
+import xbmcvfs  # type: ignore
+
+# Ensure the dependencies directory is in the path for bundled dependencies
+lib_path = os.path.join(os.path.dirname(__file__), '../dependencies')
+sys.path.insert(0, lib_path)
+
 from urllib.parse import parse_qsl
 
 import xbmcaddon  # type: ignore
 import xbmcgui  # type: ignore
-import xbmcvfs  # type: ignore
 
 from angel_interface import AngelStudiosInterface
-from angel_authentication import AuthenticationCore, KodiSessionStore
-from kodi_utils import KodiLogger, get_session_file
+from angel_authentication import AuthenticationCore, Auth0Config, KodiSessionStore
+from kodi_utils import KodiLogger
 from kodi_ui_interface import KodiUIInterface
+
+# Ensure the dependencies directory is in the path for bundled dependencies
+lib_path = os.path.join(os.path.dirname(__file__), '../dependencies')
+sys.path.insert(0, lib_path)
 
 # Plugin constants
 URL = sys.argv[0]
@@ -176,19 +187,26 @@ if __name__ == "__main__":
             "Please configure your Angel.com username and password in the addon settings.",
         )
     else:
+        # Initialize UI interface
+        ui_interface = KodiUIInterface(HANDLE, URL, logger=logger, angel_interface=None)
+
         try:
             # Call the router function with plugin parameters
             # Initialize Angel Studios authentication with session management
-
-            # Initialize UI interface
-            ui_interface = KodiUIInterface(HANDLE, URL, logger=logger, angel_interface=None)
 
             # Get the query path for GraphQL queries (relatvie to the addon path)
             query_path = xbmcvfs.translatePath(ADDON.getAddonInfo("path") + "/resources/lib/angel_graphql/")
             logger.info(f"Using query path: {query_path}")
 
             # Initialize AuthenticationCore with Kodi session store
-            auth_core = AuthenticationCore(session_store=KodiSessionStore(ADDON), logger=logger)
+            config = Auth0Config(
+                base_url="https://www.angel.com",
+                user_agent=None,
+                request_timeout=TIMEOUT,
+            )
+            auth_core = AuthenticationCore(  # type: ignore
+                session_store=KodiSessionStore(ADDON), config=config, logger=None
+            )
 
             # Initialize Angel Studios interface with authentication core
             asi = AngelStudiosInterface(
