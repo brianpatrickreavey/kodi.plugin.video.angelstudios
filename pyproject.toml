@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kodi-plugin-video-angelstudios"
+version = "0.4.1"
+description = "Kodi plugin for Angel Studios content"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "requests",
+    "simplecache",
+    "auth0-ciam-client @ git+https://github.com/brianpatrickreavey/auth0-ciam-client.git@v0.2.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "flake8",
+    "black",
+    "pyright",
+    "pytest",
+    "pytest-cov",
+    "semver",
+    "kodi-addon-builder @ git+https://github.com/brianpatrickreavey/kodi-addon-builder.git",
+]
+
+[tool.setuptools]
+# Kodi addons don't follow standard Python packaging structure
+zip-safe = false
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["plugin.video.angelstudios*"]
+exclude = ["agents*", "test_cache*", "htmlcov*", "tests*"]
+
+[tool.black]
+line-length = 100
+target-version = ['py39']
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["plugin.video.angelstudios"]
+omit = ["*/tests/*", "*/test_*.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+]
+
+[tool.flake8]
+max-line-length = 100
+extend-ignore = ["E203", "W503"]
+exclude = [".git", "__pycache__", "build", "dist"]
+
+[tool.pyright]
+include = ["plugin.video.angelstudios", "tests"]
+exclude = ["**/__pycache__", "**/node_modules"]
+pythonVersion = "3.9"
+typeCheckingMode = "strict"
