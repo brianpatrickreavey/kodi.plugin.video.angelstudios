@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_call:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch full history for git operations
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+
+    - name: Set up Python
+      run: uv python install 3.9
+
+    - name: Install dependencies
+      run: uv sync --dev
+
+    - name: Run tests with coverage
+      run: uv run make unittest-with-coverage
+
+    - name: Build zip artifact
+      run: uv run kodi-addon-builder zip --output addon.zip
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: kodi-addon
+        path: addon.zip
+        if-no-files-found: error

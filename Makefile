@@ -50,7 +50,7 @@ unittest:
 	source .venv/bin/activate && pytest $(TEST_DIRS)unit/ -v
 
 unittest-with-coverage:
-	source .venv/bin/activate && python -m pytest --cov=$(ADDON_MODULES) --cov-report=term-missing $(TEST_DIRS)unit
+	source .venv/bin/activate && python -m pytest --cov=$(ADDON_MODULES) --cov-report=term-missing --cov-fail-under=90 $(TEST_DIRS)unit
 
 coverage:
 	source .venv/bin/activate && pytest --cov=$(ADDON_MODULES) $(TEST_DIRS)unit/
