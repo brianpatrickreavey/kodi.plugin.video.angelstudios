@@ -22,11 +22,12 @@ This plan outlines the steps to prepare for the 0.5.0 release of the Kodi addon,
   - Triggers only on version tags (v*)
 - Ensure the workflow integrates with `kodi-addon-builder` for any release automation (e.g., triggering on tags created by the tool).
 
-### 2. Update Documentation
-- Revise README.md, DEVELOPMENT.md, and any setup guides to mention uv instead of pipenv/pyenv.
+### 2. Update Documentation ✅ COMPLETED
+- Revise README.md, DEVELOPMENT.md, and BUILD.md to mention uv instead of pipenv/pyenv.
 - Update installation instructions to include uv installation and usage.
 - Archive or update any docs referencing removed tools (e.g., requirements.txt).
 - Add a section on using `kodi-addon-builder` for releases (e.g., "Use `kodi-addon-builder bump-commit minor --news '...' ` for version bumps").
+- **Completed**: Updated all documentation files with uv setup instructions and kodi-addon-builder workflow.
 
 ### 3. Validate Dependencies and Compatibility
 - Confirm all dependencies in pyproject.toml are correct and uv.lock is up-to-date.

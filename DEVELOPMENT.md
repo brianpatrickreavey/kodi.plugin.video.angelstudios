@@ -7,6 +7,27 @@ This document outlines a trunk-based workflow that keeps changes small and fast 
 - Make the release version consistent across addon.xml, CHANGELOG, tags, and GitHub Releases.
 - Keep CI as the gatekeeper: tests, lint, version checks.
 
+## Development Environment Setup
+
+### Prerequisites
+- [uv](https://github.com/astral-sh/uv) - Modern Python package manager
+- Python 3.9+
+- Git
+
+### Setup
+1. Clone the repository and set up the environment:
+   ```bash
+   git clone https://github.com/yourusername/kodi.plugin.video.angelstudios.git
+   cd kodi.plugin.video.angelstudios
+   uv sync --dev
+   source .venv/bin/activate
+   ```
+
+2. Run tests to verify setup:
+   ```bash
+   uv run make unittest-with-coverage
+   ```
+
 ## Branching
 - Short-lived branches off `main`:
   - `feat/...`, `fix/...`, `chore/...` → PR to `main`.
@@ -31,69 +52,63 @@ This document outlines a trunk-based workflow that keeps changes small and fast 
 - Optional helper: use `bump_version.py` to update addon.xml and CHANGELOG together.
 
 ## Release Flow
-1. Prepare a release branch:
-   - Branch: `release/vX.Y.Z` from `main`.
-   - Update addon version in [plugin.video.angelstudios/addon.xml](plugin.video.angelstudios/addon.xml).
-   - Move "Unreleased" changes into a new `X.Y.Z - YYYY-MM-DD` section at the top of [CHANGELOG.md](CHANGELOG.md).
-   - Commit: `chore(release): vX.Y.Z`.
-   - Push and open a PR to `main`.
-2. Merge:
-   - CI passes → merge release PR to `main`.
-3. Tag and publish:
-   - Create annotated tag `vX.Y.Z` on the merge commit.
-   - Push tag to trigger the release workflow in [.github/workflows/release.yml](.github/workflows/release.yml).
-   - CI validates versions, builds the addon zip, and publishes a GitHub Release with artifacts.
+1. Develop and commit changes on `main`.
+2. When ready for release, run the automated release process:
+   ```bash
+   kodi-addon-builder release minor --news "Description of changes"
+   ```
+3. This command will:
+   - Bump version in addon.xml and pyproject.toml
+   - Update CHANGELOG.md
+   - Commit changes
+   - Create and push git tag
+   - Trigger GitHub Actions release workflow
+4. CI validates the tagged commit, then creates GitHub release with addon zip.
 
 ## CI Gates
 - On PRs to `main`:
-  - Run tests and coverage.
-  - Lint/format (optional).
-  - If branch is `release/vX.Y.Z`:
-    - Verify addon.xml version equals `X.Y.Z`.
-    - Verify CHANGELOG contains a top-level `X.Y.Z` section (no leftover "Unreleased" for included changes).
+  - Run tests with `uv run make unittest-with-coverage`
+  - Enforce minimum 90% test coverage
+  - Build addon zip artifact
 - On tag `vX.Y.Z`:
-  - Compare tag version with addon.xml. Fail if mismatch.
-  - Build/publish via [.github/workflows/release.yml](.github/workflows/release.yml).
+  - Run full CI validation on tagged commit
+  - Build versioned zip: `plugin.video.angelstudios-vX.Y.Z.zip`
+  - Create GitHub release with auto-generated notes
+  - Dispatch to central addon repository
 
 ## Changelog Discipline
-- Keep an "Unreleased" section at the top and accumulate entries via normal PRs.
-- In the release PR:
-  - Move "Unreleased" into a dated `X.Y.Z - YYYY-MM-DD` section.
-  - Create a fresh empty "Unreleased" section for the next cycle.
+- `kodi-addon-builder` automatically manages CHANGELOG.md entries.
+- The tool creates dated sections like `## [0.5.0] - YYYY-MM-DD` for each release.
+- Keep development commits descriptive as they become changelog entries.
 
 ## Hotfix Flow
-- Branch `hotfix/vX.Y.Z+1` from `main`.
-- Apply minimal fix and bump patch version in addon.xml and CHANGELOG.
-- PR → merge → tag `vX.Y.Z+1` → CI publishes.
+- Apply fix directly on `main` or use `hotfix/...` branch.
+- Use `kodi-addon-builder release patch --news "Hotfix description"` for automated patch release.
+- CI will validate the fix and create the release.
 
 ## Example Commands
-Prepare release:
+Release preparation:
 ```bash
-# Create release branch
-git checkout -b release/v1.2.3
-
-# Update addon.xml + CHANGELOG (or run bump_version.py)
-# ... edit files ...
-
-# Commit and push
-git add plugin.video.angelstudios/addon.xml CHANGELOG.md
-git commit -m "chore(release): v1.2.3"
-git push -u origin release/v1.2.3
-
-# Open PR to main in GitHub
-```
-After merge:
-```bash
-# Ensure you’re on the merge commit
+# Ensure you're on main with clean working directory
 git checkout main
 git pull
+uv run make unittest-with-coverage  # Verify tests pass
 
-# Tag and push
-git tag -a v1.2.3 -m "v1.2.3"
-git push origin v1.2.3
+# Execute automated release
+kodi-addon-builder release minor --news "Migrated to uv for modern Python dependency management, removed deprecated python-jose, extracted auth0-ciam-client, extensive code refactoring and cleanup, performance optimizations, and comprehensive testing improvements."
+```
+
+For review-before-commit:
+```bash
+# Just update files without committing
+kodi-addon-builder bump minor --news "Description of changes"
+# Review changes, then commit manually
+git add .
+git commit -m "chore(release): vX.Y.Z - Description"
+kodi-addon-builder tag  # Creates and pushes the tag
 ```
 
 ## Policy Tweaks (Optional)
-- Require that release PRs only touch addon.xml, CHANGELOG, and any version tooling.
+- `kodi-addon-builder` handles version consistency automatically.
 - Enforce squash-merge on PRs for cleaner history.
-- Add lightweight CI checks to validate addon.xml ↔ tag ↔ CHANGELOG consistency.
+- CI validates all releases through reusable workflows.

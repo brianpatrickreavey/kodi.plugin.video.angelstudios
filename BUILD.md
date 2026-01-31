@@ -7,10 +7,43 @@ Kodi addon, including versioning, branch conventions, and GitHub Actions automat
 
 ---
 
-## Development
+## Development Environment Setup
 
+### Prerequisites
+- [uv](https://github.com/astral-sh/uv) - Modern Python package manager
+- Python 3.9+
+- Git
+
+### Setup
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/kodi.plugin.video.angelstudios.git
+   cd kodi.plugin.video.angelstudios
+   ```
+
+2. Install uv (if not already installed):
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+
+3. Set up the development environment:
+   ```bash
+   uv sync --dev
+   ```
+
+4. Activate the environment:
+   ```bash
+   source .venv/bin/activate
+   ```
+
+5. Run tests to verify setup:
+   ```bash
+   uv run make unittest-with-coverage
+   ```
+
+### Development Workflow
 Development is best done with a local instance of KODI configured to use your
-live code as an addon.  In Linux, this can be accomplished by creating a
+live code as an addon. In Linux, this can be accomplished by creating a
 symbolic link between your code directory and a directory in the KODI addons
 directory.
 
@@ -33,42 +66,81 @@ lrwxrwxrwx 1 bpreavey bpreavey 50 Jul 28 14:53
 /home/bpreavey/.kodi/addons/kodi.plugin.video.angelstudios/plugin.video.angelstudios -> /home/bpreavey/Code/plugin.video.angelstudios
 ```
 
-The first time you launch KODI after creating the symlnk, KODI will prompt you
-if you want to enable the addon, and you should answer yes.  At this point,
+The first time you launch KODI after creating the symlink, KODI will prompt you
+if you want to enable the addon, and you should answer yes. At this point,
 the plugin is live within KODI.
 
 While some changes to code may take effect "live", it is best to quit KODI and
 re-launch it to ensure you are running the latest code.
 
 ## Branching & Versioning Strategy
-We are following trunk-based development.  All commits are made to `main`
+We are following trunk-based development. All commits are made to `main`
 unless there is a need for a short-lived release branch.
 
-When the code is ready for a release, update addon.xml to the next correct
-version.  This project follows `semver` versioning.  Every releage must
-include "news" describing the updates.  Most of this process is automated,
-but there are a few steps to follow:
+When the code is ready for a release, use the `kodi-addon-builder` tool to
+automate versioning, changelog management, and Git operations. This project
+follows `semver` versioning. Every release must include "news" describing the
+updates. The process is largely automated:
 
-1. Bump the version: run `bump_version.py`.  The script will prompt for a
+### Release Preparation
+1. Ensure all changes for the release are committed and tested locally
+2. Run `uv run make unittest-with-coverage` to verify tests pass with ≥90% coverage
+3. Ensure the working directory is clean (no uncommitted changes)
+
+### Automated Release Process
+Use `kodi-addon-builder` commands for releases:
+
+#### For Minor/Patch Releases:
+```bash
+# Bump version, update changelog, commit, tag, and push in one command
+kodi-addon-builder release minor --news "Brief description of changes"
+# or
+kodi-addon-builder release patch --news "Brief description of changes"
+```
+
+#### For Review-Before-Commit (if you prefer to inspect changes):
+```bash
+# Just update files without committing
+kodi-addon-builder bump minor --news "Brief description of changes"
+# Review the changes, then commit manually
+git add .
+git commit -m "chore(release): vX.Y.Z - Brief description"
+# Then create tag and push
+kodi-addon-builder tag  # Creates and pushes the tag
+```
+
+The `kodi-addon-builder release` command will:
+- Bump versions in `addon.xml` and `pyproject.toml` to the new version
+- Automatically add the news entry to `<news>` in `addon.xml`
+- Append a new entry to `CHANGELOG.md` (e.g., `## [0.5.0] - YYYY-MM-DD`)
+- Commit all changes with the news as the commit message
+- Create a git tag for the new version
+- Push the commit and tag to remote
+- Trigger the GitHub Actions release workflow
+
+### Manual Process (Fallback)
+If `kodi-addon-builder` encounters issues, the manual process is:
+
+1. Bump the version: run `bump_version.py`. The script will prompt for a
    type of bump (major|minor|patch) and for the "news" related to the
-   release.  These will be substituted into the `addon.xml` file with the
-   new version number.  The new version number will also be output to the
+   release. These will be substituted into the `addon.xml` file with the
+   new version number. The new version number will also be output to the
    terminal (you will need this later).
 2. Commit the new `addon.xml`.
-   ``` bash
+   ```bash
    git add plugin.video.angelstudios/addon.xml
    git commit -m "Your News Here"
    ```
 3. Push the new `addon.xml` to GitHub
-   ``` bash
+   ```bash
    git push
    ```
 4. Tag the build with the version from `bump_version.py`
-   ``` bash
+   ```bash
    git tag v0.1.5
    ```
 5. Push the tag to origin with the same version number
-   ``` bash
+   ```bash
    git push origin v0.1.5
    ```
 
@@ -78,33 +150,45 @@ but there are a few steps to follow:
 
 ### Workflow Triggers
 
-- On push to `main`, `develop`, or any `release/x.y.z` branch.
-- Manually via the GitHub Actions UI.
+- **CI Workflow** (`.github/workflows/ci.yml`):
+  - On push to `main` or pull requests to `main`
+  - Runs tests with `uv`, enforces ≥90% coverage, builds addon zip
+  - Fails build if coverage <90% or tests fail
 
-### Steps
+- **Release Workflow** (`.github/workflows/release.yml`):
+  - On push of version tags (`v*`)
+  - Calls CI workflow first to ensure code quality
+  - Only proceeds with release if CI passes
+  - Creates GitHub release with addon zip
 
-1. **Version Check (Release Branches Only)**
-   - Ensures the version in `addon.xml` matches the version in the branch name.
-   - Fails the build if they do not match.
+### CI Steps
 
-2. **RC Number Detection (Release Branches Only)**
-   - Checks for previous `-rcN` (release candidate) tags for the current version.
-   - Increments the RC number for each new build from the same release branch.
+1. **Environment Setup**
+   - Installs `uv` and sets up Python 3.9
+   - Syncs dependencies with `uv sync --dev`
 
-3. **Zip Build**
-   - Builds a zip file named `<addon-id>-<version>.zip` for `main` and `develop`.
-   - For release branches, appends `-rcN`
-     (e.g., `plugin.video.angelstudios-1.2.0-rc2.zip`).
+2. **Testing & Quality**
+   - Runs `uv run make unittest-with-coverage`
+   - Enforces minimum 90% test coverage
+   - Fails if tests fail or coverage <90%
 
-4. **Artifact Upload**
-   - Uploads the zip file as a workflow artifact.
+3. **Build**
+   - Creates addon zip artifact using `kodi-addon-builder zip`
 
-5. **GitHub Release**
-   - Creates a GitHub Release with the appropriate tag:
-     - `v<version>` for `main`
-     - `v<version>-rcN` for release branches
-   - Marks release branches as pre-releases.
-   - Attaches the zip file to the release.
+### Release Steps
+
+1. **CI Validation**
+   - Runs the full CI workflow on the tagged commit
+   - Ensures all tests pass and coverage ≥90%
+
+2. **Release Creation**
+   - Builds versioned zip: `plugin.video.angelstudios-vX.Y.Z.zip`
+   - Creates GitHub release with auto-generated notes
+   - Dispatches to central addon repository
+
+3. **Artifact Upload**
+   - Uploads zip as release asset
+   - Triggers downstream addon repository updates
 
 ---
 
@@ -116,7 +200,7 @@ discipline:
 ```bash
 #!/bin/bash
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
-ADDON_XML="addon.xml"
+ADDON_XML="plugin.video.angelstudios/addon.xml"
 
 # Enforce version match on release branches
 if [[ "$BRANCH" =~ ^release/ ]]; then
@@ -171,70 +255,55 @@ Place this in `.git/hooks/pre-commit` and make it executable (`chmod +x .git/hoo
 ## Recommended Release Workflow
 
 Follow these steps to ensure a clean, reproducible, and automated release
-process:
+process using `kodi-addon-builder`:
 
 ### 1. Develop Features
 
-- Work on new features or bugfixes in feature branches (`feature/xyz`) or
-  directly on `develop`.
-- Merge feature branches into `develop` as features are completed.
+- Work on new features or bugfixes directly on `main` (trunk-based development).
+- Ensure all changes are tested and meet ≥90% coverage requirement.
+- Commit changes with descriptive messages.
 
-### 2. Create a Release Branch
+### 2. Prepare Release
 
-- When ready to prepare a release, create a release branch from `develop`:
-
-  ```bash
-  git checkout develop
-  git pull
-  git checkout -b release/x.y.z
-  ```
-
-- Update the `version` attribute in `addon.xml` to match the release version
-  (`x.y.z`).
-
-### 3. Finalize the Release Branch
-
-- Perform final testing, bugfixes, and polish on the `release/x.y.z` branch.
-- Each push to the release branch triggers a build and creates a pre-release
-  (`-rcN`).
-
-### 4. Merge Release Branch into Main
-
-- When the release is ready, merge the release branch into `main` (squash
-  commits for a clean history):
-
+- When ready to release, ensure you're on `main` with all changes committed:
   ```bash
   git checkout main
   git pull
-  git merge --squash release/x.y.z
-  git commit -m "Release x.y.z"
-  git push
+  uv run make unittest-with-coverage  # Verify tests pass locally
+  git status  # Ensure working directory is clean
   ```
 
-- The workflow will build and create the final release artifact from `main`.
+### 3. Execute Automated Release
 
-### 5. Rebase Develop Off Main
-
-- Bring `develop` up to date with `main` to ensure it contains all hotfixes and
-  release changes:
-
+- Use `kodi-addon-builder` for a fully automated release:
   ```bash
-  git checkout develop
-  git pull
-  git rebase main
+  kodi-addon-builder release minor --news "Migrated to uv for modern Python dependency management, removed deprecated python-jose, extracted auth0-ciam-client, extensive code refactoring and cleanup, performance optimizations, and comprehensive testing improvements."
   ```
+
+This single command will:
+- Bump version to 0.5.0
+- Update `addon.xml` and `CHANGELOG.md`
+- Commit changes with descriptive message
+- Create and push git tag `v0.5.0`
+- Trigger GitHub Actions release workflow
+
+### 4. Monitor Release
+
+- GitHub Actions will:
+  - Run CI on the tagged commit (verify tests and ≥90% coverage)
+  - If CI passes, create GitHub release with addon zip
+  - Dispatch to central addon repository for distribution
 
 ### Summary Table
 
-| Step | Branch         | Action                                      |
-|------|---------------|---------------------------------------------|
-| 1    | feature/*, develop | Develop features, merge to develop         |
-| 2    | release/x.y.z | Create from develop, bump version           |
-| 3    | release/x.y.z | Finalize, test, fix bugs, pre-releases      |
-| 4    | main          | Merge release branch (squash), final release|
-| 5    | develop       | Rebase develop off main                     |
+| Step | Action                                      | Tool/Command |
+|------|---------------------------------------------|--------------|
+| 1    | Develop features on main, ensure tests pass | `uv run make unittest-with-coverage` |
+| 2    | Prepare for release (verify clean state)    | `git status` |
+| 3    | Execute automated release                   | `kodi-addon-builder release minor --news "..."` |
+| 4    | Monitor CI and release creation             | GitHub Actions |
 
 ---
 
-This process keeps `main` clean and production-ready, allows for parallel
-feature development, and ensures version discipline and reproducible releases.
+This process leverages `kodi-addon-builder` for automation while maintaining
+version discipline and reproducible releases through GitHub Actions CI/CD.

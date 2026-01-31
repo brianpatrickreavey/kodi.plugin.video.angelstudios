@@ -9,7 +9,23 @@ Angel Studios KODI Addon
 - Rationale: keep ISA in control of stream selection while avoiding local manifest handling; keep non-ISA simple and resilient.
 
 # Development and build environment
-Please see BUILD.md for development and build guidelines.
+This project uses `uv` for modern Python dependency management and `kodi-addon-builder` for automated releases.
+
+### Quick Setup
+```bash
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Clone and setup
+git clone https://github.com/yourusername/kodi.plugin.video.angelstudios.git
+cd kodi.plugin.video.angelstudios
+uv sync --dev
+
+# Run tests
+uv run make unittest-with-coverage
+```
+
+For detailed development and build instructions, see [BUILD.md](BUILD.md).
 
 # TODO
 * Implement correct behavior for unauthenticated users.
