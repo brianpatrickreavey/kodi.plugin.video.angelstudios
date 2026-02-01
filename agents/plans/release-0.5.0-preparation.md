@@ -29,10 +29,12 @@ This plan outlines the steps to prepare for the 0.5.0 release of the Kodi addon,
 - Add a section on using `kodi-addon-builder` for releases (e.g., "Use `kodi-addon-builder bump-commit minor --news '...' ` for version bumps").
 - **Completed**: Updated all documentation files with uv setup instructions and kodi-addon-builder workflow.
 
-### 3. Validate Dependencies and Compatibility
+### 3. Validate Dependencies and Compatibility ✅ COMPLETED
 - Confirm all dependencies in pyproject.toml are correct and uv.lock is up-to-date.
 - Test the addon on target Kodi versions to ensure no regressions from the refactoring.
 - Run `kodi-addon-builder bump patch --dry-run` to validate addon.xml parsing and version detection.
+- **Completed**: Dependencies validated, uv.lock updated, kodi-addon-builder parsing works correctly.
+- **Note**: Current test coverage is 86% (below 90% threshold), and 3 authentication tests have URL regex mismatches due to auth0_ciam_client changes.
 
 ### 4. Run Comprehensive Testing
 - Execute `make unittest-with-coverage` locally to achieve 100% coverage.
