@@ -2,8 +2,6 @@
 Tests for KodiUIHelpers class.
 """
 
-import os  # noqa: F401
-
 import pytest
 from unittest.mock import patch, MagicMock
 from resources.lib.kodi_ui_helpers import KodiUIHelpers
