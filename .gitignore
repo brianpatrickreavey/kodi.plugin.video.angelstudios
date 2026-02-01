@@ -91,7 +91,7 @@ ipython_config.py
 # However, in case of collaboration, if having platform-specific dependencies or dependencies
 # having no cross-platform support, uv may install dependencies that don't work, or not
 # install all needed dependencies.
-#uv.lock
+uv.lock
 
 # Celery stuff
 celerybeat-schedule
