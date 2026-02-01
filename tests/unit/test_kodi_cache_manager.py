@@ -445,3 +445,156 @@ class TestCacheUtils:
         ui.cache_manager.addon.getSettingBool.side_effect = fake_get
 
         assert ui.cache_manager._cache_enabled() is False
+
+
+class TestCacheTTLMethods:
+    """Test TTL calculation methods with various settings."""
+
+    def test_cache_ttl_normal_setting(self, ui_interface):
+        """Test _cache_ttl with normal setting value."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        ui.cache_manager.addon.getSettingInt.side_effect = lambda key: 24 if key == "projects_cache_hours" else 12
+
+        ttl = ui.cache_manager._cache_ttl()
+        assert ttl.total_seconds() == 24 * 3600  # 24 hours in seconds
+
+    def test_cache_ttl_zero_setting(self, ui_interface):
+        """Test _cache_ttl with zero setting (should default to 12)."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        ui.cache_manager.addon.getSettingInt.side_effect = lambda key: 0 if key == "projects_cache_hours" else 12
+
+        ttl = ui.cache_manager._cache_ttl()
+        assert ttl.total_seconds() == 12 * 3600  # 12 hours in seconds
+        logger_mock.warning.assert_called_with("projects_cache_hours was falsy (0); defaulting to 12")
+
+    def test_cache_ttl_exception_handling(self, ui_interface):
+        """Test _cache_ttl with exception (should default to 12)."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        def side_effect(key):
+            if key == "projects_cache_hours":
+                raise Exception("Setting error")
+            return 12
+        ui.cache_manager.addon.getSettingInt.side_effect = side_effect
+
+        ttl = ui.cache_manager._cache_ttl()
+        assert ttl.total_seconds() == 12 * 3600  # 12 hours in seconds
+        logger_mock.warning.assert_called_with("Failed to read projects_cache_hours; defaulting to 12: Setting error")
+
+    def test_project_cache_ttl_normal_setting(self, ui_interface):
+        """Test _project_cache_ttl with normal setting value."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        ui.cache_manager.addon.getSettingInt.side_effect = lambda key: 16 if key == "project_cache_hours" else 12
+
+        ttl = ui.cache_manager._project_cache_ttl()
+        assert ttl.total_seconds() == 16 * 3600  # 16 hours in seconds
+
+    def test_project_cache_ttl_zero_setting(self, ui_interface):
+        """Test _project_cache_ttl with zero setting (should default to 8)."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        ui.cache_manager.addon.getSettingInt.side_effect = lambda key: 0 if key == "project_cache_hours" else 12
+
+        ttl = ui.cache_manager._project_cache_ttl()
+        assert ttl.total_seconds() == 8 * 3600  # 8 hours in seconds
+        logger_mock.warning.assert_called_with("project_cache_hours was falsy (0); defaulting to 8")
+
+    def test_project_cache_ttl_exception_handling(self, ui_interface):
+        """Test _project_cache_ttl with exception (should default to 8)."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        def side_effect(key):
+            if key == "project_cache_hours":
+                raise Exception("Setting error")
+            return 12
+        ui.cache_manager.addon.getSettingInt.side_effect = side_effect
+
+        ttl = ui.cache_manager._project_cache_ttl()
+        assert ttl.total_seconds() == 8 * 3600  # 8 hours in seconds
+        logger_mock.warning.assert_called_with("Failed to read project_cache_hours; defaulting to 8: Setting error")
+
+    def test_episode_cache_ttl_normal_setting(self, ui_interface):
+        """Test _episode_cache_ttl with normal setting value."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        ui.cache_manager.addon.getSettingInt.side_effect = lambda key: 48 if key == "episodes_cache_hours" else 12
+
+        ttl = ui.cache_manager._episode_cache_ttl()
+        assert ttl.total_seconds() == 48 * 3600  # 48 hours in seconds
+
+    def test_episode_cache_ttl_zero_setting(self, ui_interface):
+        """Test _episode_cache_ttl with zero setting (should default to 72)."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        ui.cache_manager.addon.getSettingInt.side_effect = lambda key: 0 if key == "episodes_cache_hours" else 12
+
+        ttl = ui.cache_manager._episode_cache_ttl()
+        assert ttl.total_seconds() == 72 * 3600  # 72 hours in seconds
+        logger_mock.warning.assert_called_with("episodes_cache_hours was falsy (0); defaulting to 72")
+
+    def test_episode_cache_ttl_exception_handling(self, ui_interface):
+        """Test _episode_cache_ttl with exception (should default to 72)."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        def side_effect(key):
+            if key == "episodes_cache_hours":
+                raise Exception("Setting error")
+            return 12
+        ui.cache_manager.addon.getSettingInt.side_effect = side_effect
+
+        ttl = ui.cache_manager._episode_cache_ttl()
+        assert ttl.total_seconds() == 72 * 3600  # 72 hours in seconds
+        logger_mock.warning.assert_called_with("Failed to read episodes_cache_hours; defaulting to 72: Setting error")
+
+
+class TestGetProjectMethod:
+    """Test the _get_project method with various cache scenarios."""
+
+    def test_get_project_cache_hit(self, ui_interface):
+        """Test _get_project with cache hit."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        ui.cache_manager.addon.getSettingBool.side_effect = lambda key: False if key == "disable_cache" else True
+        ui.cache_manager.cache.get.return_value = {"name": "Cached Project"}
+
+        result = ui.cache_manager._get_project("test-slug")
+
+        assert result == {"name": "Cached Project"}
+        ui.cache_manager.cache.get.assert_called_with("project_test-slug")
+        logger_mock.debug.assert_called_with("Cache hit for project_test-slug")
+        angel_interface_mock.get_project.assert_not_called()
+
+    def test_get_project_cache_miss(self, ui_interface):
+        """Test _get_project with cache miss."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        ui.cache_manager.addon.getSettingBool.side_effect = lambda key: False if key == "disable_cache" else True
+        ui.cache_manager.cache.get.return_value = None
+        angel_interface_mock.get_project.return_value = {"name": "Fetched Project"}
+
+        result = ui.cache_manager._get_project("test-slug")
+
+        assert result == {"name": "Fetched Project"}
+        ui.cache_manager.cache.get.assert_called_with("project_test-slug")
+        logger_mock.debug.assert_called_with("Cache miss for project_test-slug")
+        logger_mock.info.assert_called_with("Fetching project data from AngelStudiosInterface for: test-slug")
+        angel_interface_mock.get_project.assert_called_with("test-slug")
+        ui.cache_manager.cache.set.assert_called_once()
+
+    def test_get_project_cache_disabled(self, ui_interface):
+        """Test _get_project with cache disabled."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        ui.cache_manager.addon.getSettingBool.side_effect = lambda key: True if key == "disable_cache" else False
+        angel_interface_mock.get_project.return_value = {"name": "Fetched Project"}
+
+        result = ui.cache_manager._get_project("test-slug")
+
+        assert result == {"name": "Fetched Project"}
+        ui.cache_manager.cache.get.assert_not_called()
+        logger_mock.debug.assert_called_with("Cache disabled; bypassing project cache")
+        logger_mock.info.assert_called_with("Fetching project data from AngelStudiosInterface for: test-slug")
+        angel_interface_mock.get_project.assert_called_with("test-slug")
+        ui.cache_manager.cache.set.assert_not_called()
+
+    def test_get_project_api_returns_none(self, ui_interface):
+        """Test _get_project when API returns None."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        ui.cache_manager.cache.get.return_value = None
+        angel_interface_mock.get_project.return_value = None
+
+        result = ui.cache_manager._get_project("test-slug")
+
+        assert result is None
+        ui.cache_manager.cache.set.assert_not_called()  # Should not cache None values

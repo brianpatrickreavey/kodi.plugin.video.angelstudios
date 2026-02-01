@@ -184,7 +184,7 @@ class TestMainMenu:
         import xbmcaddon
 
         addon = xbmcaddon.Addon.return_value
-        addon.getSettingInt.return_value = 5
+        addon.getSettingInt.side_effect = lambda key: 5 if key == "projects_cache_hours" else 12
 
         ui = KodiUIInterface(
             handle=1,
@@ -203,7 +203,7 @@ class TestMainMenu:
         import xbmcaddon
 
         addon = xbmcaddon.Addon.return_value
-        addon.getSettingInt.return_value = hours
+        addon.getSettingInt.side_effect = lambda key: hours if key == "projects_cache_hours" else 12
 
         ui = KodiUIInterface(
             handle=1,
@@ -221,7 +221,7 @@ class TestMainMenu:
         import xbmcaddon
 
         addon = xbmcaddon.Addon.return_value
-        addon.getSettingInt.return_value = 0
+        addon.getSettingInt.side_effect = lambda key: 0 if key == "projects_cache_hours" else 12
 
         ui = KodiUIInterface(
             handle=1,

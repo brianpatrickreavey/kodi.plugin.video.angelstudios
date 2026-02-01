@@ -744,7 +744,7 @@ class TestAngelStudioSession:
 
         with patch("resources.lib.angel_authentication.requests.Session", return_value=sess):
             with pytest.raises(
-                Exception, match="Request timeout: Unable to connect to https://auth.auth.angel.com \\(timeout: 15s\\)"
+                Exception, match="Request timeout: Unable to connect to https://auth.angel.com \\(timeout: 15s\\)"
             ):
                 inst.authenticate()
 
@@ -760,7 +760,7 @@ class TestAngelStudioSession:
 
         with patch("resources.lib.angel_authentication.requests.Session", return_value=sess):
             with pytest.raises(
-                Exception, match="Request timeout: Unable to connect to https://auth.auth.angel.com \\(timeout: 20s\\)"
+                Exception, match="Request timeout: Unable to connect to https://auth.angel.com \\(timeout: 20s\\)"
             ):
                 inst.authenticate()
 
@@ -780,7 +780,7 @@ class TestAngelStudioSession:
 
         with patch("resources.lib.angel_authentication.requests.Session", return_value=sess):
             with pytest.raises(
-                Exception, match="Request timeout: Unable to connect to https://auth.auth.angel.com \\(timeout: 25s\\)"
+                Exception, match="Request timeout: Unable to connect to https://auth.angel.com \\(timeout: 25s\\)"
             ):
                 inst.authenticate()
 

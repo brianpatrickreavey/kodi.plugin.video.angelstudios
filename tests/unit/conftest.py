@@ -36,6 +36,10 @@ sys.modules["xbmcaddon"] = MagicMock()
 sys.modules["xbmcvfs"] = MagicMock()
 sys.modules["xbmcvfs"].mkdirs = MagicMock()
 
+# Mock simplecache module (Kodi-specific caching library)
+sys.modules["simplecache"] = MagicMock()
+sys.modules["simplecache"].SimpleCache = MagicMock()
+
 # ==============================================================================
 # ADDON CONFIGURATION (Default settings used across tests)
 # ==============================================================================

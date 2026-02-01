@@ -5,6 +5,7 @@ Shared utilities and mappings used across menu handlers.
 
 import xbmcgui  # type: ignore
 from kodi_utils import TimedBlock
+from urllib.parse import urlencode
 
 # Map menu content types to Angel Studios project types for API calls
 angel_menu_content_mapper = {
@@ -44,7 +45,7 @@ class MenuUtils:
 
     def create_plugin_url(self, **kwargs):
         """Create a URL for calling the plugin recursively"""
-        return f"{self.kodi_url}?{__import__('urllib.parse').urlencode(kwargs)}"
+        return f"{self.kodi_url}?{urlencode(kwargs)}"
 
     def _build_list_item_for_content(self, content, content_type_str, **options):
         """
