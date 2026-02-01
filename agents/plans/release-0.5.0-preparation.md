@@ -43,30 +43,25 @@ This plan outlines the steps to prepare for the 0.5.0 release of the Kodi addon,
 - **Completed**: All 510 tests now pass, comprehensive test coverage improvements implemented.
 - **Coverage Status**: 94% (exceeds 90% threshold) - Significant improvements in `kodi_cache_manager.py` (96%), `kodi_menu_handler.py` (94%), and other core components.
 
-### 5. Update CHANGELOG.md and Version Files (Automated with kodi-addon-builder)
-- Use `kodi-addon-builder bump-commit minor --news "Migrated to uv for modern Python dependency management, removed deprecated python-jose, extracted auth0-ciam-client, extensive code refactoring and cleanup, performance optimizations, and comprehensive testing improvements."` to:
-  - Bump versions in addon.xml and pyproject.toml to 0.5.0.
-  - Automatically add the news entry to `<news>` in addon.xml.
-  - Append a new entry to CHANGELOG.md (e.g., `## [0.5.0] - YYYY-MM-DD\n- Migrated to uv...`).
-  - Commit all changes with the news as the commit message.
-- **Alternative**: If you prefer to review before committing, use `kodi-addon-builder bump minor --news "..."` then manually commit.
-
-### 6. Code Cleanup and Final Checks
+### 5. Final Code Cleanup and Validation
 - Remove any lingering references to old tools (e.g., in comments or scripts).
 - Ensure .gitignore includes uv.lock and excludes old files like requirements.txt.
 - Verify no broken imports or deprecated code.
 - Run `kodi-addon-builder bump patch --dry-run` to confirm no XML parsing errors.
+- Ensure working directory is clean and all tests pass.
 
-### 7. Release Preparation (Automated with kodi-addon-builder)
-- After committing the version bump, use `kodi-addon-builder release minor --news "Migrated to uv for modern Python dependency management, removed deprecated python-jose, extracted auth0-ciam-client, extensive code refactoring and cleanup, performance optimizations, and comprehensive testing improvements."` to:
-  - Bump version (if not already done).
-  - Commit changes (if not already done).
+### 6. Release (Automated with kodi-addon-builder)
+- Use `kodi-addon-builder release minor --news "Migrated to uv for modern Python dependency management, removed deprecated python-jose, extracted auth0-ciam-client, extensive code refactoring and cleanup, performance optimizations, and comprehensive testing improvements."` to:
+  - Bump versions in addon.xml and pyproject.toml to 0.5.0.
+  - Automatically add the news entry to `<news>` in addon.xml.
+  - Append a new entry to CHANGELOG.md (e.g., `## [0.5.0] - YYYY-MM-DD\n- Migrated to uv...`).
+  - Commit all changes with the news as the commit message.
   - Create a git tag for v0.5.0.
   - Push the commit and tag to remote.
+- **Alternative**: For more control, use `kodi-addon-builder bump-commit minor --news "..."` first to review changes locally, then `kodi-addon-builder tag v0.5.0 && kodi-addon-builder push --tags`.
 - Test the release workflow (e.g., release.yml) to ensure it runs CI first, packages correctly, and creates the GitHub release with the zip.
-- Prepare release notes or announcements highlighting the tooling upgrade.
 
-### 8. Post-Release Planning (Optional but Recommended)
+### 7. Post-Release Planning (Optional but Recommended)
 - Monitor CI for any failures after release.
 - Update any external dependencies or repos that reference this addon.
 - If issues arise, use `kodi-addon-builder` commands for hotfixes (e.g., `bump-commit patch --news "Fix..."`).
