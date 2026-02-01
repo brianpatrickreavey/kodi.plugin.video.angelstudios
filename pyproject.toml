@@ -14,7 +14,7 @@ dependencies = [
     "auth0-ciam-client @ git+https://github.com/brianpatrickreavey/auth0-ciam-client.git@v0.2.1",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "flake8",
     "black",

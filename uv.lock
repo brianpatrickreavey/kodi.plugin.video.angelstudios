@@ -586,8 +586,8 @@ wheels = [
 
 [[package]]
 name = "kodi-addon-builder"
-version = "0.3.0"
-source = { git = "https://github.com/brianpatrickreavey/kodi-addon-builder.git?rev=v0.3.0#b15198294e8cb7fe3b103d341eb9a2e21c2972fc" }
+version = "0.3.1"
+source = { git = "https://github.com/brianpatrickreavey/kodi-addon-builder.git?rev=v0.3.1#d7a682a1d17eea567f6d97427444f57ba997f179" }
 dependencies = [
     { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "click", version = "8.3.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
@@ -605,7 +605,7 @@ dependencies = [
     { name = "simplecache" },
 ]
 
-[package.optional-dependencies]
+[package.dev-dependencies]
 dev = [
     { name = "black", version = "25.11.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "black", version = "26.1.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
@@ -621,17 +621,20 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "auth0-ciam-client", git = "https://github.com/brianpatrickreavey/auth0-ciam-client.git?rev=v0.2.1" },
-    { name = "black", marker = "extra == 'dev'" },
-    { name = "flake8", marker = "extra == 'dev'" },
-    { name = "kodi-addon-builder", marker = "extra == 'dev'", git = "https://github.com/brianpatrickreavey/kodi-addon-builder.git?rev=v0.3.0" },
-    { name = "pyright", marker = "extra == 'dev'" },
-    { name = "pytest", marker = "extra == 'dev'" },
-    { name = "pytest-cov", marker = "extra == 'dev'" },
     { name = "requests" },
-    { name = "semver", marker = "extra == 'dev'" },
     { name = "simplecache" },
 ]
-provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "black" },
+    { name = "flake8" },
+    { name = "kodi-addon-builder", git = "https://github.com/brianpatrickreavey/kodi-addon-builder.git?rev=v0.3.1" },
+    { name = "pyright" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "semver" },
+]
 
 [[package]]
 name = "mccabe"
