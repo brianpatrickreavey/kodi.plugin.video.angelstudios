@@ -1,0 +1,9 @@
+LICENSE.txt
+README.md
+pyproject.toml
+kodi_plugin_video_angelstudios.egg-info/PKG-INFO
+kodi_plugin_video_angelstudios.egg-info/SOURCES.txt
+kodi_plugin_video_angelstudios.egg-info/dependency_links.txt
+kodi_plugin_video_angelstudios.egg-info/not-zip-safe
+kodi_plugin_video_angelstudios.egg-info/requires.txt
+kodi_plugin_video_angelstudios.egg-info/top_level.txt
