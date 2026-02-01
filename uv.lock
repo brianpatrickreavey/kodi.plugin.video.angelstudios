@@ -586,8 +586,8 @@ wheels = [
 
 [[package]]
 name = "kodi-addon-builder"
-version = "0.1.0"
-source = { git = "https://github.com/brianpatrickreavey/kodi-addon-builder.git#22c0ed14a58e4bd76da1e897f5ca688eae43fd09" }
+version = "0.3.0"
+source = { git = "https://github.com/brianpatrickreavey/kodi-addon-builder.git?rev=v0.3.0#b15198294e8cb7fe3b103d341eb9a2e21c2972fc" }
 dependencies = [
     { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "click", version = "8.3.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
@@ -623,7 +623,7 @@ requires-dist = [
     { name = "auth0-ciam-client", git = "https://github.com/brianpatrickreavey/auth0-ciam-client.git?rev=v0.2.1" },
     { name = "black", marker = "extra == 'dev'" },
     { name = "flake8", marker = "extra == 'dev'" },
-    { name = "kodi-addon-builder", marker = "extra == 'dev'", git = "https://github.com/brianpatrickreavey/kodi-addon-builder.git" },
+    { name = "kodi-addon-builder", marker = "extra == 'dev'", git = "https://github.com/brianpatrickreavey/kodi-addon-builder.git?rev=v0.3.0" },
     { name = "pyright", marker = "extra == 'dev'" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "pytest-cov", marker = "extra == 'dev'" },
