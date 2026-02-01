@@ -52,7 +52,7 @@ This plan outlines the steps to prepare for the 0.5.0 release of the Kodi addon,
 - **Completed**: No old tool references found, .gitignore updated with uv.lock exclusion and commentary, syntax validation passed, XML parsing confirmed working, all tests pass (510/510), working directory clean.
 
 ### 6. Release (Automated with kodi-addon-builder)
-- Use `kodi-addon-builder release minor --news "Migrated to uv for modern Python dependency management, removed deprecated python-jose, extracted auth0-ciam-client, extensive code refactoring and cleanup, performance optimizations, and comprehensive testing improvements."` to:
+- Use `kodi-addon-builder release minor --news "v0.5.0: Migrated to uv for modern Python dependency management, removed deprecated python-jose, extracted auth0-ciam-client, extensive code refactoring and cleanup, performance optimizations, and comprehensive testing improvements."` to:
   - Bump versions in addon.xml and pyproject.toml to 0.5.0.
   - Automatically add the news entry to `<news>` in addon.xml.
   - Append a new entry to CHANGELOG.md (e.g., `## [0.5.0] - YYYY-MM-DD\n- Migrated to uv...`).
