@@ -33,7 +33,7 @@ zip-safe = false
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["plugin.video.angelstudios*"]
-exclude = ["agents*", "test_cache*", "htmlcov*", "tests*"]
+exclude = ["agents*", "test_cache*", "htmlcov*", "tests*", "**/__pycache__*", "**/*.pyc"]
 
 [tool.black]
 line-length = 100

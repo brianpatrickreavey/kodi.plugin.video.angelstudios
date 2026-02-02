@@ -11,12 +11,13 @@ import pytest
 
 from .unittest_data import ROUTER_DISPATCH_CASES
 
-MAIN_PATH = Path(__file__).resolve().parents[2] / "plugin.video.angelstudios" / "resources" / "lib" / "main.py"
+MAIN_PATH = Path(__file__).resolve().parents[2] / "plugin.video.angelstudios" / "resources" / "lib" / "addon_entry.py"
+MAIN_ENTRY_PATH = Path(__file__).resolve().parents[2] / "plugin.video.angelstudios" / "resources" / "lib" / "main.py"
 RES_LIB = MAIN_PATH.parent / "resources" / "lib"
 
 
 def _fresh_main_module():
-    """Load main.py via importlib to avoid package import issues."""
+    """Load addon_entry.py via importlib to avoid package import issues."""
     sys.argv = ["plugin://", "1", "?"]
     sys.path.insert(0, str(MAIN_PATH.parent))
     sys.path.insert(0, str(RES_LIB))
@@ -190,6 +191,10 @@ class TestMain:
 
     def test_main_guard_calls_router_with_credentials(self, monkeypatch):
         """__main__ guard initializes interfaces and routes when creds exist."""
+        sys.path.insert(0, str(RES_LIB))
+        import angel_interface
+        import kodi_ui_interface
+
         addon = MagicMock()
         addon.getSetting.side_effect = ["user", "pass"]
         addon.getAddonInfo.return_value = "/addon"
@@ -199,9 +204,9 @@ class TestMain:
         monkeypatch.setattr(sys.modules["xbmcvfs"], "exists", MagicMock(return_value=True))
 
         asi = MagicMock()
-        monkeypatch.setattr("angel_interface.AngelStudiosInterface", MagicMock(return_value=asi))
+        monkeypatch.setattr(angel_interface, "AngelStudiosInterface", MagicMock(return_value=asi))
         ui_mock = MagicMock()
-        monkeypatch.setattr("kodi_ui_interface.KodiUIInterface", MagicMock(return_value=ui_mock))
+        monkeypatch.setattr(kodi_ui_interface, "KodiUIInterface", MagicMock(return_value=ui_mock))
 
         sys.argv = ["plugin://", "1", "?action=movies_menu"]
 
@@ -213,6 +218,9 @@ class TestMain:
 
     def test_main_guard_logs_on_exception(self, monkeypatch):
         """__main__ guard surfaces initialization failures via show_error."""
+        sys.path.insert(0, str(RES_LIB))
+        sys.argv = ["plugin://", "1", "?action=movies_menu"]
+
         addon = MagicMock()
         addon.getSetting.side_effect = ["user", "pass"]
         addon.getAddonInfo.return_value = "/addon"
@@ -221,15 +229,15 @@ class TestMain:
         monkeypatch.setattr(sys.modules["xbmcvfs"], "translatePath", MagicMock(side_effect=lambda p: p))
         monkeypatch.setattr(sys.modules["xbmcvfs"], "exists", MagicMock(return_value=True))
 
-        monkeypatch.setattr("angel_interface.AngelStudiosInterface", MagicMock(side_effect=RuntimeError("boom")))
+        import angel_interface
+        monkeypatch.setattr(angel_interface, "AngelStudiosInterface", MagicMock(side_effect=RuntimeError("boom")))
+        import kodi_ui_interface
         ui_mock = MagicMock()
-        monkeypatch.setattr("kodi_ui_interface.KodiUIInterface", MagicMock(return_value=ui_mock))
+        monkeypatch.setattr(kodi_ui_interface, "KodiUIInterface", MagicMock(return_value=ui_mock))
 
-        sys.argv = ["plugin://", "1", "?action=movies_menu"]
+        from addon_entry import router
 
-        sys.path.insert(0, str(MAIN_PATH.parent))
-        sys.path.insert(0, str(RES_LIB))
-        runpy.run_path(str(MAIN_PATH), run_name="__main__")
+        router("?action=movies_menu", ui_mock)
 
         ui_mock.show_error.assert_called_once()
 

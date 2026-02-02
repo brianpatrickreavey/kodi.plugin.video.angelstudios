@@ -156,9 +156,9 @@ credentials.json
 .vscode
 *.pkl
 
-# Bundled dependencies in addon lib
-plugin.video.angelstudios/resources/lib/*
-!plugin.video.angelstudios/resources/lib/code/
+# Generated files in addon lib
+plugin.video.angelstudios/resources/lib/__pycache__/
+plugin.video.angelstudios/resources/lib/*.pyc
 
 # Bundled dependencies
 plugin.video.angelstudios/resources/dependencies/
