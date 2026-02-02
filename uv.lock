@@ -610,8 +610,8 @@ wheels = [
 
 [[package]]
 name = "kodi-addon-builder"
-version = "0.3.6"
-source = { git = "https://github.com/brianpatrickreavey/kodi-addon-builder.git?rev=v0.3.6#17d8203451b31115c1a308df996ce0a01afb497c" }
+version = "0.3.7"
+source = { git = "https://github.com/brianpatrickreavey/kodi-addon-builder.git?rev=v0.3.7#b3f48dc8ab03e6a12338ad72aed78b66e9a70fa7" }
 dependencies = [
     { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "click", version = "8.3.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
@@ -674,7 +674,7 @@ requires-dist = [
 dev = [
     { name = "black" },
     { name = "flake8" },
-    { name = "kodi-addon-builder", git = "https://github.com/brianpatrickreavey/kodi-addon-builder.git?rev=v0.3.6" },
+    { name = "kodi-addon-builder", git = "https://github.com/brianpatrickreavey/kodi-addon-builder.git?rev=v0.3.7" },
     { name = "kodi-addon-checker" },
     { name = "pyright" },
     { name = "pytest" },

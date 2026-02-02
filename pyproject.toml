@@ -23,7 +23,7 @@ dev = [
     "pytest-cov",
     "semver",
     "kodi-addon-checker",
-    "kodi-addon-builder @ git+https://github.com/brianpatrickreavey/kodi-addon-builder.git@v0.3.6",
+    "kodi-addon-builder @ git+https://github.com/brianpatrickreavey/kodi-addon-builder.git@v0.3.7",
 ]
 
 [tool.setuptools]
