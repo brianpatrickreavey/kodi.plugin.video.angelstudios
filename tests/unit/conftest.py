@@ -85,7 +85,6 @@ if lib_path not in sys.path:
     sys.path.insert(0, lib_path)
 from resources.lib.kodi_ui_interface import KodiUIInterface  # noqa: E402
 
-
 # ==============================================================================
 # INDIVIDUAL FIXTURES (Composable, single-purpose, reusable)
 # ==============================================================================

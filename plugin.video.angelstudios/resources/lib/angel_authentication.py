@@ -11,6 +11,7 @@ import requests
 import base64
 import json
 from datetime import datetime, timezone
+from typing import Optional, Tuple
 
 from auth0_ciam_client import (
     AuthenticationCore,
@@ -75,7 +76,7 @@ class KodiSessionStore(SessionStore):
         """Save JWT token to Kodi addon settings"""
         self.addon.setSettingString("jwt_token", token)
 
-    def get_token(self) -> str | None:
+    def get_token(self) -> Optional[str]:
         """Get JWT token from Kodi addon settings"""
         token = self.addon.getSettingString("jwt_token")
         return token if token else None
@@ -89,7 +90,7 @@ class KodiSessionStore(SessionStore):
         self.addon.setSettingString("username", username)
         self.addon.setSettingString("password", password)
 
-    def get_credentials(self) -> tuple[str | None, str | None]:
+    def get_credentials(self) -> Tuple[Optional[str], Optional[str]]:
         """Get username and password from Kodi addon settings"""
         username = self.addon.getSettingString("username")
         password = self.addon.getSettingString("password")

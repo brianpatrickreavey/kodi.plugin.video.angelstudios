@@ -470,10 +470,12 @@ class TestCacheTTLMethods:
     def test_cache_ttl_exception_handling(self, ui_interface):
         """Test _cache_ttl with exception (should default to 12)."""
         ui, logger_mock, angel_interface_mock = ui_interface
+
         def side_effect(key):
             if key == "projects_cache_hours":
                 raise Exception("Setting error")
             return 12
+
         ui.cache_manager.addon.getSettingInt.side_effect = side_effect
 
         ttl = ui.cache_manager._cache_ttl()
@@ -500,10 +502,12 @@ class TestCacheTTLMethods:
     def test_project_cache_ttl_exception_handling(self, ui_interface):
         """Test _project_cache_ttl with exception (should default to 8)."""
         ui, logger_mock, angel_interface_mock = ui_interface
+
         def side_effect(key):
             if key == "project_cache_hours":
                 raise Exception("Setting error")
             return 12
+
         ui.cache_manager.addon.getSettingInt.side_effect = side_effect
 
         ttl = ui.cache_manager._project_cache_ttl()
@@ -530,10 +534,12 @@ class TestCacheTTLMethods:
     def test_episode_cache_ttl_exception_handling(self, ui_interface):
         """Test _episode_cache_ttl with exception (should default to 72)."""
         ui, logger_mock, angel_interface_mock = ui_interface
+
         def side_effect(key):
             if key == "episodes_cache_hours":
                 raise Exception("Setting error")
             return 12
+
         ui.cache_manager.addon.getSettingInt.side_effect = side_effect
 
         ttl = ui.cache_manager._episode_cache_ttl()

@@ -58,9 +58,12 @@ def test_clear_debug_data_no_dir(ui_helpers):
 
 def test_clear_debug_data_with_files(ui_helpers):
     """Test clear_debug_data removes files."""
-    with patch("os.path.isdir", return_value=True), patch(
-        "os.listdir", return_value=["file1.json", "file2.json"]
-    ), patch("os.path.isfile", return_value=True), patch("os.remove") as mock_remove:
+    with (
+        patch("os.path.isdir", return_value=True),
+        patch("os.listdir", return_value=["file1.json", "file2.json"]),
+        patch("os.path.isfile", return_value=True),
+        patch("os.remove") as mock_remove,
+    ):
         result = ui_helpers.clear_debug_data()
         assert result is True
         assert mock_remove.call_count == 2
@@ -68,9 +71,10 @@ def test_clear_debug_data_with_files(ui_helpers):
 
 def test_clear_debug_data_with_notification(ui_helpers):
     """Test clear_debug_data_with_notification."""
-    with patch.object(ui_helpers, "clear_debug_data", return_value=True), patch.object(
-        ui_helpers, "show_notification"
-    ) as mock_show:
+    with (
+        patch.object(ui_helpers, "clear_debug_data", return_value=True),
+        patch.object(ui_helpers, "show_notification") as mock_show,
+    ):
         ui_helpers.clear_debug_data_with_notification()
         mock_show.assert_called_once_with("Debug data cleared.")
 

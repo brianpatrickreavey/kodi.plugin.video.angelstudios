@@ -112,3 +112,8 @@ kodi-addon-builder tag  # Creates and pushes the tag
 - `kodi-addon-builder` handles version consistency automatically.
 - Enforce squash-merge on PRs for cleaner history.
 - CI validates all releases through reusable workflows.
+
+## Type Annotation Compatibility
+- Target Python 3.9+ for type annotations to match KODI runtime environment.
+- Use `typing.Optional` and `typing.Union` instead of `|` union syntax for Python 3.9 compatibility.
+- Configure Pyright to target Python 3.9 via `[tool.pyright]` in `pyproject.toml`.

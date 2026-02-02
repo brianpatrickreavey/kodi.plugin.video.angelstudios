@@ -26,34 +26,34 @@ help:
 
 # === FORMATTING (Addon only) ===
 black:
-	source .venv/bin/activate && black --line-length=120 $(ADDON_DIRS) $(TEST_DIRS)
+	black --line-length=120 $(ADDON_DIRS) $(TEST_DIRS)
 
 black-check:
-	source .venv/bin/activate && black --check --line-length=120 $(ADDON_DIRS) $(TEST_DIRS)
+	black --check --line-length=120 $(ADDON_DIRS) $(TEST_DIRS)
 
 format: black
 
 # === LINTING ===
 flake8:
-	source .venv/bin/activate && flake8 $(ADDON_DIRS) $(TEST_DIRS) --max-line-length=120
+	flake8 $(ADDON_DIRS) $(TEST_DIRS) --max-line-length=120
 
 pyright:
-	source .venv/bin/activate && pyright $(ADDON_DIRS)
+	pyright $(ADDON_DIRS)
 
 lint: black-check flake8
-	source .venv/bin/activate && pyright $(ADDON_DIRS)
+	pyright $(ADDON_DIRS)
 
 format-and-lint: format lint
 
 # === TESTING (Addon only) ===
 unittest:
-	source .venv/bin/activate && pytest $(TEST_DIRS)unit/ -v
+	pytest $(TEST_DIRS)unit/ -v
 
 unittest-with-coverage:
-	source .venv/bin/activate && python -m pytest --cov=$(ADDON_MODULES) --cov-report=term-missing --cov-fail-under=90 $(TEST_DIRS)unit
+	python -m pytest --cov=$(ADDON_MODULES) --cov-report=term-missing --cov-fail-under=90 $(TEST_DIRS)unit
 
 coverage:
-	source .venv/bin/activate && pytest --cov=$(ADDON_MODULES) $(TEST_DIRS)unit/
+	pytest --cov=$(ADDON_MODULES) $(TEST_DIRS)unit/
 
 # === COORDINATION TARGETS (Addon + Package) ===
 lint-all: lint

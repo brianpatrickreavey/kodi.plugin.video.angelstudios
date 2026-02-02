@@ -67,9 +67,7 @@ class TestMenuUtils:
         mock_listitem.return_value.getVideoInfoTag.return_value = MagicMock()
 
         content = {"name": "Test Project", "description": "Test description"}
-        list_item = menu_utils._build_list_item_for_content(
-            content, "project", content_type="movies"
-        )
+        list_item = menu_utils._build_list_item_for_content(content, "project", content_type="movies")
 
         assert list_item is not None
         list_item.setIsFolder.assert_called_with(True)
@@ -83,7 +81,7 @@ class TestMenuUtils:
         content = {
             "name": "Test Episode",
             "source": {"url": "https://example.com/manifest.m3u8", "duration": 1800},
-            "watchPosition": {"position": 300}
+            "watchPosition": {"position": 300},
         }
         list_item = menu_utils._build_list_item_for_content(
             content, "episode", overlay_progress=True, content_type="series"
@@ -99,9 +97,7 @@ class TestMenuUtils:
         mock_listitem.return_value.getVideoInfoTag.return_value = MagicMock()
 
         content = {"name": "Test Episode"}  # No source
-        list_item = menu_utils._build_list_item_for_content(
-            content, "episode", content_type="series"
-        )
+        list_item = menu_utils._build_list_item_for_content(content, "episode", content_type="series")
 
         assert list_item is not None
         list_item.setProperty.assert_called_with("IsPlayable", "false")
@@ -121,7 +117,7 @@ class TestMenuUtils:
             "duration": 1800,
             "episodeNumber": 1,
             "seasonNumber": 1,
-            "media_type": "episode"
+            "media_type": "episode",
         }
 
         menu_utils._process_attributes_to_infotags(list_item, info_dict)
@@ -166,13 +162,8 @@ class TestMenuUtils:
         list_item.getLabel.return_value = "Test Item"
 
         info_dict = {
-            "metadata": {
-                "contentRating": "PG-13",
-                "genres": ["Action", "Adventure"]
-            },
-            "season": {
-                "seasonNumber": 2
-            }
+            "metadata": {"contentRating": "PG-13", "genres": ["Action", "Adventure"]},
+            "season": {"seasonNumber": 2},
         }
 
         menu_utils._process_attributes_to_infotags(list_item, info_dict)
@@ -194,7 +185,7 @@ class TestMenuUtils:
             "discoveryPosterLandscapeCloudinaryPath": "landscape/path",
             "logoCloudinaryPath": "logo/path",
             "portraitStill1": {"cloudinaryPath": "still1/path"},
-            "landscapeStill1": {"cloudinaryPath": "landscape_still/path"}
+            "landscapeStill1": {"cloudinaryPath": "landscape_still/path"},
         }
 
         menu_utils._process_attributes_to_infotags(list_item, info_dict)
@@ -215,7 +206,9 @@ class TestMenuUtils:
 
     @patch("xbmcgui.ListItem")
     @patch("xbmc.VideoStreamDetail")
-    def test_create_list_item_from_episode_directory_mode(self, mock_videostream, mock_listitem, menu_utils, mock_parent):
+    def test_create_list_item_from_episode_directory_mode(
+        self, mock_videostream, mock_listitem, menu_utils, mock_parent
+    ):
         """Test creating list item for episode in directory mode."""
         mock_listitem.return_value.getVideoInfoTag.return_value = MagicMock()
 
@@ -223,7 +216,7 @@ class TestMenuUtils:
             "name": "Test Episode",
             "source": {"url": "https://example.com/manifest.m3u8", "duration": 1800},
             "episodeNumber": 1,
-            "seasonNumber": 1
+            "seasonNumber": 1,
         }
         project = {"name": "Test Series"}
 
@@ -239,7 +232,9 @@ class TestMenuUtils:
     @patch("xbmcgui.ListItem")
     @patch("xbmc.VideoStreamDetail")
     @patch("xbmc.getCondVisibility")
-    def test_create_list_item_from_episode_playback_mode(self, mock_cond_visibility, mock_videostream, mock_listitem, menu_utils, mock_parent):
+    def test_create_list_item_from_episode_playback_mode(
+        self, mock_cond_visibility, mock_videostream, mock_listitem, menu_utils, mock_parent
+    ):
         """Test creating list item for episode in playback mode."""
         mock_listitem.return_value.getVideoInfoTag.return_value = MagicMock()
         mock_cond_visibility.return_value = True  # ISA available
@@ -249,7 +244,7 @@ class TestMenuUtils:
             "source": {"url": "https://example.com/manifest.m3u8", "duration": 1800},
             "episodeNumber": 1,
             "seasonNumber": 1,
-            "watch_position": 300
+            "watch_position": 300,
         }
         project = {"name": "Test Series"}
 
@@ -271,9 +266,7 @@ class TestMenuUtils:
 
         episode = {"name": "Test Episode"}  # No source
 
-        list_item = menu_utils._create_list_item_from_episode(
-            episode, is_playback=False
-        )
+        list_item = menu_utils._create_list_item_from_episode(episode, is_playback=False)
 
         assert list_item is not None
         mock_listitem.assert_called_with(label="[I] Test Episode (Unavailable)[/I]", offscreen=False)

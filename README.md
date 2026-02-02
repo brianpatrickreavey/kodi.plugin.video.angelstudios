@@ -1,6 +1,11 @@
 # angelstudios-kodi
 Angel Studios KODI Addon
 
+## Requirements
+- **Python**: 3.9 or higher (matches KODI runtime environment)
+- **KODI**: 19.0 or higher
+- **Dependencies**: Managed via `uv` and `pyproject.toml`
+
 # Overview
 
 ## Playback behavior (current)

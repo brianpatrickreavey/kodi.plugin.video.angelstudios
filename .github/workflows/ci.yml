@@ -31,6 +31,9 @@ jobs:
     - name: Run tests with coverage
       run: uv run make unittest-with-coverage
 
+    - name: Validate addon
+      run: uv run kodi-addon-checker --branch omega plugin.video.angelstudios
+
     - name: Build zip artifact
       run: uv run kodi-addon-builder zip --output addon.zip
 
