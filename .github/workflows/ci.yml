@@ -12,11 +12,22 @@ env:
   KODI_BRANCHES: '["omega", "nexus", "piers"]'
 
 jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      test_matrix: ${{ steps.config.outputs.test_matrix }}
+      validate_matrix: ${{ steps.config.outputs.validate_matrix }}
+    steps:
+      - id: config
+        run: |
+          echo "test_matrix={\"python-version\":${PYTHON_VERSIONS}}" >> $GITHUB_OUTPUT
+          echo "validate_matrix={\"python-version\":${PYTHON_VERSIONS},\"kodi-branch\":${KODI_BRANCHES}}" >> $GITHUB_OUTPUT
+
   test:
+    needs: setup
     runs-on: ubuntu-latest
     strategy:
-      matrix:
-        python-version: ${{ fromJSON(env.PYTHON_VERSIONS) }}
+      matrix: ${{ fromJson(needs.setup.outputs.test_matrix) }}
 
     steps:
     - name: Checkout code
@@ -39,11 +50,10 @@ jobs:
       run: uv run make unittest-with-coverage
 
   validate:
+    needs: setup
     runs-on: ubuntu-latest
     strategy:
-      matrix:
-        python-version: ${{ fromJSON(env.PYTHON_VERSIONS) }}
-        kodi-branch: ${{ fromJSON(env.KODI_BRANCHES) }}
+      matrix: ${{ fromJson(needs.setup.outputs.validate_matrix) }}
 
     steps:
     - name: Checkout code
