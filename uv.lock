@@ -586,8 +586,8 @@ wheels = [
 
 [[package]]
 name = "kodi-addon-builder"
-version = "0.3.1"
-source = { git = "https://github.com/brianpatrickreavey/kodi-addon-builder.git?rev=v0.3.1#d7a682a1d17eea567f6d97427444f57ba997f179" }
+version = "0.3.6"
+source = { git = "https://github.com/brianpatrickreavey/kodi-addon-builder.git?rev=v0.3.6#17d8203451b31115c1a308df996ce0a01afb497c" }
 dependencies = [
     { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "click", version = "8.3.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
@@ -597,7 +597,7 @@ dependencies = [
 
 [[package]]
 name = "kodi-plugin-video-angelstudios"
-version = "0.4.1"
+version = "0.5.0"
 source = { editable = "." }
 dependencies = [
     { name = "auth0-ciam-client" },
@@ -629,7 +629,7 @@ requires-dist = [
 dev = [
     { name = "black" },
     { name = "flake8" },
-    { name = "kodi-addon-builder", git = "https://github.com/brianpatrickreavey/kodi-addon-builder.git?rev=v0.3.1" },
+    { name = "kodi-addon-builder", git = "https://github.com/brianpatrickreavey/kodi-addon-builder.git?rev=v0.3.6" },
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-cov" },
