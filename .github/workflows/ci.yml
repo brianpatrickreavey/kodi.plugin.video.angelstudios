@@ -37,13 +37,3 @@ jobs:
     - name: Validate addon
       run: uv run kodi-addon-checker --branch omega plugin.video.angelstudios
       continue-on-error: true
-
-    - name: Build zip artifact
-      run: uv run kodi-addon-builder zip --output addon.zip
-
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: kodi-addon
-        path: addon.zip
-        if-no-files-found: error
