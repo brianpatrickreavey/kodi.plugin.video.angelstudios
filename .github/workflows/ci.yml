@@ -75,4 +75,3 @@ jobs:
 
     - name: Validate addon
       run: uv run kodi-addon-checker --branch ${{ matrix.kodi-branch }} plugin.video.angelstudios
-      continue-on-error: true
