@@ -70,6 +70,9 @@ jobs:
     - name: Install dependencies
       run: uv sync --group dev
 
+    - name: Clean addon
+      run: make clean-addon
+
     - name: Validate addon
       run: uv run kodi-addon-checker --branch ${{ matrix.kodi-branch }} plugin.video.angelstudios
       continue-on-error: true
