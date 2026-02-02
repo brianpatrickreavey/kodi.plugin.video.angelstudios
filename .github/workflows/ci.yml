@@ -7,12 +7,16 @@ on:
     branches: [ main, master ]
   workflow_call:
 
+env:
+  PYTHON_VERSIONS: '["3.9", "3.10", "3.11", "3.12"]'
+  KODI_BRANCHES: '["omega", "nexus", "piers"]'
+
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        python-version: ${{ fromJSON(env.PYTHON_VERSIONS) }}
 
     steps:
     - name: Checkout code
@@ -34,6 +38,28 @@ jobs:
     - name: Run tests with coverage
       run: uv run make unittest-with-coverage
 
+  validate:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ${{ fromJSON(env.PYTHON_VERSIONS) }}
+        kodi-branch: ${{ fromJSON(env.KODI_BRANCHES) }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+
+    - name: Set up Python
+      run: uv python install ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: uv sync --group dev
+
     - name: Validate addon
-      run: uv run kodi-addon-checker --branch omega plugin.video.angelstudios
+      run: uv run kodi-addon-checker --branch ${{ matrix.kodi-branch }} plugin.video.angelstudios
       continue-on-error: true
