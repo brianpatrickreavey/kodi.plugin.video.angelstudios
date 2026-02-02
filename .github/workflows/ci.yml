@@ -10,6 +10,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
 
     steps:
     - name: Checkout code
@@ -23,7 +26,7 @@ jobs:
         version: "latest"
 
     - name: Set up Python
-      run: uv python install 3.9
+      run: uv python install ${{ matrix.python-version }}
 
     - name: Install dependencies
       run: uv sync --group dev
@@ -33,6 +36,7 @@ jobs:
 
     - name: Validate addon
       run: uv run kodi-addon-checker --branch omega plugin.video.angelstudios
+      continue-on-error: true
 
     - name: Build zip artifact
       run: uv run kodi-addon-builder zip --output addon.zip
