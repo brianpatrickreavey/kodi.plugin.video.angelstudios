@@ -24,7 +24,7 @@ jobs:
           files: plugin.video.angelstudios-${{ github.ref_name }}.zip
           generate_release_notes: true
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.CENTRAL_PAT }}
 
       - name: Dispatch to Central Repo
         uses: peter-evans/repository-dispatch@v3
