@@ -641,7 +641,7 @@ wheels = [
 
 [[package]]
 name = "kodi-plugin-video-angelstudios"
-version = "0.5.0"
+version = "0.5.5"
 source = { editable = "." }
 dependencies = [
     { name = "auth0-ciam-client" },
