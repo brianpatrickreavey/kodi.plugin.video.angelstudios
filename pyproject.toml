@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kodi-plugin-video-angelstudios"
-version = "0.5.6"
+version = "0.5.5"
 description = "Kodi plugin for Angel Studios content"
 readme = "README.md"
 requires-python = ">=3.9"
