@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.5] - 2026-02-02
+- Refactor CI workflows to eliminate ZIP building duplication and improve efficiency
+
+## [0.5.4] - 2026-02-02
+- Add multi-version Python testing (3.9-3.12) for forward compatibility and make addon checker warnings non-blocking
+
+## [0.5.3] - 2026-02-02
+- Update kodi-addon-builder to v0.3.7 and fix CI test path for Python 3.9 compatibility validation
+
+## [0.5.2] - 2026-02-02
+- Release version 0.5.2
+
+## [0.5.1] - 2026-02-01
+- Release version 0.5.1
+
+## [0.5.0] - 2026-02-01
+- Release version 0.5.0
+
 ## [0.4.1] - 2026-01-07
 - bugfix: erroneous attempt to set duration on unavailable episodes resulted in episode_menu errors.  updated duration logic to be gated by episode availability.
 - [Bug-fix] Handle unavailable episodes (source: None) without crashing
