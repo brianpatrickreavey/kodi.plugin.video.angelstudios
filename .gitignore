@@ -155,6 +155,7 @@ addon_development.xml
 credentials.json
 .vscode
 *.pkl
+dry-run
 
 # Generated files in addon lib
 plugin.video.angelstudios/resources/lib/__pycache__/

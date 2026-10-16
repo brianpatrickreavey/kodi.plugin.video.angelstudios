@@ -55,11 +55,14 @@ This document outlines a trunk-based workflow that keeps changes small and fast 
 1. Develop and commit changes on `main`.
 2. When ready for release, run the automated release process:
    ```bash
-   kodi-addon-builder release minor --news "Description of changes"
+   kodi-addon-builder release minor \
+     --summary "Short description of the release" \
+     --news "### Added\n- New feature description\n### Fixed\n- Bug fix description"
    ```
 3. This command will:
    - Bump version in addon.xml and pyproject.toml
-   - Update CHANGELOG.md
+   - Update CHANGELOG.md with formatted news
+   - Update addon.xml news section with Kodi-compatible bracketed format
    - Commit changes
    - Create and push git tag
    - Trigger GitHub Actions release workflow
@@ -83,7 +86,7 @@ This document outlines a trunk-based workflow that keeps changes small and fast 
 
 ## Hotfix Flow
 - Apply fix directly on `main` or use `hotfix/...` branch.
-- Use `kodi-addon-builder release patch --news "Hotfix description"` for automated patch release.
+- Use `kodi-addon-builder release patch --summary "Hotfix description" --news "### Fixed\n- Hotfix details"` for automated patch release.
 - CI will validate the fix and create the release.
 
 ## Example Commands
@@ -95,17 +98,19 @@ git pull
 uv run make unittest-with-coverage  # Verify tests pass
 
 # Execute automated release
-kodi-addon-builder release minor --news "Migrated to uv for modern Python dependency management, removed deprecated python-jose, extracted auth0-ciam-client, extensive code refactoring and cleanup, performance optimizations, and comprehensive testing improvements."
+kodi-addon-builder release minor \
+  --summary "Migrated to uv for modern Python dependency management" \
+  --news "### Added\n- Modern Python dependency management with uv\n- Comprehensive testing improvements\n### Changed\n- Removed deprecated python-jose\n- Extensive code refactoring and cleanup\n### Fixed\n- Performance optimizations"
 ```
 
 For review-before-commit:
 ```bash
-# Just update files without committing
-kodi-addon-builder bump minor --news "Description of changes"
-# Review changes, then commit manually
-git add .
-git commit -m "chore(release): vX.Y.Z - Description"
-kodi-addon-builder tag  # Creates and pushes the tag
+# Dry-run to preview changes
+kodi-addon-builder release minor \
+  --summary "Description of changes" \
+  --news "### Added\n- New features" \
+  --dry-run
+# Review /dry-run directory, then run without --dry-run
 ```
 
 ## Policy Tweaks (Optional)
