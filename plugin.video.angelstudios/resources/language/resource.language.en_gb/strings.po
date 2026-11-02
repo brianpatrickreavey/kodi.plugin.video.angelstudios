@@ -414,6 +414,22 @@ msgctxt "#30523"
 msgid "Show all debug messages in Kodi log regardless of category or debug mode."
 msgstr "Show all debug messages in Kodi log regardless of category or debug mode."
 
+msgctxt "#30524"
+msgid "Log authentication steps"
+msgstr "Log authentication steps"
+
+msgctxt "#30525"
+msgid "Writes login steps to kodi.log. The log includes your Angel email and a one-time login code. Do not share kodi.log while this is on."
+msgstr "Writes login steps to kodi.log. The log includes your Angel email and a one-time login code. Do not share kodi.log while this is on."
+
+msgctxt "#30526"
+msgid "Authentication logging is on. kodi.log will include your Angel email address and the login callback URL. That URL contains a one-time login code. If Kodi debug logging is on, or if Promote all debug or Promote uncategorized debug is on, the log also includes the start of your login token. Do not share kodi.log while this setting is on."
+msgstr "Authentication logging is on. kodi.log will include your Angel email address and the login callback URL. That URL contains a one-time login code. If Kodi debug logging is on, or if Promote all debug or Promote uncategorized debug is on, the log also includes the start of your login token. Do not share kodi.log while this setting is on."
+
+msgctxt "#30527"
+msgid "Authentication log warning already shown"
+msgstr "Authentication log warning already shown"
+
 # ============================================================================
 # 30600-30699: Future Use
 # ============================================================================

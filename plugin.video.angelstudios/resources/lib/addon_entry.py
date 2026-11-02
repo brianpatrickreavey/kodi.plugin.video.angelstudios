@@ -74,6 +74,33 @@ logger = KodiLogger(
     miscategorized_promotion=miscategorized_promotion,
 )
 
+
+def auth_step_logger():
+    """Return the Kodi logger only when the user has opted in.
+
+    Login steps include the Angel email and the callback URL. The callback
+    URL contains a one-time login code. Warn once each time the setting is
+    turned on, before any of those lines are written.
+    """
+    enabled = ADDON.getSettingBool("log_auth_steps")
+    warned = ADDON.getSettingBool("log_auth_steps_warned")
+    if not enabled:
+        if warned:
+            ADDON.setSettingBool("log_auth_steps_warned", False)
+        return None
+    if not warned:
+        message = ADDON.getLocalizedString(30526) or (
+            "Authentication logging is on. kodi.log will include your Angel email "
+            "address and the login callback URL. That URL contains a one-time login code. "
+            "If Kodi debug logging is on, or if Promote all debug or Promote uncategorized "
+            "debug is on, the log also includes the start of your login token. "
+            "Do not share kodi.log while this setting is on."
+        )
+        xbmcgui.Dialog().ok("Angel Studios", message)
+        ADDON.setSettingBool("log_auth_steps_warned", True)
+    return logger
+
+
 # Create Angel Studios interface
 angel_interface = None
 
@@ -205,8 +232,9 @@ def main():
                 user_agent=None,
                 request_timeout=TIMEOUT,
             )
+            auth_logger = auth_step_logger()
             auth_core = AuthenticationCore(  # type: ignore
-                session_store=KodiSessionStore(ADDON), config=config, logger=None
+                session_store=KodiSessionStore(ADDON), config=config, logger=auth_logger
             )
 
             # Initialize Angel Studios interface with authentication core
