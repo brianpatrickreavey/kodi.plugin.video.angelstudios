@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kodi-plugin-video-angelstudios"
-version = "0.5.6"
+version = "0.5.7"
 description = "Kodi plugin for Angel Studios content"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
     "requests",
     "simplecache",
-    "auth0-ciam-client @ git+https://github.com/brianpatrickreavey/auth0-ciam-client.git@v0.2.1",
+    "auth0-ciam-client @ git+https://github.com/brianpatrickreavey/auth0-ciam-client.git@v0.2.2",
 ]
 
 [dependency-groups]

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.7] - 2026-11-01
+- Require `script.module.auth0-ciam-client` 0.0.5.
+- Test dependency is `auth0-ciam-client` tag `v0.2.2`.
+
 ## [0.5.5] - 2026-02-02
 - Refactor CI workflows to eliminate ZIP building duplication and improve efficiency
 
