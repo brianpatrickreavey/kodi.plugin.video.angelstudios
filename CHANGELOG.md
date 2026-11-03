@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.8] - 2026-11-02
+- Add the setting Log authentication steps. It is off by default.
+- Turning it on warns that kodi.log can include the Angel email and a one-time login code.
+
 ## [0.5.7] - 2026-11-01
 - Require `script.module.auth0-ciam-client` 0.0.5.
 - Test dependency is `auth0-ciam-client` tag `v0.2.2`.
