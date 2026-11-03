@@ -75,3 +75,13 @@ jobs:
 
     - name: Validate addon
       run: uv run kodi-addon-checker --branch ${{ matrix.kodi-branch }} plugin.video.angelstudios
+
+  zip:
+    name: zip installs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check the release zip unpacks as one addon
+        run: bash tools/build_release_zip.sh plugin.video.angelstudios
