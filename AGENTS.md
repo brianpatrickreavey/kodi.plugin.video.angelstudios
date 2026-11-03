@@ -2,7 +2,9 @@
 
 Kodi addon `plugin.video.angelstudios`. Read [`.github/copilot-instructions.md`](.github/copilot-instructions.md) and [`agents/README.md`](agents/README.md).
 
-**CRITICAL:** A prompt containing `?` is read-only. No edits unless the user uses explicit action language.
+Exploration is the default. Answer questions and design options in text. Change files when the user asks for a change or a result. A "?" does not cancel a request, and a missing "?" does not turn a speculative idea into a task. If a message mixes both, do the task and answer the question. Do not implement the answer in the same turn. See `~/.grok/rules/explore-before-implement.md`.
+
+Ship steps are in `~/Code/kodi-development/README.md`.
 
 On a new machine:
 

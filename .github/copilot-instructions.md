@@ -2,17 +2,15 @@
 
 ## Kodi Plugin for Angel Studios - AI Agent Guidelines
 
-This is a Kodi addon (`plugin.video.angelstudios`) for streaming Angel Studios content. The codebase follows Kodi plugin conventions with custom GraphQL API integration.
+This is a Kodi addon (`plugin.video.angelstudios`) for streaming Angel Studios content. The codebase follows Kodi plugin conventions with custom GraphQL API integration. Ship steps are in `~/Code/kodi-development/README.md`.
 
 ### Workflow Practices
 
-- **CRITICAL BEHAVIOR RULE**: ANY PROMPT CONTAINING A QUESTION MARK (?) IS A QUESTION ONLY AND NO CHANGES, FILE MODIFICATIONS, OR MODIFICATION TOOL USAGE ARE TO BE MADE AS A RESULT OF THAT PROMPT. RESPOND WITH TEXT EXPLANATIONS ONLY. READONLY TOOLS (LIKE READING FILES) ARE ALLOWED FOR INFORMATION GATHERING.
-- TREAT ALL USER MESSAGES AS QUESTIONS UNLESS THEY CONTAIN EXPLICIT ACTION WORDS LIKE "PLEASE IMPLEMENT", "EDIT THIS FILE", "MAKE THESE CHANGES", "UPDATE THE CODE", OR SIMILAR UNAMBIGUOUS DIRECTIVES.
-- NEVER USE MODIFICATION TOOLS OR MAKE FILE CHANGES UNLESS THE USER EXPLICITLY REQUESTS IMPLEMENTATION WITH CLEAR ACTION LANGUAGE.
-- Prioritize response clarity: Questions must receive direct, factual answers without assuming intent to act. Actions (such as code edits, file modifications, or tool usage) require explicit, unambiguous directives from the developer. Never initiate changes based on questions alone—always seek confirmation for any proposed modifications.
-- Unless explicit authorization is given to edit code, all requests are to be treated as read-only conversations about the codebase, plans, and options.
-- Ask for clarification if anything is unclear or multiple approaches are viable.
-- Do not interpret questions as invitations to choose and act; questions are questions, directives are directives.
+- Exploration and implementation are different. A question, a comparison, a "what if", or a request to look at options is exploration: answer it and stop. Do not edit files, install software, or commit as a side effect of exploring.
+- A question mark does not cancel a request, and the lack of one does not make a speculative idea a task. Act when the user asks for a change or a result.
+- If one message mixes a concrete task with an open question, do the task and answer the question. Do not implement the answer in the same turn.
+- When the scope is ambiguous, state the assumption and wait before changing files.
+- Ask for clarification when several approaches are real options and the user has not picked one.
 - All proposed code changes should be preceded by a clear plan and rationale.
 - The developer controls the process; defer to their decisions.
 - Always re-read all relevant files before making suggestions or changes. Do NOT rely on cache or other shortcuts.
