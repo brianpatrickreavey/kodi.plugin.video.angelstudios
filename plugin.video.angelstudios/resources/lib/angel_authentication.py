@@ -28,6 +28,36 @@ from auth0_ciam_client import (
 )
 
 
+def _jwt_from_cookies(cookies):
+    """Return the JWT for the first configured Angel cookie name that is set.
+
+    Order comes from create_angel_studios_config().jwt_cookie_names:
+    angel_jwt_v3, then angel_jwt_v2, then angel_jwt.
+    """
+    names = create_angel_studios_config().jwt_cookie_names
+    by_name = {}
+    try:
+        for cookie in cookies:
+            name = getattr(cookie, "name", None)
+            if not isinstance(name, str):
+                break
+            by_name[name] = getattr(cookie, "value", None)
+    except TypeError:
+        by_name = {}
+
+    for name in names:
+        value = by_name.get(name)
+        if isinstance(value, str) and value:
+            return value
+        getter = getattr(cookies, "get", None)
+        if getter is None:
+            continue
+        value = getter(name)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
 def decode_jwt_payload(token):
     """
     Decode JWT payload without signature verification.
@@ -214,7 +244,7 @@ class AngelStudioSession:
                 # Set cookies in session
                 self.session.cookies = loaded_cookies
                 # Set Authorization header from JWT cookie if present
-                jwt_cookie = self.session.cookies.get("angel_jwt")
+                jwt_cookie = _jwt_from_cookies(self.session.cookies)
                 if jwt_cookie:
                     self.session.headers["Authorization"] = f"Bearer {jwt_cookie}"
                 return True
@@ -286,7 +316,7 @@ class AngelStudioSession:
 
                 # If no token in header, check cookies
                 if not token:
-                    jwt_cookie = self.session.cookies.get("angel_jwt")
+                    jwt_cookie = _jwt_from_cookies(self.session.cookies)
                     if jwt_cookie:
                         token = jwt_cookie
                         jwt_present = True

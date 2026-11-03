@@ -479,6 +479,34 @@ class TestAngelStudioSession:
         assert details["jwt_present"] is True
         assert details["login_email"] == "user@example.com"
 
+    def test_get_session_details_prefers_newer_cookie_names(self, logger):
+        """Session details read v3 before v2 before angel_jwt when the header is empty."""
+        now = datetime.now(timezone.utc)
+        future = int((now + timedelta(hours=1)).timestamp())
+        iat = int(now.timestamp())
+        claims_v3 = {"exp": future, "iat": iat, "email": "v3@example.com", "sub": "v3"}
+        claims_v2 = {"exp": future, "iat": iat, "email": "v2@example.com", "sub": "v2"}
+        token_v3 = _make_jwt_with_claims(claims_v3)
+        token_v2 = _make_jwt_with_claims(claims_v2)
+        sess = MagicMock()
+        sess.cookies = DummyCookies(
+            mapping={"angel_jwt": "not-a-jwt", "angel_jwt_v2": token_v2, "angel_jwt_v3": token_v3}
+        )
+        sess.headers = {}
+        inst = AngelStudioSession(username="fallback@example.com", logger=logger)
+        inst.session = sess
+
+        details = inst.get_session_details()
+
+        assert details["jwt_present"] is True
+        assert details["login_email"] == "v3@example.com"
+        assert details["account_id"] == "v3"
+
+        sess.cookies = DummyCookies(mapping={"angel_jwt": "not-a-jwt", "angel_jwt_v2": token_v2})
+        details = inst.get_session_details()
+        assert details["login_email"] == "v2@example.com"
+        assert details["account_id"] == "v2"
+
     def test_get_session_details_with_claims_and_auth_header(self, logger):
         """Claims populate email/account and compute expirations with auth header set."""
         now = datetime.now(timezone.utc)
@@ -599,6 +627,29 @@ class TestAngelStudioSession:
         ):
             assert inst._AngelStudioSession__load_session_cookies() is True
             assert sess.headers.get("Authorization") == "Bearer tok"
+
+    def test_load_session_cookies_prefers_v3_over_older_names(self, logger):
+        """Saved cookies use the library order: v3, then v2, then angel_jwt."""
+        cookies_obj = DummyCookies(
+            mapping={},
+            iterable=[
+                SimpleNamespace(name="angel_jwt", value="old"),
+                SimpleNamespace(name="angel_jwt_v2", value="older"),
+                SimpleNamespace(name="angel_jwt_v3", value="new"),
+            ],
+        )
+        sess = MagicMock()
+        sess.cookies = DummyCookies()
+        sess.headers = {}
+        inst = AngelStudioSession(session_file="/tmp/sess", logger=logger)
+        inst.session = sess
+        with (
+            patch("builtins.open", mock_open(read_data=pickle.dumps(cookies_obj))),
+            patch("pickle.load", return_value=cookies_obj),
+            patch("os.path.exists", return_value=True),
+        ):
+            assert inst._AngelStudioSession__load_session_cookies() is True
+            assert sess.headers.get("Authorization") == "Bearer new"
 
     def test_load_session_cookies_file_not_found(self, logger):
         """Gracefully handle missing cookie file."""
