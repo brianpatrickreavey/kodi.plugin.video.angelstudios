@@ -358,10 +358,6 @@ class MenuUtils:
             video_stream_detail.setHeight(1080)
             info_tag = list_item.getVideoInfoTag()
             info_tag.addVideoStream(video_stream_detail)
-
-            # Resume
-            if episode.get("watch_position"):
-                info_tag.setResumePoint(episode["watch_position"])
         else:
             list_item.setIsFolder(True)
 

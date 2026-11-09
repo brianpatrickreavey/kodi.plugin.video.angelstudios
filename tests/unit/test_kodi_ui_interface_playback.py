@@ -25,7 +25,11 @@ class TestEpisodePlayback:
 
             # Assertions
             mock_get_project.assert_called_once_with(project_slug)
-            mock_play_video.assert_called_once_with(episode_data={"episode": episode_data, "project": project_data})
+            mock_play_video.assert_called_once_with(
+                episode_data={"episode": episode_data, "project": project_data},
+                resume_at=None,
+                saved_position=None,
+            )
 
     def test_play_episode_project_not_found(self, ui_interface, mock_xbmc, mock_cache):
         """Test play_episode when project is not found."""

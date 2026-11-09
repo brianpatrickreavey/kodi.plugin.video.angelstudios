@@ -9,6 +9,7 @@ It provides methods for authentication, making GraphQL queries, and retrieving p
 
 import json
 import logging
+import math
 import os
 import re
 import sys
@@ -26,6 +27,8 @@ InvalidCredentialsError = angel_authentication.InvalidCredentialsError
 # Library constants
 angel_website_url = "https://www.angel.com"
 angel_graphql_url = "https://api.angelstudios.com/graphql"
+# The website player posts here. The host is the same API origin as GraphQL.
+angel_watch_positions_url = "https://api.angelstudios.com/watch-positions"
 
 
 class AngelStudiosInterface:
@@ -392,6 +395,68 @@ class AngelStudiosInterface:
         except Exception as e:
             self.log.error(f"Error fetching episode data for GUID '{episode_guid}': {e}")
             return {}
+
+    def get_watch_position(self, watchable_guid):
+        """Return the saved position in seconds, or None when this title has none.
+
+        This reads the content record the website uses for the series-page link.
+        """
+        try:
+            result = self._graphql_query("getContent", variables={"guid": watchable_guid})
+        except Exception as e:
+            self.log.warning(f"Could not read watch position for {watchable_guid}: {e}")
+            return None
+        if not isinstance(result, dict):
+            return None
+        content = result.get("getContent")
+        watch_position = content.get("watchPosition") if isinstance(content, dict) else None
+        if not isinstance(watch_position, dict) or watch_position.get("position") is None:
+            return None
+        return watch_position.get("position")
+
+    def upsert_watch_position(self, watchable_guid, position, event_type="heartbeat"):
+        """Send the current position in seconds. Playback keeps going when this fails.
+
+        The website posts this body to /watch-positions. That is the record behind
+        the series-page position link. event_type is heartbeat, pause, stop_exit,
+        or complete. The fraction of a second is dropped, matching that player.
+        """
+        try:
+            seconds = int(math.floor(float(position)))
+        except (TypeError, ValueError, OverflowError):
+            self.log.warning(f"Watch position is not a number: {position!r}")
+            return False
+        if seconds < 0:
+            return False
+        if not isinstance(event_type, str) or not event_type:
+            event_type = "heartbeat"
+        try:
+            self.auth_core.ensure_valid_session()
+            token = self.auth_core.session_store.get_token()
+            if token:
+                self.session.headers.update({"Authorization": f"Bearer {token}"})
+            response = self.session.post(
+                angel_watch_positions_url,
+                json={
+                    "content_id": watchable_guid,
+                    "event_type": event_type,
+                    "position": seconds,
+                },
+                headers={
+                    "Content-Type": "application/json",
+                    "X-ANGEL-APP-NAME": "angel-web",
+                },
+                timeout=self.timeout,
+            )
+        except Exception as e:
+            self.log.warning(f"Could not save watch position for {watchable_guid}: {e}")
+            return False
+        if not getattr(response, "ok", False):
+            status = getattr(response, "status_code", None)
+            self.log.warning(f"Could not save watch position for {watchable_guid}: HTTP {status}")
+            return False
+        self.log.info(f"Saved watch position {seconds}s for {watchable_guid}")
+        return True
 
     def get_resume_watching(self, first=None, after=None):
         """

@@ -25,7 +25,11 @@ class TestEpisodePlayback:
 
             # Assertions
             mock_get_project.assert_called_once_with(project_slug)
-            mock_play_video.assert_called_once_with(episode_data={"episode": episode_data, "project": project_data})
+            mock_play_video.assert_called_once_with(
+                episode_data={"episode": episode_data, "project": project_data},
+                resume_at=None,
+                saved_position=None,
+            )
 
     def test_play_episode_project_not_found(self, ui_interface, mock_xbmc, mock_cache):
         """Test play_episode when project is not found."""
@@ -430,3 +434,505 @@ class TestInputStreamAdaptive:
 
         monkeypatch.setattr(builtins, "__import__", _fake_import)
         assert ui.playback_handler._ensure_isa_available("hls") is True
+
+
+class _ScriptedPlayer:
+    """Playback stand-in whose playing flag and clock are a fixed list."""
+
+    def __init__(self, playing, times=None, pause_at=None, fail_seek=False, stop_after_time=False):
+        self.stopped = False
+        self.ended = False
+        self.paused = False
+        self.on_pause = None
+        self._playing = list(playing)
+        self._times = list(times or [])
+        self.pause_at = pause_at
+        self.fail_seek = fail_seek
+        self.stop_after_time = stop_after_time
+        self.seek_calls = []
+        self._did_pause = False
+
+    def isPlayingVideo(self):
+        if not self._playing:
+            return False
+        return self._playing.pop(0)
+
+    def getTime(self):
+        if self.pause_at is not None and self.on_pause is not None and not self._did_pause:
+            self._did_pause = True
+            self.paused = True
+            self.on_pause(self.pause_at)
+        if not self._times:
+            raise RuntimeError("no time")
+        value = self._times.pop(0)
+        if self.stop_after_time:
+            self.stopped = True
+        return value
+
+    def seekTime(self, seconds):
+        if self.fail_seek:
+            raise RuntimeError("seek failed")
+        self.seek_calls.append(seconds)
+
+
+class _ScriptedMonitor:
+    def __init__(self, abort=False, wait_abort=False, abort_after=None, wait_abort_after=None):
+        self.abort = abort
+        self.wait_abort = wait_abort
+        self.abort_after = abort_after
+        self.wait_abort_after = wait_abort_after
+        self.abort_calls = 0
+        self.wait_calls = 0
+
+    def abortRequested(self):
+        self.abort_calls += 1
+        if self.abort_after is not None:
+            return self.abort_calls >= self.abort_after
+        return self.abort
+
+    def waitForAbort(self, _seconds):
+        self.wait_calls += 1
+        if self.wait_abort_after is not None:
+            return self.wait_calls >= self.wait_abort_after
+        return self.wait_abort
+
+
+class TestWatchProgressPlayback:
+    def _project(self):
+        project = copy.deepcopy(MOCK_PROJECT_DATA["single_season_project"])
+        episode = project["seasons"][0]["episodes"][0]
+        return project, episode
+
+    def _play(self, ui, content_type, saved, resume, episode_extra=None):
+        project, episode = self._project()
+        if episode_extra:
+            episode.update(episode_extra)
+        ui.angel_interface.get_watch_position.return_value = saved
+        with (
+            patch.object(ui, "_get_project", return_value=project),
+            patch.object(ui.playback_handler, "play_video") as play_video,
+        ):
+            ui.play_episode(episode["guid"], project["slug"], content_type, resume=resume)
+        return play_video, episode, project
+
+    @pytest.mark.parametrize("content_type", ["movies", "series", "specials"])
+    def test_resume_choice_seeks_saved_position(self, ui_interface, content_type):
+        """Kodi's Resume choice seeks to Angel's saved seconds."""
+        ui, _, _ = ui_interface
+        play_video, episode, project = self._play(ui, content_type, 125, True)
+
+        play_video.assert_called_once_with(
+            episode_data={"episode": episode, "project": project},
+            resume_at=125.0,
+            saved_position=125.0,
+        )
+
+    def test_play_from_beginning_does_not_seek(self, ui_interface):
+        """Play from beginning still remembers the saved position for the opening guard."""
+        ui, _, _ = ui_interface
+        play_video, episode, project = self._play(ui, "series", 125, False)
+
+        play_video.assert_called_once_with(
+            episode_data={"episode": episode, "project": project},
+            resume_at=None,
+            saved_position=125.0,
+        )
+
+    def test_continue_watching_does_not_seek(self, ui_interface):
+        """Continue Watching does not use the catalog resume choice."""
+        ui, _, _ = ui_interface
+        play_video, episode, project = self._play(ui, "", 125, True)
+
+        play_video.assert_called_once_with(
+            episode_data={"episode": episode, "project": project},
+            resume_at=None,
+            saved_position=125.0,
+        )
+
+    def test_no_saved_position_does_not_seek(self, ui_interface):
+        """A title Angel has not started plays from the beginning."""
+        ui, _, _ = ui_interface
+        play_video, _, _ = self._play(ui, "series", None, True)
+
+        assert play_video.call_args.kwargs["resume_at"] is None
+        assert play_video.call_args.kwargs["saved_position"] is None
+
+    def test_fresh_zero_does_not_use_a_stale_episode_position(self, ui_interface):
+        """A real zero from Angel wins over an older position copied onto the episode."""
+        ui, _, _ = ui_interface
+        play_video, _, _ = self._play(
+            ui, "series", 0, True, episode_extra={"watch_position": 500, "watchPosition": {"position": 500}}
+        )
+
+        assert play_video.call_args.kwargs["saved_position"] == 0.0
+        assert play_video.call_args.kwargs["resume_at"] is None
+
+    def test_read_failure_falls_back_to_the_episode(self, ui_interface):
+        """When the fresh read fails, Resume seeks to the position already on the episode."""
+        ui, logger, _ = ui_interface
+        project, episode = self._project()
+        episode["watchPosition"] = {"position": 90}
+        ui.angel_interface.get_watch_position.side_effect = RuntimeError("down")
+        with (
+            patch.object(ui, "_get_project", return_value=project),
+            patch.object(ui.playback_handler, "play_video") as play_video,
+            patch.object(ui, "show_error") as show_error,
+        ):
+            ui.play_episode(episode["guid"], project["slug"], "specials", resume=True)
+
+        show_error.assert_not_called()
+        logger.warning.assert_any_call(f"Could not read watch position for {episode['guid']}: down")
+        assert play_video.call_args.kwargs["resume_at"] == 90.0
+        assert play_video.call_args.kwargs["saved_position"] == 90.0
+
+    def test_cached_episode_seeks_when_resume_was_chosen(self, ui_interface):
+        """A cached catalog title seeks when Kodi chose Resume."""
+        ui, _, _ = ui_interface
+        _, episode = self._project()
+        episode["project"] = {"name": "Cached"}
+        ui.angel_interface.get_watch_position.return_value = 40
+        with (
+            patch.object(ui.cache_manager, "_get_episode", return_value=episode),
+            patch.object(ui.playback_handler, "play_video") as play_video,
+        ):
+            ui.play_episode(episode["guid"], episode["projectSlug"], "movies", resume=True)
+
+        play_video.assert_called_once_with(
+            episode_data={"episode": episode, "project": {"name": "Cached"}},
+            resume_at=40.0,
+            saved_position=40.0,
+        )
+
+    def test_player_callbacks_record_pause_and_stop(self):
+        """Pause reads the playhead. Stop, end, and error all end the watch."""
+        import kodi_playback_handler
+
+        player = kodi_playback_handler._WatchProgressPlayer()
+        assert player.isPlayingVideo() is False
+        assert player.getTime() == 0
+        assert player.seekTime(3) is None
+
+        seen = []
+        player.on_pause = seen.append
+        player.getTime = MagicMock(return_value=44)
+        player.onPlayBackPaused()
+        assert player.paused is True
+        assert seen == [44]
+
+        player.getTime.side_effect = RuntimeError("gone")
+        player.onPlayBackPaused()
+        assert seen == [44, None]
+
+        player.on_pause = None
+        player.onPlayBackPaused()
+        player.onPlayBackResumed()
+        assert player.paused is False
+        player.onPlayBackStopped()
+        assert player.stopped is True
+        assert player.ended is False
+        player.stopped = False
+        player.onPlayBackEnded()
+        assert player.stopped is True
+        assert player.ended is True
+        player.stopped = False
+        player.ended = False
+        player.onPlayBackError()
+        assert player.stopped is True
+        assert player.ended is False
+
+        class RealPlayer:
+            pass
+
+        original = kodi_playback_handler.xbmc.Player
+        kodi_playback_handler.xbmc.Player = RealPlayer
+        try:
+            assert kodi_playback_handler._kodi_player_type() is RealPlayer
+        finally:
+            kodi_playback_handler.xbmc.Player = original
+
+    def _run_monitor(
+        self, ui, player, saved, resume_at, now_values, guid="title-guid", monitor=None, project_slug=None
+    ):
+        import kodi_playback_handler
+
+        if monitor is None:
+            monitor = _ScriptedMonitor()
+        times = iter(now_values)
+
+        def monotonic():
+            try:
+                return next(times)
+            except StopIteration:
+                return now_values[-1]
+
+        with (
+            patch("kodi_playback_handler._WatchProgressPlayer", return_value=player),
+            patch("kodi_playback_handler.xbmc.Monitor", return_value=monitor),
+            patch("kodi_playback_handler.time.monotonic", side_effect=monotonic),
+        ):
+            ui.playback_handler._monitor_watch_progress(guid, saved, resume_at, project_slug)
+        return kodi_playback_handler
+
+    def test_monitor_reports_each_minute_and_on_stop(self, ui_interface):
+        """Once playback is running, a minute tick and the stop both go to Angel."""
+        ui, _, angel = ui_interface
+        angel.upsert_watch_position.return_value = True
+        player = _ScriptedPlayer([False, True, True, True, False], times=[100, 130])
+
+        self._run_monitor(ui, player, saved=500, resume_at=None, now_values=[0, 60, 61])
+
+        assert angel.upsert_watch_position.call_args_list[0].args == ("title-guid", 100)
+        assert angel.upsert_watch_position.call_args_list[0].kwargs == {"event_type": "heartbeat"}
+        assert angel.upsert_watch_position.call_args_list[1].args == ("title-guid", 130)
+        assert angel.upsert_watch_position.call_args_list[1].kwargs == {"event_type": "stop_exit"}
+
+    def test_successful_save_updates_the_cached_resume_time(self, ui_interface):
+        """The next episode list reads the cache, so a save has to land there."""
+        ui, _, angel = ui_interface
+        angel.upsert_watch_position.return_value = True
+        ui.cache_manager.addon.getSettingBool.side_effect = lambda key: key != "disable_cache"
+        ui.cache_manager.addon.getSettingInt.return_value = 8
+        project = {
+            "slug": "tuttle-twins",
+            "seasons": [
+                {
+                    "episodes": [
+                        {"guid": "title-guid", "watchPosition": {"position": 1220}},
+                        {"guid": "other", "watchPosition": {"position": 10}},
+                    ]
+                }
+            ],
+        }
+        episode = {"guid": "title-guid", "watchPosition": {"position": 1220}}
+        resume = {"episodes": [{"guid": "title-guid", "watchPosition": {"position": 1220}}]}
+        store = {
+            "project_tuttle-twins": project,
+            "episode_title-guid": episode,
+            "resume_watching_10_none": resume,
+        }
+        ui.cache_manager.cache.get.side_effect = store.get
+        ui.cache_manager.cache.set.side_effect = lambda key, value, expiration=None: store.__setitem__(key, value)
+        player = _ScriptedPlayer([False, True, True, False], times=[77])
+
+        self._run_monitor(ui, player, saved=1220, resume_at=None, now_values=[0, 0], project_slug="tuttle-twins")
+
+        assert project["seasons"][0]["episodes"][0]["watchPosition"]["position"] == 77
+        assert project["seasons"][0]["episodes"][1]["watchPosition"]["position"] == 10
+        assert episode["watchPosition"]["position"] == 77
+        assert resume["episodes"][0]["watchPosition"]["position"] == 1220
+
+    def test_rejected_save_leaves_the_cached_resume_time(self, ui_interface):
+        """A failed write must not change the time the resume dialog will show."""
+        ui, _, angel = ui_interface
+        angel.upsert_watch_position.return_value = False
+        player = _ScriptedPlayer([False, True, True, False], times=[77])
+
+        with patch.object(ui.cache_manager, "remember_watch_position") as remember:
+            self._run_monitor(ui, player, saved=1220, resume_at=None, now_values=[0, 0], project_slug="tuttle-twins")
+
+        remember.assert_not_called()
+
+    def test_monitor_seeks_then_reports_stop(self, ui_interface):
+        """Resume seeks to the saved seconds, then stop reports where playback ended."""
+        ui, _, angel = ui_interface
+        angel.upsert_watch_position.return_value = True
+        player = _ScriptedPlayer([False, True, True, False], times=[130])
+
+        self._run_monitor(ui, player, saved=125, resume_at=125, now_values=[0, 0])
+
+        assert player.seek_calls == [125.0]
+        angel.upsert_watch_position.assert_called_once_with("title-guid", 130, event_type="stop_exit")
+
+    def test_stop_in_the_opening_keeps_the_saved_position(self, ui_interface):
+        """Stopping in the first few seconds does not replace Angel's saved position."""
+        ui, _, angel = ui_interface
+        player = _ScriptedPlayer([False, True, True, False], times=[2])
+
+        self._run_monitor(ui, player, saved=1200, resume_at=None, now_values=[0, 0])
+
+        angel.upsert_watch_position.assert_not_called()
+
+    def test_pause_reports_the_playhead(self, ui_interface):
+        """Pause sends the current seconds before playback continues."""
+        ui, _, angel = ui_interface
+        angel.upsert_watch_position.return_value = True
+        player = _ScriptedPlayer([False, True, True, False], times=[140], pause_at=140)
+
+        self._run_monitor(ui, player, saved=100, resume_at=None, now_values=[0, 0])
+
+        assert angel.upsert_watch_position.call_count == 2
+        assert all(call.args == ("title-guid", 140) for call in angel.upsert_watch_position.call_args_list)
+        assert angel.upsert_watch_position.call_args_list[0].kwargs == {"event_type": "pause"}
+        assert angel.upsert_watch_position.call_args_list[1].kwargs == {"event_type": "stop_exit"}
+
+    def test_successful_save_blocks_a_later_opening_position(self, ui_interface):
+        """After Angel accepts a position, a later reading at the start is not sent."""
+        ui, _, angel = ui_interface
+        angel.upsert_watch_position.return_value = True
+        player = _ScriptedPlayer([False, True, True, True, False], times=[80, 2])
+
+        self._run_monitor(ui, player, saved=None, resume_at=None, now_values=[0, 60, 60])
+
+        angel.upsert_watch_position.assert_called_once_with("title-guid", 80, event_type="heartbeat")
+
+    def test_rejected_save_still_reports_a_later_position(self, ui_interface):
+        """A failed write does not pretend Angel stored the position."""
+        ui, _, angel = ui_interface
+        angel.upsert_watch_position.return_value = False
+        player = _ScriptedPlayer([False, True, True, True, False], times=[80, 2])
+
+        self._run_monitor(ui, player, saved=None, resume_at=None, now_values=[0, 60, 60])
+
+        assert angel.upsert_watch_position.call_args_list[0].args == ("title-guid", 80)
+        assert angel.upsert_watch_position.call_args_list[1].args == ("title-guid", 2)
+
+    def test_seek_failure_still_reports_stop(self, ui_interface):
+        """A failed seek logs and playback still reports where it stopped."""
+        ui, logger, angel = ui_interface
+        angel.upsert_watch_position.return_value = True
+        player = _ScriptedPlayer([False, True, True, False], times=[80], fail_seek=True)
+
+        self._run_monitor(ui, player, saved=None, resume_at=90, now_values=[0, 0])
+
+        logger.warning.assert_any_call("Could not resume at 90s: seek failed")
+        angel.upsert_watch_position.assert_called_once_with("title-guid", 80, event_type="stop_exit")
+
+    def test_missing_clock_uses_the_last_position(self, ui_interface):
+        """If the playhead disappears, the last reading is what gets sent."""
+        ui, _, angel = ui_interface
+        angel.upsert_watch_position.return_value = True
+        player = _ScriptedPlayer([False, True, True, True, False], times=[80])
+
+        self._run_monitor(ui, player, saved=None, resume_at=None, now_values=[0, 0, 0])
+
+        angel.upsert_watch_position.assert_called_once_with("title-guid", 80, event_type="stop_exit")
+
+    def test_stop_callback_ends_the_watch_and_reports(self, ui_interface):
+        """onPlayBackStopped ends the loop and the last position is sent."""
+        ui, _, angel = ui_interface
+        angel.upsert_watch_position.return_value = True
+        player = _ScriptedPlayer([False, True, True], times=[88], stop_after_time=True)
+
+        self._run_monitor(ui, player, saved=None, resume_at=None, now_values=[0, 0])
+
+        assert player.stopped is True
+        angel.upsert_watch_position.assert_called_once_with("title-guid", 88, event_type="stop_exit")
+
+    def test_ended_playback_reports_complete(self, ui_interface):
+        """A video that finishes sends complete, which is the website's end event."""
+        ui, _, angel = ui_interface
+        angel.upsert_watch_position.return_value = True
+        player = _ScriptedPlayer([False, True, True, False], times=[80])
+        player.ended = True
+
+        self._run_monitor(ui, player, saved=None, resume_at=None, now_values=[0, 0])
+
+        angel.upsert_watch_position.assert_called_once_with("title-guid", 80, event_type="complete")
+
+    def test_abort_during_playback_sends_the_last_position(self, ui_interface):
+        """Kodi shutting down mid-playback still sends the last position."""
+        ui, _, angel = ui_interface
+        angel.upsert_watch_position.return_value = True
+        player = _ScriptedPlayer([False, True, True], times=[70])
+        # Startup uses two abort checks. The play loop reads one sample, then aborts.
+        monitor = _ScriptedMonitor(abort_after=4)
+
+        self._run_monitor(ui, player, saved=None, resume_at=None, now_values=[0, 0], monitor=monitor)
+
+        angel.upsert_watch_position.assert_called_once_with("title-guid", 70, event_type="stop_exit")
+
+    def test_wait_abort_during_playback_sends_the_last_position(self, ui_interface):
+        """Abort while the loop is waiting still sends the position just read."""
+        ui, _, angel = ui_interface
+        angel.upsert_watch_position.return_value = True
+        player = _ScriptedPlayer([False, True, True], times=[70])
+        # The first wait is startup. The second is the play loop.
+        monitor = _ScriptedMonitor(wait_abort_after=2)
+
+        self._run_monitor(ui, player, saved=None, resume_at=None, now_values=[0, 0], monitor=monitor)
+
+        angel.upsert_watch_position.assert_called_once_with("title-guid", 70, event_type="stop_exit")
+
+    def test_monitor_stops_when_kodi_aborts(self, ui_interface):
+        """Shutdown during startup does not send a position."""
+        ui, _, angel = ui_interface
+        player = _ScriptedPlayer([True])
+        with (
+            patch("kodi_playback_handler._WatchProgressPlayer", return_value=player),
+            patch("kodi_playback_handler.xbmc.Monitor", return_value=_ScriptedMonitor(abort=True)),
+        ):
+            ui.playback_handler._monitor_watch_progress("title-guid", 100, None)
+        angel.upsert_watch_position.assert_not_called()
+
+    def test_monitor_stops_when_wait_aborts(self, ui_interface):
+        """Abort while waiting for playback to start does not send a position."""
+        ui, _, angel = ui_interface
+        player = _ScriptedPlayer([False])
+        with (
+            patch("kodi_playback_handler._WatchProgressPlayer", return_value=player),
+            patch("kodi_playback_handler.xbmc.Monitor", return_value=_ScriptedMonitor(wait_abort=True)),
+        ):
+            ui.playback_handler._monitor_watch_progress("title-guid", 100, None)
+        angel.upsert_watch_position.assert_not_called()
+
+    def test_playback_that_never_starts_is_not_reported(self, ui_interface, monkeypatch):
+        """Give up when the stream never starts, and leave Angel's position alone."""
+        ui, logger, angel = ui_interface
+        import kodi_playback_handler
+
+        monkeypatch.setattr(kodi_playback_handler, "_PLAYBACK_START_TIMEOUT", 0.2)
+        monkeypatch.setattr(kodi_playback_handler, "_PLAYBACK_START_POLL", 0.2)
+        player = _ScriptedPlayer([False])
+        with (
+            patch("kodi_playback_handler._WatchProgressPlayer", return_value=player),
+            patch("kodi_playback_handler.xbmc.Monitor", return_value=_ScriptedMonitor()),
+        ):
+            ui.playback_handler._monitor_watch_progress("title-guid", 100, 100)
+        angel.upsert_watch_position.assert_not_called()
+        logger.info.assert_any_call("Playback did not start; watch position was not updated")
+
+    def test_send_failure_does_not_raise(self, ui_interface):
+        """A write error is logged. The monitor still returns."""
+        ui, logger, angel = ui_interface
+        angel.upsert_watch_position.side_effect = RuntimeError("down")
+        player = _ScriptedPlayer([False, True, True, False], times=[80])
+
+        self._run_monitor(ui, player, saved=None, resume_at=None, now_values=[0, 0])
+
+        logger.warning.assert_any_call("Could not save watch position for title-guid: down")
+
+    def test_missing_writer_is_logged(self, ui_interface):
+        """No upsert method means the position is skipped, not a playback error."""
+        ui, logger, _ = ui_interface
+        ui.angel_interface = object()
+        player = _ScriptedPlayer([False, True, True, False], times=[80])
+
+        self._run_monitor(ui, player, saved=None, resume_at=None, now_values=[0, 0])
+
+        logger.warning.assert_any_call("Watch position was not saved for title-guid")
+
+    def test_monitor_error_does_not_show_playback_error(self, ui_interface):
+        """A progress failure after the stream starts does not pop the play error."""
+        ui, logger, _ = ui_interface
+        with (
+            patch("xbmcplugin.setResolvedUrl"),
+            patch.object(ui.playback_handler, "_monitor_watch_progress", side_effect=RuntimeError("boom")),
+            patch.object(ui, "show_error") as show_error,
+        ):
+            ui.play_video(episode_data=MOCK_EPISODE_DATA)
+
+        show_error.assert_not_called()
+        logger.warning.assert_any_call("Watch progress stopped for episode-guid-1: boom")
+
+    def test_resolve_failure_does_not_monitor(self, ui_interface):
+        """If Kodi never got the stream, progress is not watched."""
+        ui, _, _ = ui_interface
+        with (
+            patch("xbmcplugin.setResolvedUrl", side_effect=Exception(TEST_EXCEPTION_MESSAGE)),
+            patch.object(ui.playback_handler, "_monitor_watch_progress") as monitor,
+            patch.object(ui, "show_error") as show_error,
+        ):
+            ui.play_video(episode_data=MOCK_EPISODE_DATA)
+
+        monitor.assert_not_called()
+        show_error.assert_called_once()

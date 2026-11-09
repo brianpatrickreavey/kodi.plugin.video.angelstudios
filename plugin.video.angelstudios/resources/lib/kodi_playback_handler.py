@@ -3,9 +3,82 @@ Kodi Playback Handler for Angel Studios addon.
 Handles all Kodi-specific playback operations and stream resolution.
 """
 
+import time
+
 import xbmc  # type: ignore
 import xbmcgui  # type: ignore
 import xbmcplugin  # type: ignore
+
+from watch_progress import (
+    REPORT_INTERVAL_SECONDS,
+    coerce_seconds,
+    position_from_episode,
+    WatchProgressSession,
+)
+
+# Catalog plays ask Resume or Play from beginning. Continue Watching leaves this empty.
+_RESUME_CONTENT_TYPES = {"movies", "series", "specials"}
+
+# How long to wait for the stream to start before giving up on progress reports.
+_PLAYBACK_START_TIMEOUT = 30
+_PLAYBACK_START_POLL = 0.2
+
+
+def _kodi_player_type():
+    """Return xbmc.Player when Kodi provides that class.
+
+    Tests replace xbmc with MagicMock. A MagicMock cannot be a base class,
+    so the pause and stop callbacks use a small stand-in there.
+    """
+    player_type = getattr(xbmc, "Player", None)
+    if isinstance(player_type, type):
+        return player_type
+
+    class _Player:
+        def isPlayingVideo(self):
+            return False
+
+        def getTime(self):
+            return 0
+
+        def seekTime(self, seconds):
+            return None
+
+    return _Player
+
+
+class _WatchProgressPlayer(_kodi_player_type()):
+    """Player callbacks for pause and stop. The monitor loop sends the stop position."""
+
+    def __init__(self):
+        super().__init__()
+        self.stopped = False
+        self.ended = False
+        self.paused = False
+        self.on_pause = None
+
+    def onPlayBackPaused(self):
+        self.paused = True
+        if self.on_pause is None:
+            return
+        try:
+            position = self.getTime()
+        except Exception:
+            position = None
+        self.on_pause(position)
+
+    def onPlayBackResumed(self):
+        self.paused = False
+
+    def onPlayBackStopped(self):
+        self.stopped = True
+
+    def onPlayBackEnded(self):
+        self.ended = True
+        self.stopped = True
+
+    def onPlayBackError(self):
+        self.stopped = True
 
 
 class KodiPlaybackHandler:
@@ -21,7 +94,7 @@ class KodiPlaybackHandler:
         self.kodi_url = parent.kodi_url
         self.log = parent.log
 
-    def play_episode(self, episode_guid, project_slug):
+    def play_episode(self, episode_guid, project_slug, content_type="", resume=False):
         """Play an episode using cached project data (no separate API call)."""
         try:
             # First, check if episode is cached (e.g., from Continue Watching)
@@ -41,7 +114,7 @@ class KodiPlaybackHandler:
 
                 # Play using cached episode data
                 project = episode.get("project", {"name": episode.get("name", "Unknown")})
-                self.play_video(episode_data={"episode": episode, "project": project})
+                self._start_playback(episode, project, content_type, resume)
                 return
 
             # Fallback: Fetch project data and find episode in it
@@ -78,13 +151,49 @@ class KodiPlaybackHandler:
             self.log.info(f"Playing episode: {episode_name} from project: {project_name}")
 
             # Play using existing episode data
-            self.play_video(episode_data={"episode": episode, "project": project})
+            self._start_playback(episode, project, content_type, resume)
 
         except Exception as e:
             self.log.error(f"Error playing episode {episode_guid}: {e}")
             self.parent.show_error(f"Failed to play episode: {str(e)}")
 
-    def play_video(self, stream_url=None, episode_data=None):
+    def _lookup_saved_position(self, episode):
+        """Return Angel's saved seconds. A fresh read wins over the copy on the episode."""
+        guid = episode.get("guid") if isinstance(episode, dict) else None
+        interface = getattr(self.parent, "angel_interface", None)
+        getter = getattr(interface, "get_watch_position", None) if interface else None
+        if guid and callable(getter):
+            try:
+                fresh = coerce_seconds(getter(guid))
+            except Exception as exc:
+                self.log.warning(f"Could not read watch position for {guid}: {exc}")
+                fresh = None
+            if fresh is not None:
+                return fresh
+        return position_from_episode(episode)
+
+    def _seek_target(self, content_type, saved_position, resume):
+        """Return the seconds to seek to after Kodi's resume dialog.
+
+        resume is true only when that dialog, or the player setting, chose
+        Resume. Continue Watching does not seek. Cancel never reaches here.
+        """
+        if not resume or content_type not in _RESUME_CONTENT_TYPES:
+            return None
+        if saved_position is None or saved_position < 1:
+            return None
+        return saved_position
+
+    def _start_playback(self, episode, project, content_type, resume):
+        """Resolve the stream, then report progress for this title."""
+        saved = self._lookup_saved_position(episode)
+        self.play_video(
+            episode_data={"episode": episode, "project": project},
+            resume_at=self._seek_target(content_type, saved, resume),
+            saved_position=saved,
+        )
+
+    def play_video(self, stream_url=None, episode_data=None, resume_at=None, saved_position=None):
         """Play a video stream with optional enhanced metadata"""
         if stream_url and episode_data:
             raise ValueError("Provide only stream_url or episode_data, not both")
@@ -92,12 +201,14 @@ class KodiPlaybackHandler:
             raise ValueError("Must provide either stream_url or episode_data to play video")
 
         list_item = xbmcgui.ListItem(offscreen=True)
+        project_slug = None
 
         try:
             if episode_data:
                 # Enhanced playback with metadata
                 episode = episode_data.get("episode", {})
                 project = episode_data.get("project", {})
+                project_slug = self._project_slug(project, episode)
 
                 # Create ListItem with metadata using helper
                 list_item = self.parent.menu_handler._create_list_item_from_episode(
@@ -124,6 +235,116 @@ class KodiPlaybackHandler:
         except Exception as e:
             self.parent.show_error(f"Error playing video: {e}")
             self.log.error(f"Error playing video: {e}")
+            return
+
+        guid = None
+        if episode_data:
+            guid = (episode_data.get("episode") or {}).get("guid")
+        if not guid:
+            return
+        try:
+            self._monitor_watch_progress(guid, saved_position, resume_at, project_slug)
+        except Exception as exc:
+            self.log.warning(f"Watch progress stopped for {guid}: {exc}")
+
+    def _project_slug(self, project, episode):
+        """Return the slug for the cached project, when this playback has one."""
+        slug = project.get("slug") if isinstance(project, dict) else None
+        if slug or not isinstance(episode, dict):
+            return slug or None
+        slug = episode.get("projectSlug")
+        if slug:
+            return slug
+        nested = episode.get("project")
+        if isinstance(nested, dict):
+            return nested.get("slug") or None
+        return None
+
+    def _send_watch_position(self, guid, position, session, project_slug=None, event_type="heartbeat"):
+        """Send one position. A failure is logged and playback continues."""
+        interface = getattr(self.parent, "angel_interface", None)
+        sender = getattr(interface, "upsert_watch_position", None) if interface else None
+        if not callable(sender):
+            self.log.warning(f"Watch position was not saved for {guid}")
+            return
+        try:
+            saved = sender(guid, position, event_type=event_type)
+        except Exception as exc:
+            self.log.warning(f"Could not save watch position for {guid}: {exc}")
+            return
+        if saved:
+            session.note_saved(position)
+            self._remember_saved_position(project_slug, guid, position)
+
+    def _remember_saved_position(self, project_slug, guid, position):
+        """Keep the episode-list cache aligned with a position Angel accepted."""
+        cache_manager = getattr(self.parent, "cache_manager", None)
+        remember = getattr(cache_manager, "remember_watch_position", None) if cache_manager else None
+        if not callable(remember):
+            return
+        try:
+            remember(project_slug, guid, position)
+        except Exception as exc:
+            self.log.warning(f"Could not update the cached resume time for {guid}: {exc}")
+
+    def _monitor_watch_progress(self, guid, saved_position, resume_at, project_slug=None):
+        """Report the playhead once a minute, and again on pause or stop.
+
+        This stays on the plugin thread until playback ends. setResolvedUrl has
+        already returned the stream to Kodi, so the directory wait is finished.
+        """
+        player = _WatchProgressPlayer()
+        monitor = xbmc.Monitor()
+        session = WatchProgressSession(saved_position, interval=REPORT_INTERVAL_SECONDS)
+
+        def report_pause(position):
+            sample = session.on_pause_or_stop(position)
+            if sample is not None:
+                self._send_watch_position(guid, sample, session, project_slug, event_type="pause")
+
+        player.on_pause = report_pause
+
+        polls = int(_PLAYBACK_START_TIMEOUT / _PLAYBACK_START_POLL)
+        started = False
+        for _ in range(polls):
+            if monitor.abortRequested() is True:
+                return
+            if player.isPlayingVideo() is True:
+                started = True
+                break
+            if monitor.waitForAbort(_PLAYBACK_START_POLL) is True:
+                return
+        if not started:
+            self.log.info("Playback did not start; watch position was not updated")
+            return
+
+        session.start(time.monotonic())
+        if resume_at is not None and resume_at >= 1:
+            try:
+                player.seekTime(float(resume_at))
+            except Exception as exc:
+                self.log.warning(f"Could not resume at {resume_at}s: {exc}")
+
+        while True:
+            if monitor.abortRequested() is True or player.stopped is True:
+                break
+            if player.isPlayingVideo() is not True:
+                break
+            try:
+                position = player.getTime()
+            except Exception:
+                position = session.last_position
+            due = session.observe(position, time.monotonic(), paused=player.paused is True)
+            if due is not None:
+                self._send_watch_position(guid, due, session, project_slug, event_type="heartbeat")
+            if monitor.waitForAbort(1) is True:
+                break
+
+        sample = session.on_pause_or_stop(session.last_position)
+        if sample is not None:
+            # The website uses complete when the video finishes, and stop_exit when the player closes.
+            event_type = "complete" if player.ended is True else "stop_exit"
+            self._send_watch_position(guid, sample, session, project_slug, event_type=event_type)
 
     def _ensure_isa_available(self, manifest_type: str = "hls") -> bool:
         """Check if InputStream Adaptive is available (and installed/enabled)."""

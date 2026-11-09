@@ -7,6 +7,8 @@ from datetime import timedelta
 
 from simplecache import SimpleCache  # type: ignore
 
+from watch_progress import apply_saved_position, patch_project_watch_position
+
 
 class KodiCacheManager:
     """Handles caching operations and cache management for Kodi UI."""
@@ -79,6 +81,37 @@ class KodiCacheManager:
         if self._cache_enabled():
             return self.cache.get(f"episode_{guid}")
         return None
+
+    def remember_watch_position(self, project_slug, guid, seconds):
+        """Copy a position Angel accepted into the cached episode list.
+
+        The resume dialog reads that list. The project fetch stays cached for
+        hours, so a new position would stay invisible until the cache expired.
+        Continue Watching uses a different cache entry and is left alone.
+        """
+        if not guid or not self._cache_enabled():
+            return
+        if project_slug:
+            self._patch_cached_project(project_slug, guid, seconds)
+        self._patch_cached_episode(guid, seconds)
+
+    def _patch_cached_project(self, project_slug, guid, seconds):
+        key = f"project_{project_slug}"
+        project = self.cache.get(key)
+        if not isinstance(project, dict):
+            return
+        if not patch_project_watch_position(project, guid, seconds):
+            return
+        self.cache.set(key, project, expiration=self._cache_ttl())
+
+    def _patch_cached_episode(self, guid, seconds):
+        key = f"episode_{guid}"
+        episode = self.cache.get(key)
+        if not isinstance(episode, dict):
+            return
+        if not apply_saved_position(episode, seconds):
+            return
+        self.cache.set(key, episode, expiration=self._episode_cache_ttl())
 
     def _cache_enabled(self):
         """Return True if cache is enabled based on addon settings.
