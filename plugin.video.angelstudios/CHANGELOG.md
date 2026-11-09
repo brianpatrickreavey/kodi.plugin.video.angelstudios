@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [0.5.9] - 2026-11-08
+- Stop requesting `primaryFlowPhases`. Angel's phase-manager service is refusing connections, and that error was hiding the seasons.
+
 ## [0.5.8] - 2026-11-02
 - Add the setting Log authentication steps. It is off by default.
 - Turning it on warns that kodi.log can include the Angel email and a one-time login code.

@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<addon id="plugin.video.angelstudios" version="0.5.8" name="Angel Studios" provider-name="Brian Reavey, Peter Reavey">
+<addon id="plugin.video.angelstudios" version="0.5.9" name="Angel Studios" provider-name="Brian Reavey, Peter Reavey">
   <requires>
     <import addon="xbmc.python" version="3.0.1" />
     <import addon="script.module.beautifulsoup4" version="4.12.2" />
@@ -21,6 +21,6 @@
     <assets>
       <icon>resources/images/icons/Angel_Studios_Logo.png</icon>
     </assets>
-    <news>0.5.8 - Add the Log authentication steps setting. It is off by default.</news>
+    <news>0.5.9 - Stop requesting primaryFlowPhases so a phase-manager error does not hide the seasons.</news>
   </extension>
 </addon>

@@ -20,11 +20,6 @@ query getEpisodeAndUserWatchData($guid: ID!, $projectSlug: String!, $includePrer
       genres
       __typename
     }
-    primaryFlowPhases {
-      status
-      phaseSlugEnum
-      __typename
-    }
     discoveryPosterCloudinaryPath
     discoveryPosterLandscapeCloudinaryPath
     discoveryPosterTransformation

@@ -184,11 +184,6 @@ query getProject($slug: String!, $includePrerelease: Boolean = false, $includeSe
         __typename
       }
     }
-    primaryFlowPhases {
-      status
-      phaseSlugEnum
-      __typename
-    }
     discoveryPosterLandscapeCloudinaryPath
     discoveryVideoLandscapeUrl
     logoCloudinaryPath
