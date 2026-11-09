@@ -1,4 +1,5 @@
 from unittest.mock import patch, MagicMock
+import json
 import pytest
 from .unittest_data import MOCK_PROJECT_DATA, MOCK_EPISODE_DATA, TEST_EXCEPTION_MESSAGE
 import copy
@@ -29,6 +30,7 @@ class TestEpisodePlayback:
                 episode_data={"episode": episode_data, "project": project_data},
                 resume_at=None,
                 saved_position=None,
+                clear_kodi_stop=False,
             )
 
     def test_play_episode_project_not_found(self, ui_interface, mock_xbmc, mock_cache):
@@ -525,6 +527,7 @@ class TestWatchProgressPlayback:
             episode_data={"episode": episode, "project": project},
             resume_at=125.0,
             saved_position=125.0,
+            clear_kodi_stop=True,
         )
 
     def test_play_from_beginning_does_not_seek(self, ui_interface):
@@ -536,6 +539,7 @@ class TestWatchProgressPlayback:
             episode_data={"episode": episode, "project": project},
             resume_at=None,
             saved_position=125.0,
+            clear_kodi_stop=True,
         )
 
     def test_continue_watching_does_not_seek(self, ui_interface):
@@ -547,6 +551,7 @@ class TestWatchProgressPlayback:
             episode_data={"episode": episode, "project": project},
             resume_at=None,
             saved_position=125.0,
+            clear_kodi_stop=False,
         )
 
     def test_no_saved_position_does_not_seek(self, ui_interface):
@@ -601,7 +606,118 @@ class TestWatchProgressPlayback:
             episode_data={"episode": episode, "project": {"name": "Cached"}},
             resume_at=40.0,
             saved_position=40.0,
+            clear_kodi_stop=True,
         )
+
+    def _play_url(self):
+        plugin = "plugin://plugin.video.angelstudios/"
+        query = "?action=play_episode&content_type=series&episode_guid=abc"
+        return plugin, query, plugin + query
+
+    def _play_and_record(self, ui, argv, rpc, resume_at, clear_kodi_stop):
+        order = []
+
+        def wrapped_rpc(payload):
+            order.append("clear")
+            return rpc(payload)
+
+        def resolve(*_args, **_kwargs):
+            order.append("resolve")
+
+        with (
+            patch("kodi_playback_handler.sys.argv", argv),
+            patch("kodi_playback_handler.xbmc.executeJSONRPC", side_effect=wrapped_rpc),
+            patch("xbmcplugin.setResolvedUrl", side_effect=resolve),
+        ):
+            ui.playback_handler.play_video(
+                episode_data={"episode": {"source": {"url": "http://example/master.m3u8"}}, "project": {}},
+                resume_at=resume_at,
+                saved_position=80,
+                clear_kodi_stop=clear_kodi_stop,
+            )
+        return order
+
+    @pytest.mark.parametrize("resume_at", [80, None])
+    def test_catalog_play_clears_kodi_stop_before_resolve(self, ui_interface, resume_at):
+        """Resume and Play from beginning both drop Kodi's stored stop before the stream starts."""
+        ui, logger, _ = ui_interface
+        plugin, query, play_url = self._play_url()
+        seen = {}
+
+        def rpc(payload):
+            seen["body"] = json.loads(payload)
+            return '{"jsonrpc":"2.0","id":1,"result":"OK"}'
+
+        order = self._play_and_record(ui, [plugin, "5", query, "resume:true"], rpc, resume_at, True)
+
+        assert order == ["clear", "resolve"]
+        assert seen["body"]["method"] == "Files.SetFileDetails"
+        assert seen["body"]["params"] == {
+            "file": play_url,
+            "media": "video",
+            "resume": {"position": 0, "total": 0},
+        }
+        logger.info.assert_any_call("Cleared Kodi's stored stop")
+
+    def test_continue_watching_does_not_clear_kodi_stop(self, ui_interface):
+        """Continue Watching keeps Kodi's own stop. It does not use the catalog resume time."""
+        ui, _, _ = ui_interface
+        plugin, query, _ = self._play_url()
+
+        def rpc(_payload):
+            raise AssertionError("Continue Watching must not clear Kodi's stored stop")
+
+        order = self._play_and_record(ui, [plugin, "5", query], rpc, None, False)
+
+        assert order == ["resolve"]
+
+    def test_clear_failure_still_starts_playback(self, ui_interface):
+        """A JSON-RPC error is logged. The stream still starts."""
+        ui, logger, _ = ui_interface
+        plugin, query, _ = self._play_url()
+
+        def rpc(_payload):
+            return '{"error":{"code":-32602,"message":"Invalid params."}}'
+
+        order = self._play_and_record(ui, [plugin, "5", query], rpc, 80, True)
+
+        assert order == ["clear", "resolve"]
+        logger.warning.assert_any_call(
+            'Could not clear Kodi\'s stored stop: {"error":{"code":-32602,"message":"Invalid params."}}'
+        )
+
+    def test_clear_exception_still_starts_playback(self, ui_interface):
+        """A JSON-RPC exception is logged. The stream still starts."""
+        ui, logger, _ = ui_interface
+        plugin, query, _ = self._play_url()
+
+        def rpc(_payload):
+            raise RuntimeError("rpc down")
+
+        order = self._play_and_record(ui, [plugin, "5", query], rpc, None, True)
+
+        assert order == ["clear", "resolve"]
+        logger.warning.assert_any_call("Could not clear Kodi's stored stop: rpc down")
+
+    @pytest.mark.parametrize(
+        "argv",
+        [
+            ["plugin://plugin.video.angelstudios/"],
+            ["not-a-plugin", "5", "?action=play_episode"],
+            ["plugin://plugin.video.angelstudios/", "5", "action=play_episode"],
+        ],
+    )
+    def test_missing_play_url_still_starts_playback(self, ui_interface, argv):
+        """No plugin URL means there is nothing to clear. Playback still starts."""
+        ui, logger, _ = ui_interface
+
+        def rpc(_payload):
+            raise AssertionError("missing play URL must not call JSON-RPC")
+
+        order = self._play_and_record(ui, argv, rpc, 80, True)
+
+        assert order == ["resolve"]
+        logger.warning.assert_any_call("Could not clear Kodi's stored stop: play URL is missing")
 
     def test_player_callbacks_record_pause_and_stop(self):
         """Pause reads the playhead. Stop, end, and error all end the watch."""

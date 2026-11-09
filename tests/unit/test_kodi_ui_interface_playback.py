@@ -29,6 +29,7 @@ class TestEpisodePlayback:
                 episode_data={"episode": episode_data, "project": project_data},
                 resume_at=None,
                 saved_position=None,
+                clear_kodi_stop=False,
             )
 
     def test_play_episode_project_not_found(self, ui_interface, mock_xbmc, mock_cache):

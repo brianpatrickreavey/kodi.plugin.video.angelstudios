@@ -3,6 +3,8 @@ Kodi Playback Handler for Angel Studios addon.
 Handles all Kodi-specific playback operations and stream resolution.
 """
 
+import json
+import sys
 import time
 
 import xbmc  # type: ignore
@@ -22,6 +24,23 @@ _RESUME_CONTENT_TYPES = {"movies", "series", "specials"}
 # How long to wait for the stream to start before giving up on progress reports.
 _PLAYBACK_START_TIMEOUT = 30
 _PLAYBACK_START_POLL = 0.2
+
+
+def _plugin_play_url():
+    """Return the plugin URL Kodi stored for this play.
+
+    argv[0] is plugin://plugin.video.angelstudios/ and argv[2] is the query.
+    Kodi stores that full string as the video filename.
+    """
+    if len(sys.argv) < 3:
+        return None
+    plugin = sys.argv[0]
+    query = sys.argv[2]
+    if not isinstance(plugin, str) or not plugin.startswith("plugin://"):
+        return None
+    if not isinstance(query, str) or not query.startswith("?"):
+        return None
+    return plugin + query
 
 
 def _kodi_player_type():
@@ -191,9 +210,45 @@ class KodiPlaybackHandler:
             episode_data={"episode": episode, "project": project},
             resume_at=self._seek_target(content_type, saved, resume),
             saved_position=saved,
+            clear_kodi_stop=content_type in _RESUME_CONTENT_TYPES,
         )
 
-    def play_video(self, stream_url=None, episode_data=None, resume_at=None, saved_position=None):
+    def _clear_kodi_resume_bookmark(self):
+        """Drop the stop Kodi stored for this plugin URL.
+
+        Angel's seconds are the resume time. Kodi also keeps its own stop and
+        seeks to that a few seconds after playback starts. This runs before
+        setResolvedUrl returns, which is when Kodi reads that stop.
+        A failure is logged and playback still starts.
+        """
+        play_url = _plugin_play_url()
+        if not play_url:
+            self.log.warning("Could not clear Kodi's stored stop: play URL is missing")
+            return
+        request = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "Files.SetFileDetails",
+            "params": {
+                "file": play_url,
+                "media": "video",
+                "resume": {"position": 0, "total": 0},
+            },
+        }
+        try:
+            raw = xbmc.executeJSONRPC(json.dumps(request))
+            response = json.loads(raw) if isinstance(raw, str) else None
+        except Exception as exc:
+            self.log.warning(f"Could not clear Kodi's stored stop: {exc}")
+            return
+        if isinstance(response, dict) and response.get("result") == "OK":
+            self.log.info("Cleared Kodi's stored stop")
+            return
+        self.log.warning(f"Could not clear Kodi's stored stop: {raw}")
+
+    def play_video(
+        self, stream_url=None, episode_data=None, resume_at=None, saved_position=None, clear_kodi_stop=False
+    ):
         """Play a video stream with optional enhanced metadata"""
         if stream_url and episode_data:
             raise ValueError("Provide only stream_url or episode_data, not both")
@@ -227,6 +282,11 @@ class KodiPlaybackHandler:
                 list_item.addStreamInfo("video", {"codec": "h264"})
 
                 self.log.info(f"Playing basic video from URL: {stream_url}")
+
+            # Drop Kodi's stored stop before Resolve. Kodi reads that bookmark
+            # after setResolvedUrl returns and seeks to it a few seconds later.
+            if clear_kodi_stop:
+                self._clear_kodi_resume_bookmark()
 
             # Resolve and play
             xbmcplugin.setResolvedUrl(self.handle, True, listitem=list_item)
