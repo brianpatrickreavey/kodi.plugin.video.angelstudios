@@ -4,7 +4,9 @@ Handles all Kodi-specific playback operations and stream resolution.
 """
 
 import json
+import queue
 import sys
+import threading
 import time
 
 import xbmc  # type: ignore
@@ -66,6 +68,87 @@ def _kodi_player_type():
     return _Player
 
 
+def _is_this_playback(player, expected_file):
+    """Return True when the player is showing the episode this playback requested.
+
+    isPlayingVideo() is already true when another video has not stopped yet.
+    The plugin URL Kodi stored for this play is the identity of the new episode.
+    """
+    if player.isPlayingVideo() is not True:
+        return False
+    if not expected_file:
+        return True
+    getter = getattr(player, "getPlayingFile", None)
+    if not callable(getter):
+        return False
+    try:
+        current = getter()
+    except Exception:
+        return False
+    return current == expected_file
+
+
+class _OrderedPositionSender:
+    """Send watch positions one at a time, in the order they were submitted.
+
+    The playback loop only queues a position. A slow request cannot hold the
+    playhead sample, and a stop queued while a heartbeat is in flight is sent
+    after that heartbeat, never before it.
+    """
+
+    def __init__(self, send):
+        self._send = send
+        self._queue = queue.Queue()
+        self._lock = threading.Lock()
+        self._idle = threading.Condition(self._lock)
+        self._closed = False
+        self._started = False
+        self._pending = 0
+        self._thread = threading.Thread(target=self._run, name="watch-progress", daemon=True)
+
+    def submit(self, position, event_type):
+        with self._lock:
+            if self._closed:
+                return
+            if not self._started:
+                self._started = True
+                self._thread.start()
+            self._pending += 1
+            self._queue.put((position, event_type))
+
+    def flush(self):
+        """Wait until every position submitted so far has been sent."""
+        with self._idle:
+            while self._pending:
+                self._idle.wait()
+
+    def close(self):
+        with self._lock:
+            if self._closed:
+                started = self._started
+            else:
+                self._closed = True
+                started = self._started
+                if started:
+                    self._pending += 1
+                    self._queue.put(None)
+        if started:
+            self._thread.join()
+
+    def _run(self):
+        while True:
+            item = self._queue.get()
+            try:
+                if item is None:
+                    return
+                position, event_type = item
+                self._send(position, event_type)
+            finally:
+                with self._idle:
+                    self._pending -= 1
+                    self._idle.notify_all()
+
+
 class _WatchProgressPlayer(_kodi_player_type()):
     """Player callbacks for pause and stop. The monitor loop sends the stop position."""
 
@@ -75,8 +158,13 @@ class _WatchProgressPlayer(_kodi_player_type()):
         self.ended = False
         self.paused = False
         self.on_pause = None
+        self.expected_file = None
+        self.seen_target = False
+        self.stop_position = None
 
     def onPlayBackPaused(self):
+        if self.expected_file and not self.seen_target:
+            return
         self.paused = True
         if self.on_pause is None:
             return
@@ -89,15 +177,26 @@ class _WatchProgressPlayer(_kodi_player_type()):
     def onPlayBackResumed(self):
         self.paused = False
 
-    def onPlayBackStopped(self):
+    def _finish(self, ended):
+        """Record the playhead, then end the watch. Ignore the previous video's stop."""
+        if self.expected_file and not self.seen_target:
+            return
+        try:
+            self.stop_position = self.getTime()
+        except Exception:
+            pass
+        if ended:
+            self.ended = True
         self.stopped = True
+
+    def onPlayBackStopped(self):
+        self._finish(False)
 
     def onPlayBackEnded(self):
-        self.ended = True
-        self.stopped = True
+        self._finish(True)
 
     def onPlayBackError(self):
-        self.stopped = True
+        self._finish(False)
 
 
 class KodiPlaybackHandler:
@@ -257,6 +356,8 @@ class KodiPlaybackHandler:
 
         list_item = xbmcgui.ListItem(offscreen=True)
         project_slug = None
+        guid = None
+        player = None
 
         try:
             if episode_data:
@@ -283,6 +384,14 @@ class KodiPlaybackHandler:
 
                 self.log.info(f"Playing basic video from URL: {stream_url}")
 
+            if episode_data and isinstance(episode, dict):
+                guid = episode.get("guid") or None
+            # Register before Resolve so a video that is already playing is not
+            # mistaken for this episode. Its stop must not end the new watch.
+            if guid:
+                player = _WatchProgressPlayer()
+                player.expected_file = _plugin_play_url()
+
             # Drop Kodi's stored stop before Resolve. Kodi reads that bookmark
             # after setResolvedUrl returns and seeks to it a few seconds later.
             if clear_kodi_stop:
@@ -297,13 +406,10 @@ class KodiPlaybackHandler:
             self.log.error(f"Error playing video: {e}")
             return
 
-        guid = None
-        if episode_data:
-            guid = (episode_data.get("episode") or {}).get("guid")
         if not guid:
             return
         try:
-            self._monitor_watch_progress(guid, saved_position, resume_at, project_slug)
+            self._monitor_watch_progress(guid, saved_position, resume_at, project_slug, player)
         except Exception as exc:
             self.log.warning(f"Watch progress stopped for {guid}: {exc}")
 
@@ -347,64 +453,80 @@ class KodiPlaybackHandler:
         except Exception as exc:
             self.log.warning(f"Could not update the cached resume time for {guid}: {exc}")
 
-    def _monitor_watch_progress(self, guid, saved_position, resume_at, project_slug=None):
+    def _monitor_watch_progress(self, guid, saved_position, resume_at, project_slug=None, player=None):
         """Report the playhead once a minute, and again on pause or stop.
 
         This stays on the plugin thread until playback ends. setResolvedUrl has
         already returned the stream to Kodi, so the directory wait is finished.
+        The player is created before that resolve when this play has a guid.
         """
-        player = _WatchProgressPlayer()
+        if player is None:
+            player = _WatchProgressPlayer()
         monitor = xbmc.Monitor()
         session = WatchProgressSession(saved_position, interval=REPORT_INTERVAL_SECONDS)
+        sender = _OrderedPositionSender(
+            lambda position, event_type: self._send_watch_position(
+                guid, position, session, project_slug, event_type=event_type
+            )
+        )
 
         def report_pause(position):
             sample = session.on_pause_or_stop(position)
             if sample is not None:
-                self._send_watch_position(guid, sample, session, project_slug, event_type="pause")
+                sender.submit(sample, "pause")
 
         player.on_pause = report_pause
+        expected_file = getattr(player, "expected_file", None)
 
-        polls = int(_PLAYBACK_START_TIMEOUT / _PLAYBACK_START_POLL)
-        started = False
-        for _ in range(polls):
-            if monitor.abortRequested() is True:
+        try:
+            polls = int(_PLAYBACK_START_TIMEOUT / _PLAYBACK_START_POLL)
+            started = False
+            for _ in range(polls):
+                if monitor.abortRequested() is True:
+                    return
+                if _is_this_playback(player, expected_file):
+                    started = True
+                    break
+                if monitor.waitForAbort(_PLAYBACK_START_POLL) is True:
+                    return
+            if not started:
+                self.log.info("Playback did not start; watch position was not updated")
                 return
-            if player.isPlayingVideo() is True:
-                started = True
-                break
-            if monitor.waitForAbort(_PLAYBACK_START_POLL) is True:
-                return
-        if not started:
-            self.log.info("Playback did not start; watch position was not updated")
-            return
 
-        session.start(time.monotonic())
-        if resume_at is not None and resume_at >= 1:
-            try:
-                player.seekTime(float(resume_at))
-            except Exception as exc:
-                self.log.warning(f"Could not resume at {resume_at}s: {exc}")
+            player.seen_target = True
+            session.start(time.monotonic())
+            if resume_at is not None and resume_at >= 1:
+                try:
+                    player.seekTime(float(resume_at))
+                except Exception as exc:
+                    self.log.warning(f"Could not resume at {resume_at}s: {exc}")
 
-        while True:
-            if monitor.abortRequested() is True or player.stopped is True:
-                break
-            if player.isPlayingVideo() is not True:
-                break
-            try:
-                position = player.getTime()
-            except Exception:
-                position = session.last_position
-            due = session.observe(position, time.monotonic(), paused=player.paused is True)
-            if due is not None:
-                self._send_watch_position(guid, due, session, project_slug, event_type="heartbeat")
-            if monitor.waitForAbort(1) is True:
-                break
+            while True:
+                if monitor.abortRequested() is True or player.stopped is True:
+                    break
+                if not _is_this_playback(player, expected_file):
+                    break
+                try:
+                    position = player.getTime()
+                except Exception:
+                    position = session.last_position
+                due = session.observe(position, time.monotonic(), paused=player.paused is True)
+                if due is not None:
+                    sender.submit(due, "heartbeat")
+                if monitor.waitForAbort(1) is True:
+                    break
 
-        sample = session.on_pause_or_stop(session.last_position)
-        if sample is not None:
-            # The website uses complete when the video finishes, and stop_exit when the player closes.
-            event_type = "complete" if player.ended is True else "stop_exit"
-            self._send_watch_position(guid, sample, session, project_slug, event_type=event_type)
+            # The heartbeat request has to finish before the stop is chosen.
+            # Otherwise a slow save could still be the position Angel keeps.
+            sender.flush()
+            ending = getattr(player, "stop_position", None)
+            sample = session.on_pause_or_stop(ending if ending is not None else session.last_position)
+            if sample is not None:
+                # The website uses complete when the video finishes, and stop_exit when the player closes.
+                event_type = "complete" if player.ended is True else "stop_exit"
+                sender.submit(sample, event_type)
+        finally:
+            sender.close()
 
     def _ensure_isa_available(self, manifest_type: str = "hls") -> bool:
         """Check if InputStream Adaptive is available (and installed/enabled)."""

@@ -397,9 +397,11 @@ class AngelStudiosInterface:
             return {}
 
     def get_watch_position(self, watchable_guid):
-        """Return the saved position in seconds, or None when this title has none.
+        """Return the saved position in seconds.
 
-        This reads the content record the website uses for the series-page link.
+        Zero means the content record has no position. None means the read
+        failed, so a cached position must be left alone. This reads the content
+        record the website uses for the series-page link.
         """
         try:
             result = self._graphql_query("getContent", variables={"guid": watchable_guid})
@@ -408,11 +410,77 @@ class AngelStudiosInterface:
             return None
         if not isinstance(result, dict):
             return None
-        content = result.get("getContent")
-        watch_position = content.get("watchPosition") if isinstance(content, dict) else None
-        if not isinstance(watch_position, dict) or watch_position.get("position") is None:
+        return self._position_from_content(result.get("getContent"))
+
+    def get_watch_positions(self, watchable_guids):
+        """Return saved seconds for many titles in one request.
+
+        A title whose record has no position is 0. A title missing from a
+        successful response is omitted. None means the read failed, so every
+        cached position must be left alone.
+        """
+        guids = []
+        seen = set()
+        for guid in watchable_guids or []:
+            if isinstance(guid, str) and guid and guid not in seen:
+                seen.add(guid)
+                guids.append(guid)
+        if not guids:
+            return {}
+
+        found = {}
+        # One alias per title. A long season is split so one timeout is not
+        # the whole list, and a failed chunk leaves that chunk cached.
+        chunk_size = 25
+        for start in range(0, len(guids), chunk_size):
+            chunk = guids[start : start + chunk_size]
+            part = self._fetch_watch_position_chunk(chunk)
+            if part is None:
+                if not found:
+                    return None
+                continue
+            found.update(part)
+        return found
+
+    def _position_from_content(self, content):
+        """Return seconds, 0 when the record has no position, or None when it is not a record."""
+        if not isinstance(content, dict):
             return None
+        watch_position = content.get("watchPosition") if "watchPosition" in content else None
+        if "watchPosition" not in content or not isinstance(watch_position, dict):
+            return 0
+        if watch_position.get("position") is None:
+            return 0
         return watch_position.get("position")
+
+    def _fetch_watch_position_chunk(self, guids):
+        """Read one batch of positions. None means this batch failed."""
+        variable_defs = []
+        fields = []
+        variables = {}
+        for index, guid in enumerate(guids):
+            key = f"id{index}"
+            variable_defs.append(f"${key}: ID!")
+            variables[key] = guid
+            fields.append(
+                f"  item_{index}: getContent(id: ${key}) {{\n"
+                "    ... on ContentWatchable { watchPosition { position } }\n"
+                "  }\n"
+            )
+        query = "query getWatchPositions(" + ", ".join(variable_defs) + ") {\n" + "".join(fields) + "}\n"
+        try:
+            result = self._graphql_query("getWatchPositions", variables=variables, raw_query=query)
+        except Exception as e:
+            self.log.warning(f"Could not read watch positions: {e}")
+            return None
+        if not isinstance(result, dict):
+            return None
+        found = {}
+        for index, guid in enumerate(guids):
+            position = self._position_from_content(result.get(f"item_{index}"))
+            if position is not None:
+                found[guid] = position
+        return found
 
     def upsert_watch_position(self, watchable_guid, position, event_type="heartbeat"):
         """Send the current position in seconds. Playback keeps going when this fails.

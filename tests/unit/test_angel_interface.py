@@ -836,22 +836,38 @@ class TestAngelStudiosInterface:
             assert angel_interface.get_watch_position("g1") == 0
 
     def test_get_watch_position_missing_data(self, angel_interface):
-        """Missing content or position means this title has no saved position."""
-        payloads = [
-            None,
-            [],
-            {},
-            {"getContent": None},
+        """A failed or unreadable response is None. A record with no position is zero."""
+        failed = [None, [], {}, {"getContent": None}, {"getContent": "nope"}]
+        cleared = [
             {"getContent": {}},
-            {"getContent": "nope"},
             {"getContent": {"watchPosition": None}},
             {"getContent": {"watchPosition": {}}},
             {"getContent": {"watchPosition": {"position": None}}},
         ]
         with patch.object(angel_interface, "_graphql_query") as mock_query:
-            for payload in payloads:
+            for payload in failed:
                 mock_query.return_value = payload
                 assert angel_interface.get_watch_position("g1") is None
+            for payload in cleared:
+                mock_query.return_value = payload
+                assert angel_interface.get_watch_position("g1") == 0
+
+    def test_get_watch_positions_reads_the_list_in_one_query(self, angel_interface):
+        """Season rows share one request. A null position clears that title only."""
+        with patch.object(angel_interface, "_graphql_query") as mock_query:
+            mock_query.return_value = {
+                "item_0": {"watchPosition": {"position": 12}},
+                "item_1": {"watchPosition": None},
+            }
+            assert angel_interface.get_watch_positions(["ep-a", "ep-b", "ep-a"]) == {"ep-a": 12, "ep-b": 0}
+        assert mock_query.call_count == 1
+        assert mock_query.call_args.kwargs["variables"] == {"id0": "ep-a", "id1": "ep-b"}
+
+    def test_get_watch_positions_failure_keeps_the_cache(self, angel_interface):
+        """A failed batch is None so the caller can keep the cached resume times."""
+        with patch.object(angel_interface, "_graphql_query", side_effect=Exception("down")):
+            assert angel_interface.get_watch_positions(["ep-a"]) is None
+        angel_interface.log.warning.assert_called_once_with("Could not read watch positions: down")
 
     def test_get_watch_position_exception(self, angel_interface):
         """A failed read returns None and does not raise."""

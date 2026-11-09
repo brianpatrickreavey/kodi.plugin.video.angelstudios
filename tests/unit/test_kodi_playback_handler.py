@@ -1007,6 +1007,86 @@ class TestWatchProgressPlayback:
         angel.upsert_watch_position.assert_not_called()
         logger.info.assert_any_call("Playback did not start; watch position was not updated")
 
+    def test_monitor_ignores_a_video_that_is_already_playing(self, ui_interface, monkeypatch):
+        """A different video that is already playing is not this episode."""
+        ui, logger, angel = ui_interface
+        import kodi_playback_handler
+
+        monkeypatch.setattr(kodi_playback_handler, "_PLAYBACK_START_TIMEOUT", 0.4)
+        monkeypatch.setattr(kodi_playback_handler, "_PLAYBACK_START_POLL", 0.2)
+        player = _ScriptedPlayer([True, True], times=[40])
+        player.expected_file = "plugin://plugin.video.angelstudios/?action=play_episode&episode_guid=title-guid"
+        player.getPlayingFile = lambda: "plugin://plugin.video.angelstudios/?action=play_episode&episode_guid=other"
+
+        self._run_monitor(ui, player, saved=100, resume_at=80, now_values=[0])
+
+        angel.upsert_watch_position.assert_not_called()
+        assert player.seek_calls == []
+        logger.info.assert_any_call("Playback did not start; watch position was not updated")
+
+    def test_monitor_waits_until_the_requested_episode_starts(self, ui_interface):
+        """Seek and progress start only after the playing file is this episode."""
+        ui, _, angel = ui_interface
+        angel.upsert_watch_position.return_value = True
+        expected = "plugin://plugin.video.angelstudios/?action=play_episode&episode_guid=title-guid"
+        files = iter(["plugin://other", expected, expected])
+        player = _ScriptedPlayer([True, True, True, False], times=[90])
+        player.expected_file = expected
+        player.getPlayingFile = lambda: next(files)
+
+        self._run_monitor(ui, player, saved=80, resume_at=80, now_values=[0, 0])
+
+        assert player.seek_calls == [80.0]
+        angel.upsert_watch_position.assert_called_once_with("title-guid", 90, event_type="stop_exit")
+
+    def test_stop_uses_the_position_captured_when_playback_stopped(self, ui_interface):
+        """A heartbeat sampled earlier does not replace the position taken at stop."""
+        ui, _, angel = ui_interface
+        angel.upsert_watch_position.return_value = True
+        player = _ScriptedPlayer([False, True, True, True, False], times=[100, 100])
+        player.stop_position = 155
+
+        self._run_monitor(ui, player, saved=None, resume_at=None, now_values=[0, 60, 61])
+
+        assert angel.upsert_watch_position.call_args_list[0].args == ("title-guid", 100)
+        assert angel.upsert_watch_position.call_args_list[0].kwargs == {"event_type": "heartbeat"}
+        assert angel.upsert_watch_position.call_args_list[1].args == ("title-guid", 155)
+        assert angel.upsert_watch_position.call_args_list[1].kwargs == {"event_type": "stop_exit"}
+
+    def test_player_is_registered_before_the_stream_resolves(self, ui_interface, monkeypatch):
+        """The player exists before Resolve, so the previous video's stop is visible."""
+        ui, _, _ = ui_interface
+        import kodi_playback_handler
+
+        monkeypatch.setattr(kodi_playback_handler, "_PLAYBACK_START_TIMEOUT", 0.2)
+        monkeypatch.setattr(kodi_playback_handler, "_PLAYBACK_START_POLL", 0.2)
+        plugin, query, play_url = self._play_url()
+        order = []
+        player = _ScriptedPlayer([False])
+
+        def factory():
+            order.append("player")
+            return player
+
+        def resolve(*_args, **_kwargs):
+            order.append("resolve")
+
+        with (
+            patch("kodi_playback_handler.sys.argv", [plugin, "5", query]),
+            patch("kodi_playback_handler._WatchProgressPlayer", side_effect=factory),
+            patch("xbmcplugin.setResolvedUrl", side_effect=resolve),
+            patch("kodi_playback_handler.xbmc.Monitor", return_value=_ScriptedMonitor()),
+        ):
+            ui.playback_handler.play_video(
+                episode_data={"episode": {"guid": "abc", "subtitle": "One"}, "project": {}},
+                resume_at=None,
+                saved_position=80,
+                clear_kodi_stop=False,
+            )
+
+        assert order == ["player", "resolve"]
+        assert player.expected_file == play_url
+
     def test_send_failure_does_not_raise(self, ui_interface):
         """A write error is logged. The monitor still returns."""
         ui, logger, angel = ui_interface

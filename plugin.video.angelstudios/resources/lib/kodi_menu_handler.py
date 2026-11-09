@@ -271,25 +271,42 @@ class KodiMenuHandler(MenuUtils):
             args[3] if len(args) > 3 else kwargs.get("season_id", "all"),
         )
     )
-    def _use_fresh_watch_position(self, episode, project_slug):
+    def _fresh_watch_positions(self, episodes):
+        """Read current positions for this list in one request.
+
+        None means the read failed. The cached resume time on each row stays.
+        """
+        guids = []
+        for episode in episodes or []:
+            if isinstance(episode, dict) and episode.get("guid"):
+                guids.append(episode.get("guid"))
+        interface = getattr(self.parent, "angel_interface", None)
+        getter = getattr(interface, "get_watch_positions", None) if interface else None
+        if not guids or not callable(getter):
+            return None
+        try:
+            fresh = getter(guids)
+        except Exception as exc:
+            self.log.warning(f"Could not read watch positions: {exc}")
+            return None
+        if not isinstance(fresh, dict):
+            return None
+        return fresh
+
+    def _use_fresh_watch_position(self, episode, project_slug, fresh_positions):
         """Replace this row's cached resume time with the website's current position.
 
         The episode list stays cached for hours. A save made in the browser is
-        not in that copy. Opening the list reads the content position. When it
-        changed, the cache is updated so the resume clock matches.
+        not in that copy. Opening the list reads the content positions together.
+        When one changed, the cache is updated so the resume clock matches.
+        A failed batch leaves the cached time alone.
         """
-        if not isinstance(episode, dict):
+        if not isinstance(episode, dict) or not isinstance(fresh_positions, dict):
             return
         guid = episode.get("guid")
-        interface = getattr(self.parent, "angel_interface", None)
-        getter = getattr(interface, "get_watch_position", None) if interface else None
-        if not guid or not callable(getter):
+        if not guid or guid not in fresh_positions:
             return
-        try:
-            fresh = coerce_seconds(getter(guid))
-        except Exception as exc:
-            self.log.warning(f"Could not read watch position for {guid}: {exc}")
-            return
+        fresh = coerce_seconds(fresh_positions.get(guid))
         if fresh is None:
             return
         previous = position_from_episode(episode)
@@ -350,6 +367,9 @@ class KodiMenuHandler(MenuUtils):
             )
             self.log.info(f"Setting content type for Kodi: {content_type} ({kodi_content_type})")
             xbmcplugin.setContent(self.handle, kodi_content_type)
+            fresh_positions = None
+            if content_type in ("movies", "series", "specials"):
+                fresh_positions = self._fresh_watch_positions(episodes_list)
 
             for episode in episodes_list:
                 try:
@@ -366,7 +386,7 @@ class KodiMenuHandler(MenuUtils):
                         overlay_progress=False,
                     )
                     if content_type in ("movies", "series", "specials"):
-                        self._use_fresh_watch_position(episode, project_slug)
+                        self._use_fresh_watch_position(episode, project_slug, fresh_positions)
                         point = native_resume_point(episode)
                         if point:
                             list_item.getVideoInfoTag().setResumePoint(point[0], point[1])

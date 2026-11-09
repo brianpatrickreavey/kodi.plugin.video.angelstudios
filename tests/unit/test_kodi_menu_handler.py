@@ -865,7 +865,9 @@ class TestEpisodesMenu:
         for episode in season["episodes"]:
             episode["watchPosition"] = {"position": 30.0}
             episode["source"] = {"url": "http://example.com/video.mp4", "duration": 3600}
-        angel_interface_mock.get_watch_position.return_value = 1413
+        angel_interface_mock.get_watch_positions.return_value = {
+            episode["guid"]: 1413 for episode in season["episodes"]
+        }
 
         with patch.object(ui.cache_manager, "_cache_enabled", return_value=True):
             ui.cache_manager.cache.get.return_value = project_data
@@ -891,7 +893,7 @@ class TestEpisodesMenu:
         episode = season["episodes"][0]
         episode["watchPosition"] = {"position": 30.0}
         episode["source"] = {"duration": 3600}
-        angel_interface_mock.get_watch_position.side_effect = RuntimeError("down")
+        angel_interface_mock.get_watch_positions.side_effect = RuntimeError("down")
 
         with patch.object(ui.cache_manager, "_cache_enabled", return_value=True):
             ui.cache_manager.cache.get.return_value = project_data
@@ -907,7 +909,8 @@ class TestEpisodesMenu:
         show_error.assert_not_called()
         info_tag = mock_build_item.return_value.getVideoInfoTag.return_value
         info_tag.setResumePoint.assert_any_call(30.0, 3600.0)
-        logger_mock.warning.assert_any_call(f"Could not read watch position for {episode['guid']}: down")
+        logger_mock.warning.assert_any_call("Could not read watch positions: down")
+        angel_interface_mock.get_watch_positions.assert_called_once()
 
     def test_episodes_menu_hides_resume_when_the_website_position_is_zero(self, ui_interface, mock_xbmc, mock_cache):
         """A website position of zero is stored on the row so Kodi's old bookmark is not used."""
@@ -917,7 +920,9 @@ class TestEpisodesMenu:
         for episode in season["episodes"]:
             episode["watchPosition"] = {"position": 30.0}
             episode["source"] = {"duration": 3600}
-        angel_interface_mock.get_watch_position.return_value = 0
+        angel_interface_mock.get_watch_positions.return_value = {
+            episode["guid"]: 0 for episode in season["episodes"]
+        }
 
         with patch.object(ui.cache_manager, "_cache_enabled", return_value=True):
             ui.cache_manager.cache.get.return_value = project_data
