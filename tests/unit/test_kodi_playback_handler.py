@@ -1039,6 +1039,58 @@ class TestWatchProgressPlayback:
         assert player.seek_calls == [80.0]
         angel.upsert_watch_position.assert_called_once_with("title-guid", 90, event_type="stop_exit")
 
+    def test_monitor_accepts_the_resolved_stream_address(self, ui_interface):
+        """The stream URL Kodi reports after resolve is still this episode."""
+        ui, _, angel = ui_interface
+        angel.upsert_watch_position.return_value = True
+        plugin = "plugin://plugin.video.angelstudios/?action=play_episode&episode_guid=title-guid"
+        stream = "https://api.angelstudios.com/streaming/title-guid/master.m3u8"
+        player = _ScriptedPlayer([True, True, False], times=[610])
+        player.expected_file = plugin
+        player.stream_file = stream
+        player.getPlayingFile = lambda: stream
+
+        self._run_monitor(ui, player, saved=600, resume_at=600, now_values=[0, 0])
+
+        assert player.seek_calls == [600.0]
+        angel.upsert_watch_position.assert_called_once_with("title-guid", 610, event_type="stop_exit")
+
+    def test_monitor_keeps_watching_when_the_file_becomes_the_stream(self, ui_interface):
+        """A change from the plugin URL to the stream URL is the same episode."""
+        ui, _, angel = ui_interface
+        angel.upsert_watch_position.return_value = True
+        plugin = "plugin://plugin.video.angelstudios/?action=play_episode&episode_guid=title-guid"
+        stream = "https://api.angelstudios.com/streaming/title-guid/master.m3u8"
+        files = iter([plugin, stream, stream])
+        player = _ScriptedPlayer([True, True, True, False], times=[610, 620])
+        player.expected_file = plugin
+        player.stream_file = stream
+        player.getPlayingFile = lambda: next(files)
+
+        self._run_monitor(ui, player, saved=600, resume_at=600, now_values=[0, 0])
+
+        angel.upsert_watch_position.assert_called_once_with("title-guid", 620, event_type="stop_exit")
+
+    def test_monitor_ignores_a_different_stream(self, ui_interface, monkeypatch):
+        """Another title's stream is not this episode."""
+        ui, logger, angel = ui_interface
+        import kodi_playback_handler
+
+        monkeypatch.setattr(kodi_playback_handler, "_PLAYBACK_START_TIMEOUT", 0.4)
+        monkeypatch.setattr(kodi_playback_handler, "_PLAYBACK_START_POLL", 0.2)
+        plugin = "plugin://plugin.video.angelstudios/?action=play_episode&episode_guid=title-guid"
+        stream = "https://api.angelstudios.com/streaming/title-guid/master.m3u8"
+        player = _ScriptedPlayer([True, True], times=[610])
+        player.expected_file = plugin
+        player.stream_file = stream
+        player.getPlayingFile = lambda: "https://api.angelstudios.com/streaming/other/master.m3u8"
+
+        self._run_monitor(ui, player, saved=600, resume_at=600, now_values=[0])
+
+        angel.upsert_watch_position.assert_not_called()
+        assert player.seek_calls == []
+        logger.info.assert_any_call("Playback did not start; watch position was not updated")
+
     def test_stop_uses_the_position_captured_when_playback_stopped(self, ui_interface):
         """A heartbeat sampled earlier does not replace the position taken at stop."""
         ui, _, angel = ui_interface
@@ -1086,6 +1138,38 @@ class TestWatchProgressPlayback:
 
         assert order == ["player", "resolve"]
         assert player.expected_file == play_url
+
+    def test_player_records_the_stream_address_before_resolve(self, ui_interface, monkeypatch):
+        """The stream URL is stored with the player before Kodi opens the file."""
+        ui, _, _ = ui_interface
+        import kodi_playback_handler
+
+        monkeypatch.setattr(kodi_playback_handler, "_PLAYBACK_START_TIMEOUT", 0.2)
+        monkeypatch.setattr(kodi_playback_handler, "_PLAYBACK_START_POLL", 0.2)
+        plugin, query, play_url = self._play_url()
+        stream = "https://api.angelstudios.com/streaming/abc/master.m3u8"
+        player = _ScriptedPlayer([False])
+
+        class _Item:
+            def getPath(self):
+                return stream
+
+        with (
+            patch("kodi_playback_handler.sys.argv", [plugin, "5", query]),
+            patch("kodi_playback_handler._WatchProgressPlayer", return_value=player),
+            patch.object(ui.menu_handler, "_create_list_item_from_episode", return_value=_Item()),
+            patch("xbmcplugin.setResolvedUrl"),
+            patch("kodi_playback_handler.xbmc.Monitor", return_value=_ScriptedMonitor()),
+        ):
+            ui.playback_handler.play_video(
+                episode_data={"episode": {"guid": "abc", "subtitle": "One"}, "project": {}},
+                resume_at=None,
+                saved_position=80,
+                clear_kodi_stop=False,
+            )
+
+        assert player.expected_file == play_url
+        assert player.stream_file == stream
 
     def test_send_failure_does_not_raise(self, ui_interface):
         """A write error is logged. The monitor still returns."""
