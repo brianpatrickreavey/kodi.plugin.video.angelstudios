@@ -371,8 +371,8 @@ msgid "Force logout"
 msgstr "Force logout"
 
 msgctxt "#30513"
-msgid "Clears authentication/session cookies to require re-login."
-msgstr "Clears authentication/session cookies to require re-login."
+msgid "Signs out of Angel on this device and requires login again."
+msgstr "Signs out of Angel on this device and requires login again."
 
 msgctxt "#30514"
 msgid "Clear debug data"

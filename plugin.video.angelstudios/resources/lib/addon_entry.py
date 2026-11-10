@@ -214,7 +214,8 @@ def main():
     """Main addon entry point"""
     logger.info(f"Addon invoked with argv: {sys.argv}")
 
-    if not USERNAME or not PASSWORD:
+    action = dict(parse_qsl(sys.argv[2][1:])).get("action")
+    if (not USERNAME or not PASSWORD) and action != "show_information":
         # Show error if credentials are not set
         xbmcgui.Dialog().ok(
             "Angel Studios",

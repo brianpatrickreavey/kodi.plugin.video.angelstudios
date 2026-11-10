@@ -213,7 +213,23 @@ class TestMain:
         sys.path.insert(0, str(RES_LIB))
         runpy.run_path(str(MAIN_PATH), run_name="__main__")
 
-        dialog.ok.assert_called_once()
+        dialog.ok.assert_called_once_with(
+            "Angel Studios", "Please configure your Angel.com username and password in the addon settings."
+        )
+
+    def test_session_details_available_without_credentials(self, monkeypatch):
+        main = _fresh_main_module()
+        monkeypatch.setattr(main, "USERNAME", "")
+        monkeypatch.setattr(main, "PASSWORD", "")
+        ui = MagicMock()
+        monkeypatch.setattr(main, "KodiUIInterface", MagicMock(return_value=ui))
+        monkeypatch.setattr(main, "AuthenticationCore", MagicMock())
+        monkeypatch.setattr(main, "AngelStudiosInterface", MagicMock())
+        monkeypatch.setattr(sys, "argv", ["plugin://", "1", "?action=show_information"])
+
+        main.main()
+
+        ui.show_auth_details_dialog.assert_called_once_with()
 
     def test_main_guard_calls_router_with_credentials(self, monkeypatch):
         """__main__ guard initializes interfaces and routes when creds exist."""
@@ -276,7 +292,8 @@ class TestMain:
         monkeypatch.setattr("kodi_ui_interface.xbmcgui.Dialog", MagicMock(return_value=dialog))
 
         auth_core = MagicMock()
-        auth_core.get_session_details.return_value = {
+        ui.angel_interface = MagicMock(auth_core=auth_core)
+        ui.angel_interface.get_session_details.return_value = {
             "login_email": "user@example.com",
             "account_id": "uuid-123",
             "authenticated": True,
@@ -289,11 +306,9 @@ class TestMain:
             "cookie_names": ["angel_jwt_v2", "other"],
             "session_file": "/tmp/session.pkl",
         }
-        ui.angel_interface = MagicMock(auth_core=auth_core)
-
         ui.show_auth_details_dialog()
 
-        auth_core.get_session_details.assert_called_once()
+        ui.angel_interface.get_session_details.assert_called_once()
         dialog.textviewer.assert_called_once()
         content = dialog.textviewer.call_args[0][1]
         assert "user@example.com" in content
@@ -320,8 +335,8 @@ class TestMain:
         monkeypatch.setattr("kodi_ui_interface.xbmcgui.Dialog", MagicMock(return_value=dialog))
 
         auth_core = MagicMock()
-        auth_core.get_session_details.side_effect = RuntimeError("boom")
         ui.angel_interface = MagicMock(auth_core=auth_core)
+        ui.angel_interface.get_session_details.side_effect = RuntimeError("boom")
 
         ui.show_auth_details_dialog()
 
@@ -334,7 +349,8 @@ class TestMain:
         monkeypatch.setattr("kodi_ui_interface.xbmcgui.Dialog", MagicMock(return_value=dialog))
 
         auth_core = MagicMock()
-        auth_core.get_session_details.return_value = {
+        ui.angel_interface = MagicMock(auth_core=auth_core)
+        ui.angel_interface.get_session_details.return_value = {
             "login_email": "user@example.com",
             "account_id": "uuid-123",
             "authenticated": True,
@@ -347,8 +363,6 @@ class TestMain:
             "cookie_names": [],
             "session_file": "/tmp/session.pkl",
         }
-        ui.angel_interface = MagicMock(auth_core=auth_core)
-
         ui.show_auth_details_dialog()
 
         dialog.textviewer.assert_called_once()
