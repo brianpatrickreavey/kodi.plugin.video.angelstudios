@@ -55,7 +55,7 @@ class KodiUIHelpers:
             return
 
         try:
-            details = self.parent.angel_interface.auth_core.get_session_details()
+            details = self.parent.angel_interface.get_session_details()
         except Exception:
             xbmcgui.Dialog().ok("Angel Studios Session Details", "Unable to read session details.")
             return
@@ -134,18 +134,13 @@ class KodiUIHelpers:
             self.parent.log.error("Debug data clear failed via settings")
 
     def force_logout_with_notification(self):
-        """Force local logout via angel_interface and notify user."""
+        """Revoke the session via angel_interface and notify user."""
         if not self.parent.angel_interface:
             raise ValueError("Angel interface not initialized")
         result = self.parent.angel_interface.force_logout()
         if result:
-            xbmcgui.Dialog().ok(
-                "Angel Studios - Force Logout",
-                "Successfully logged out.\n\n"
-                "Session details may not update immediately.\n"
-                "Restart the addon to see changes.",
-            )
-            self.parent.log.info("Logged out locally via settings")
+            xbmcgui.Dialog().ok("Angel Studios - Force Logout", "Successfully logged out.")
+            self.parent.log.info("Logged out via settings")
         else:
             xbmcgui.Dialog().ok("Angel Studios - Force Logout", "Logout failed; please try again.")
             self.parent.log.error("Logout failed via settings")

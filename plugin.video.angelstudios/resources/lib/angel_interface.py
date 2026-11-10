@@ -13,6 +13,7 @@ import math
 import os
 import re
 import sys
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 import angel_authentication
@@ -810,14 +811,51 @@ class AngelStudiosInterface:
             self.log.info("Session is valid")
 
     def force_logout(self):
-        """Force a local logout; future enhancement may call remote logout API."""
+        """Revoke the saved session before clearing local authentication."""
         try:
+            token = self.auth_core.session_store.get_token()
+            if not token:
+                self.log.error("Logout failed: no session token available")
+                return False
+            response = requests.get(
+                f"{angel_website_url}/auth/logout",
+                cookies={"angel_jwt_v3": token},
+                allow_redirects=False,
+                timeout=self.timeout,
+            )
+            if response.status_code not in (301, 302, 303, 307, 308):
+                self.log.error(f"Logout failed: HTTP {response.status_code}")
+                return False
             self.auth_core.logout()
-            # Clear session headers
+            self.auth_core.session_store.clear_credentials()
             self.session.headers.pop("Authorization", None)
             return True
         except Exception as e:
             self.log.error(f"Logout failed: {e}")
             return False
+
+    def get_session_details(self):
+        """Return diagnostics for the saved session without signing in."""
+        store = self.auth_core.session_store
+        token = store.get_token()
+        username, _ = store.get_credentials()
+        details = {"login_email": username or "Unknown", "authenticated": self.auth_core.validate_session()}
+        if token:
+            try:
+                payload = angel_authentication.decode_jwt_payload(token)
+                details["login_email"] = payload.get("email", details["login_email"])
+                details["account_id"] = payload.get("sub")
+                for claim, label in (("iat", "issued_at"), ("exp", "expires_at")):
+                    if claim in payload:
+                        timestamp = datetime.fromtimestamp(payload[claim], timezone.utc)
+                        details[f"{label}_utc"] = timestamp.isoformat()
+                        details[f"{label}_local"] = timestamp.astimezone().isoformat()
+                        if claim == "exp":
+                            details["expires_in_seconds"] = int(
+                                (timestamp - datetime.now(timezone.utc)).total_seconds()
+                            )
+            except (ValueError, TypeError, OverflowError, OSError):
+                self.log.warning("Unable to decode session details")
+        return details
 
     # Interface remains KODI-agnostic and does not manage cache internally

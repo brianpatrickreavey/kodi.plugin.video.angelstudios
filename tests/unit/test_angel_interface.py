@@ -1,4 +1,7 @@
 import os
+import base64
+import json
+import time
 import pytest
 import requests
 from unittest.mock import patch, MagicMock, mock_open, PropertyMock
@@ -505,31 +508,117 @@ class TestAngelStudiosInterface:
             assert result == {}
             angel_interface.log.error.assert_called_once_with("Error fetching resume watching: Query failed")
 
-    def test_force_logout_exception(self):
-        """force_logout returns False on exception and logs error."""
-        iface = object.__new__(AngelStudiosInterface)
-        iface.log = MagicMock()
-        iface.auth_core = MagicMock()
-        iface.auth_core.logout.side_effect = RuntimeError("boom")
-        iface.session = MagicMock()
+    @pytest.mark.parametrize("status", [301, 302, 303, 307, 308])
+    def test_force_logout_success(self, angel_interface, status):
+        """A redirect revokes the saved token before clearing local state."""
+        store = angel_interface.auth_core.session_store
+        angel_interface.session.headers = {"Authorization": "******"}
 
-        result = iface.force_logout()
+        with patch("resources.lib.angel_interface.requests.get") as get:
+            get.return_value.status_code = status
 
-        assert result is False
-        iface.log.error.assert_called_once()
+            def verify_local_state(*args, **kwargs):
+                angel_interface.auth_core.logout.assert_not_called()
+                store.clear_credentials.assert_not_called()
+                return get.return_value
 
-    def test_force_logout_success(self):
-        """force_logout clears session on success."""
-        asi = object.__new__(AngelStudiosInterface)
-        asi.log = MagicMock()
-        asi.auth_core = MagicMock()
-        asi.auth_core.logout.return_value = None  # logout doesn't return anything
-        asi.session = MagicMock()
+            get.side_effect = verify_local_state
+            assert angel_interface.force_logout() is True
 
-        result = asi.force_logout()
+        get.assert_called_once_with(
+            "https://www.angel.com/auth/logout",
+            cookies={"angel_jwt_v3": "mock-jwt-token"},
+            allow_redirects=False,
+            timeout=30,
+        )
+        angel_interface.auth_core.logout.assert_called_once_with()
+        store.clear_credentials.assert_called_once_with()
+        assert "Authorization" not in angel_interface.session.headers
 
-        assert result is True
-        asi.auth_core.logout.assert_called_once()
+    @pytest.mark.parametrize("status", [200, 300, 304, 400, 500])
+    def test_force_logout_non_redirect_preserves_state(self, angel_interface, status):
+        angel_interface.session.headers = {"Authorization": "******"}
+        with patch("resources.lib.angel_interface.requests.get") as get:
+            get.return_value.status_code = status
+            assert angel_interface.force_logout() is False
+        angel_interface.auth_core.logout.assert_not_called()
+        angel_interface.auth_core.session_store.clear_credentials.assert_not_called()
+        assert angel_interface.session.headers["Authorization"] == "******"
+
+    @pytest.mark.parametrize("error", [requests.ConnectionError("offline"), requests.Timeout("timeout")])
+    def test_force_logout_network_failure_preserves_state(self, angel_interface, error):
+        angel_interface.session.headers = {"Authorization": "******"}
+        with patch("resources.lib.angel_interface.requests.get", side_effect=error):
+            assert angel_interface.force_logout() is False
+        angel_interface.auth_core.logout.assert_not_called()
+        angel_interface.auth_core.session_store.clear_credentials.assert_not_called()
+        assert angel_interface.session.headers["Authorization"] == "******"
+
+    def test_force_logout_without_token_preserves_credentials(self, angel_interface):
+        angel_interface.auth_core.session_store.get_token.return_value = None
+        with patch("resources.lib.angel_interface.requests.get") as get:
+            assert angel_interface.force_logout() is False
+        get.assert_not_called()
+        angel_interface.auth_core.logout.assert_not_called()
+        angel_interface.auth_core.session_store.clear_credentials.assert_not_called()
+
+    def test_force_logout_local_error(self, angel_interface):
+        angel_interface.auth_core.logout.side_effect = RuntimeError("boom")
+        with patch("resources.lib.angel_interface.requests.get") as get:
+            get.return_value.status_code = 307
+            assert angel_interface.force_logout() is False
+        angel_interface.auth_core.session_store.clear_credentials.assert_not_called()
+
+    def test_force_logout_with_real_store(self):
+        from angel_authentication import AuthenticationCore, Auth0Config, AuthenticationRequiredError, KodiSessionStore
+
+        payload = (
+            base64.urlsafe_b64encode(
+                json.dumps(
+                    {"email": "viewer@example.com", "sub": "account", "iat": 1700000000, "exp": int(time.time()) + 3600}
+                ).encode()
+            )
+            .decode()
+            .rstrip("=")
+        )
+        token = f"header.{payload}.signature"
+        settings = {"jwt_token": token, "username": "viewer@example.com", "password": "password"}
+        addon = MagicMock()
+        addon.getSettingString.side_effect = lambda name: settings.get(name, "")
+        addon.setSettingString.side_effect = lambda name, value: settings.__setitem__(name, value)
+        core = AuthenticationCore(KodiSessionStore(addon), Auth0Config(base_url="https://www.angel.com"))
+        interface = AngelStudiosInterface(core, logger=MagicMock())
+
+        details = interface.get_session_details()
+        assert details["authenticated"] is True
+        assert details["login_email"] == "viewer@example.com"
+        assert details["account_id"] == "account"
+        assert details["expires_in_seconds"] > 0
+        assert "issued_at_utc" in details
+
+        with patch("resources.lib.angel_interface.requests.get", side_effect=requests.ConnectionError):
+            assert interface.force_logout() is False
+        assert settings == {"jwt_token": token, "username": "viewer@example.com", "password": "password"}
+        assert interface.get_session_details()["authenticated"] is True
+
+        with patch("resources.lib.angel_interface.requests.get") as get:
+            get.return_value.status_code = 307
+            assert interface.force_logout() is True
+        assert settings == {"jwt_token": "", "username": "", "password": ""}
+        assert interface.get_session_details()["authenticated"] is False
+        with pytest.raises(AuthenticationRequiredError):
+            core.ensure_valid_session()
+        core.session_store.save_credentials("viewer@example.com", "password")
+        with patch.object(core, "_perform_authentication", return_value="new-token") as authenticate:
+            core.ensure_valid_session()
+        authenticate.assert_called_once_with("viewer@example.com", "password")
+        assert settings["jwt_token"] == "new-token"
+
+    def test_get_session_details_invalid_token(self, angel_interface):
+        angel_interface.auth_core.session_store.get_token.return_value = "invalid"
+        angel_interface.auth_core.session_store.get_credentials.return_value = ("viewer", "password")
+        angel_interface.auth_core.validate_session.return_value = False
+        assert angel_interface.get_session_details() == {"login_email": "viewer", "authenticated": False}
 
     def test_get_episodes_for_guids_empty_list(self, angel_interface):
         """Test get_episodes_for_guids with empty guid list returns empty dict."""
