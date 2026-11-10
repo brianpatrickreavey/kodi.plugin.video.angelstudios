@@ -68,15 +68,25 @@ def _kodi_player_type():
     return _Player
 
 
-def _is_this_playback(player, expected_file):
+def _accepted_playback_files(player):
+    """Return the plugin URL and the resolved stream URL for this play."""
+    files = []
+    for value in (getattr(player, "expected_file", None), getattr(player, "stream_file", None)):
+        if isinstance(value, str) and value and value not in files:
+            files.append(value)
+    return files
+
+
+def _is_this_playback(player, accepted_files):
     """Return True when the player is showing the episode this playback requested.
 
     isPlayingVideo() is already true when another video has not stopped yet.
-    The plugin URL Kodi stored for this play is the identity of the new episode.
+    After the addon resolves the episode, Kodi may report the plugin URL or the
+    stream URL. Either one means this episode is playing.
     """
     if player.isPlayingVideo() is not True:
         return False
-    if not expected_file:
+    if not accepted_files:
         return True
     getter = getattr(player, "getPlayingFile", None)
     if not callable(getter):
@@ -85,7 +95,7 @@ def _is_this_playback(player, expected_file):
         current = getter()
     except Exception:
         return False
-    return current == expected_file
+    return current in accepted_files
 
 
 class _OrderedPositionSender:
@@ -159,11 +169,16 @@ class _WatchProgressPlayer(_kodi_player_type()):
         self.paused = False
         self.on_pause = None
         self.expected_file = None
+        self.stream_file = None
         self.seen_target = False
         self.stop_position = None
 
+    def _ignore_until_this_episode(self):
+        """A stop before this episode is seen belongs to the previous video."""
+        return bool(_accepted_playback_files(self)) and not self.seen_target
+
     def onPlayBackPaused(self):
-        if self.expected_file and not self.seen_target:
+        if self._ignore_until_this_episode():
             return
         self.paused = True
         if self.on_pause is None:
@@ -179,7 +194,7 @@ class _WatchProgressPlayer(_kodi_player_type()):
 
     def _finish(self, ended):
         """Record the playhead, then end the watch. Ignore the previous video's stop."""
-        if self.expected_file and not self.seen_target:
+        if self._ignore_until_this_episode():
             return
         try:
             self.stop_position = self.getTime()
@@ -391,6 +406,9 @@ class KodiPlaybackHandler:
             if guid:
                 player = _WatchProgressPlayer()
                 player.expected_file = _plugin_play_url()
+                stream_path = list_item.getPath()
+                if isinstance(stream_path, str) and stream_path:
+                    player.stream_file = stream_path
 
             # Drop Kodi's stored stop before Resolve. Kodi reads that bookmark
             # after setResolvedUrl returns and seeks to it a few seconds later.
@@ -476,7 +494,7 @@ class KodiPlaybackHandler:
                 sender.submit(sample, "pause")
 
         player.on_pause = report_pause
-        expected_file = getattr(player, "expected_file", None)
+        accepted_files = _accepted_playback_files(player)
 
         try:
             polls = int(_PLAYBACK_START_TIMEOUT / _PLAYBACK_START_POLL)
@@ -484,7 +502,7 @@ class KodiPlaybackHandler:
             for _ in range(polls):
                 if monitor.abortRequested() is True:
                     return
-                if _is_this_playback(player, expected_file):
+                if _is_this_playback(player, accepted_files):
                     started = True
                     break
                 if monitor.waitForAbort(_PLAYBACK_START_POLL) is True:
@@ -504,7 +522,7 @@ class KodiPlaybackHandler:
             while True:
                 if monitor.abortRequested() is True or player.stopped is True:
                     break
-                if not _is_this_playback(player, expected_file):
+                if not _is_this_playback(player, accepted_files):
                     break
                 try:
                     position = player.getTime()
