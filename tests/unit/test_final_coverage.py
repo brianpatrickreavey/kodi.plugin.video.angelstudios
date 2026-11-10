@@ -176,6 +176,7 @@ class TestMainLine122:
 
     def test_main_shows_error_when_credentials_missing(self):
         """Test main module initialization shows error dialog when credentials are missing (line 122)."""
+        import os
         import sys
         import runpy
 
@@ -191,7 +192,9 @@ class TestMainLine122:
             sys.argv = ["plugin://plugin.video.angelstudios/", "1", "?"]
 
             # Add plugin directory to path
-            plugin_path = "/home/bpreavey/Code/kodi.plugin.video.angelstudios/plugin.video.angelstudios"
+            plugin_path = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "..", "..", "plugin.video.angelstudios")
+            )
             if plugin_path not in sys.path:
                 sys.path.insert(0, plugin_path)
 
