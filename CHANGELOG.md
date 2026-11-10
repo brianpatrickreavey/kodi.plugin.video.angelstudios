@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.6.0] - 2026-11-09
+- Send watch progress to Angel during playback and resume catalog titles from that position.
+- Clear Kodi's stored stop so resume stays on Angel's position.
+- A title with no saved position starts at the beginning. A failed read keeps the cached time.
+
 ## [0.5.9] - 2026-11-08
 - Stop requesting `primaryFlowPhases`. Angel's phase-manager service is refusing connections, and that error was hiding the seasons.
 
