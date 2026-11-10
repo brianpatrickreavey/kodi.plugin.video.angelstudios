@@ -604,3 +604,63 @@ class TestGetProjectMethod:
 
         assert result is None
         ui.cache_manager.cache.set.assert_not_called()  # Should not cache None values
+
+
+class TestRememberWatchPosition:
+    """A saved position has to show up on the next episode list."""
+
+    def _enable_cache(self, ui):
+        ui.cache_manager.addon.getSettingBool.side_effect = lambda key: key != "disable_cache"
+        ui.cache_manager.addon.getSettingInt.return_value = 8
+
+    def test_updates_the_project_and_episode_copies(self, ui_interface):
+        ui, _, _ = ui_interface
+        self._enable_cache(ui)
+        project = {
+            "seasons": [
+                {
+                    "episodes": [
+                        {"guid": "ep-1", "watchPosition": {"position": 1220}},
+                        {"guid": "ep-2", "watchPosition": {"position": 30}},
+                    ]
+                }
+            ]
+        }
+        episode = {"guid": "ep-1", "watchPosition": {"position": 1220}, "watch_position": 1220}
+        resume = {"episodes": [{"guid": "ep-1", "watchPosition": {"position": 1220}}]}
+        store = {
+            "project_tuttle-twins": project,
+            "episode_ep-1": episode,
+            "resume_watching_10_none": resume,
+        }
+        ui.cache_manager.cache.get.side_effect = store.get
+        ui.cache_manager.cache.set.side_effect = lambda key, value, expiration=None: store.__setitem__(key, value)
+
+        ui.cache_manager.remember_watch_position("tuttle-twins", "ep-1", 77)
+
+        assert project["seasons"][0]["episodes"][0]["watchPosition"]["position"] == 77
+        assert project["seasons"][0]["episodes"][1]["watchPosition"]["position"] == 30
+        assert episode["watchPosition"]["position"] == 77
+        assert episode["watch_position"] == 77
+        assert resume["episodes"][0]["watchPosition"]["position"] == 1220
+
+    def test_leaves_a_missing_title_cached_as_it_was(self, ui_interface):
+        ui, _, _ = ui_interface
+        self._enable_cache(ui)
+        project = {"seasons": [{"episodes": [{"guid": "other", "watchPosition": {"position": 10}}]}]}
+        store = {"project_tuttle-twins": project}
+        ui.cache_manager.cache.get.side_effect = store.get
+
+        ui.cache_manager.remember_watch_position("tuttle-twins", "ep-1", 77)
+
+        ui.cache_manager.cache.set.assert_not_called()
+        assert project["seasons"][0]["episodes"][0]["watchPosition"]["position"] == 10
+
+    def test_cache_disabled_does_not_read(self, ui_interface):
+        ui, _, _ = ui_interface
+        ui.cache_manager.addon.getSettingBool.side_effect = lambda key: key == "disable_cache"
+
+        ui.cache_manager.remember_watch_position("tuttle-twins", "ep-1", 77)
+
+        ui.cache_manager.cache.get.assert_not_called()
+        ui.cache_manager.cache.set.assert_not_called()

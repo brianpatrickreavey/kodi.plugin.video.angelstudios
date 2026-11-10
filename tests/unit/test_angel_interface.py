@@ -3,7 +3,7 @@ import pytest
 import requests
 from unittest.mock import patch, MagicMock, mock_open, PropertyMock
 
-from resources.lib.angel_interface import AngelStudiosInterface, angel_graphql_url
+from resources.lib.angel_interface import AngelStudiosInterface, angel_graphql_url, angel_watch_positions_url
 import resources.lib.angel_utils as angel_utils
 from .unittest_data import MOCK_PROJECT_DATA, MOCK_EPISODE_DATA, MOCK_GRAPHQL_RESPONSE
 
@@ -824,3 +824,101 @@ class TestAngelStudiosInterface:
                 Exception, match="Request timeout: Unable to connect to Angel Studios \\(timeout: 30s\\)"
             ):
                 angel_interface.get_episodes_for_guids(guids)
+
+    def test_get_watch_position_returns_saved_seconds(self, angel_interface):
+        """A saved position comes back in seconds, including zero."""
+        with patch.object(angel_interface, "_graphql_query") as mock_query:
+            mock_query.return_value = {"getContent": {"id": "g1", "watchPosition": {"position": 1214}}}
+            assert angel_interface.get_watch_position("g1") == 1214
+            mock_query.assert_called_once_with("getContent", variables={"guid": "g1"})
+
+            mock_query.return_value = {"getContent": {"watchPosition": {"position": 0}}}
+            assert angel_interface.get_watch_position("g1") == 0
+
+    def test_get_watch_position_missing_data(self, angel_interface):
+        """A failed or unreadable response is None. A record with no position is zero."""
+        failed = [None, [], {}, {"getContent": None}, {"getContent": "nope"}]
+        cleared = [
+            {"getContent": {}},
+            {"getContent": {"watchPosition": None}},
+            {"getContent": {"watchPosition": {}}},
+            {"getContent": {"watchPosition": {"position": None}}},
+        ]
+        with patch.object(angel_interface, "_graphql_query") as mock_query:
+            for payload in failed:
+                mock_query.return_value = payload
+                assert angel_interface.get_watch_position("g1") is None
+            for payload in cleared:
+                mock_query.return_value = payload
+                assert angel_interface.get_watch_position("g1") == 0
+
+    def test_get_watch_positions_reads_the_list_in_one_query(self, angel_interface):
+        """Season rows share one request. A null position clears that title only."""
+        with patch.object(angel_interface, "_graphql_query") as mock_query:
+            mock_query.return_value = {
+                "item_0": {"watchPosition": {"position": 12}},
+                "item_1": {"watchPosition": None},
+            }
+            assert angel_interface.get_watch_positions(["ep-a", "ep-b", "ep-a"]) == {"ep-a": 12, "ep-b": 0}
+        assert mock_query.call_count == 1
+        assert mock_query.call_args.kwargs["variables"] == {"id0": "ep-a", "id1": "ep-b"}
+
+    def test_get_watch_positions_failure_keeps_the_cache(self, angel_interface):
+        """A failed batch is None so the caller can keep the cached resume times."""
+        with patch.object(angel_interface, "_graphql_query", side_effect=Exception("down")):
+            assert angel_interface.get_watch_positions(["ep-a"]) is None
+        angel_interface.log.warning.assert_called_once_with("Could not read watch positions: down")
+
+    def test_get_watch_position_exception(self, angel_interface):
+        """A failed read returns None and does not raise."""
+        with patch.object(angel_interface, "_graphql_query", side_effect=Exception("down")):
+            assert angel_interface.get_watch_position("g1") is None
+        angel_interface.log.warning.assert_called_once_with("Could not read watch position for g1: down")
+
+    def test_upsert_watch_position_sends_whole_seconds(self, angel_interface):
+        """The website post gets the content id, event, and whole seconds."""
+        response = MagicMock()
+        response.ok = True
+        response.status_code = 200
+        with patch.object(angel_interface.session, "post", return_value=response) as mock_post:
+            assert angel_interface.upsert_watch_position("g1", 120.6, event_type="pause") is True
+            mock_post.assert_called_once_with(
+                angel_watch_positions_url,
+                json={"content_id": "g1", "event_type": "pause", "position": 120},
+                headers={"Content-Type": "application/json", "X-ANGEL-APP-NAME": "angel-web"},
+                timeout=angel_interface.timeout,
+            )
+        angel_interface.log.info.assert_called_with("Saved watch position 120s for g1")
+
+    def test_upsert_watch_position_defaults_to_heartbeat(self, angel_interface):
+        """A missing event name is sent as a heartbeat."""
+        response = MagicMock()
+        response.ok = True
+        with patch.object(angel_interface.session, "post", return_value=response) as mock_post:
+            assert angel_interface.upsert_watch_position("g1", 40, event_type="") is True
+            assert mock_post.call_args.kwargs["json"]["event_type"] == "heartbeat"
+            assert mock_post.call_args.kwargs["json"]["position"] == 40
+
+    def test_upsert_watch_position_rejects_bad_numbers(self, angel_interface):
+        """A non-number or a negative position is not sent."""
+        with patch.object(angel_interface.session, "post") as mock_post:
+            assert angel_interface.upsert_watch_position("g1", "nope") is False
+            assert angel_interface.upsert_watch_position("g1", None) is False
+            assert angel_interface.upsert_watch_position("g1", -1) is False
+            mock_post.assert_not_called()
+        angel_interface.log.warning.assert_any_call("Watch position is not a number: 'nope'")
+
+    def test_upsert_watch_position_failure(self, angel_interface):
+        """A failed write returns False and leaves playback alone."""
+        with patch.object(angel_interface.session, "post", side_effect=requests.Timeout("down")):
+            assert angel_interface.upsert_watch_position("g1", 40) is False
+        angel_interface.log.warning.assert_called_with("Could not save watch position for g1: down")
+
+    def test_upsert_watch_position_http_error(self, angel_interface):
+        """An HTTP error is a failed save. The response body is not required."""
+        response = MagicMock()
+        response.ok = False
+        response.status_code = 401
+        with patch.object(angel_interface.session, "post", return_value=response):
+            assert angel_interface.upsert_watch_position("g1", 40) is False
+        angel_interface.log.warning.assert_called_with("Could not save watch position for g1: HTTP 401")

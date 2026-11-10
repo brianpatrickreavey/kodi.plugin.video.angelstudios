@@ -814,7 +814,7 @@ class TestEpisodesMenu:
             mock_end_dir.assert_called_once_with(1)
 
     def test_episodes_menu_applies_progress_bars(self, ui_interface, mock_xbmc, mock_cache):
-        """Test episodes_menu applies progress bars to episodes with watch position."""
+        """Episode rows give Kodi a resume point in seconds, so its own dialog can open."""
         ui, logger_mock, angel_interface_mock = ui_interface
         mock_add_item, mock_end_dir, mock_list_item = mock_xbmc
 
@@ -849,9 +849,94 @@ class TestEpisodesMenu:
                     args, kwargs = call_args
                     assert args[0] in season["episodes"]  # episode data
                     assert args[1] == "episode"  # content_type_str
-                    assert kwargs.get("overlay_progress") is True  # progress bar enabled
+                    assert kwargs.get("overlay_progress") is False
                     assert kwargs.get("project") == project_data  # project data passed
                     assert kwargs.get("content_type") == "series"  # content type passed
+
+                info_tag = mock_created_item.getVideoInfoTag.return_value
+                assert info_tag.setResumePoint.call_count == len(season["episodes"])
+                info_tag.setResumePoint.assert_called_with(30.0, 3600.0)
+
+    def test_episodes_menu_uses_the_website_position(self, ui_interface, mock_xbmc, mock_cache):
+        """A position saved on angel.com replaces the cached resume clock."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        project_data = copy.deepcopy(MOCK_PROJECT_DATA["multi_season_project"])
+        season = project_data["seasons"][0]
+        for episode in season["episodes"]:
+            episode["watchPosition"] = {"position": 30.0}
+            episode["source"] = {"url": "http://example.com/video.mp4", "duration": 3600}
+        angel_interface_mock.get_watch_positions.return_value = {
+            episode["guid"]: 1413 for episode in season["episodes"]
+        }
+
+        with patch.object(ui.cache_manager, "_cache_enabled", return_value=True):
+            ui.cache_manager.cache.get.return_value = project_data
+            with (
+                patch.object(ui.menu_handler, "_build_list_item_for_content") as mock_build_item,
+                patch("xbmcplugin.setContent"),
+                patch("xbmcplugin.addSortMethod"),
+            ):
+                mock_build_item.return_value = MagicMock()
+                ui.episodes_menu(content_type="series", project_slug=project_data["slug"], season_id=season["id"])
+
+        info_tag = mock_build_item.return_value.getVideoInfoTag.return_value
+        assert info_tag.setResumePoint.call_count == len(season["episodes"])
+        info_tag.setResumePoint.assert_called_with(1413.0, 3600.0)
+        assert season["episodes"][0]["watchPosition"]["position"] == 1413
+        logger_mock.info.assert_any_call(f"Resume time for {season['episodes'][0]['guid']} is 1413s")
+
+    def test_episodes_menu_keeps_the_cached_position_when_the_read_fails(self, ui_interface, mock_xbmc, mock_cache):
+        """A failed read leaves the resume clock that is already on the row."""
+        ui, logger_mock, angel_interface_mock = ui_interface
+        project_data = copy.deepcopy(MOCK_PROJECT_DATA["multi_season_project"])
+        season = project_data["seasons"][0]
+        episode = season["episodes"][0]
+        episode["watchPosition"] = {"position": 30.0}
+        episode["source"] = {"duration": 3600}
+        angel_interface_mock.get_watch_positions.side_effect = RuntimeError("down")
+
+        with patch.object(ui.cache_manager, "_cache_enabled", return_value=True):
+            ui.cache_manager.cache.get.return_value = project_data
+            with (
+                patch.object(ui.menu_handler, "_build_list_item_for_content") as mock_build_item,
+                patch("xbmcplugin.setContent"),
+                patch("xbmcplugin.addSortMethod"),
+                patch.object(ui, "show_error") as show_error,
+            ):
+                mock_build_item.return_value = MagicMock()
+                ui.episodes_menu(content_type="series", project_slug=project_data["slug"], season_id=season["id"])
+
+        show_error.assert_not_called()
+        info_tag = mock_build_item.return_value.getVideoInfoTag.return_value
+        info_tag.setResumePoint.assert_any_call(30.0, 3600.0)
+        logger_mock.warning.assert_any_call("Could not read watch positions: down")
+        angel_interface_mock.get_watch_positions.assert_called_once()
+
+    def test_episodes_menu_hides_resume_when_the_website_position_is_zero(self, ui_interface, mock_xbmc, mock_cache):
+        """A website position of zero is stored on the row so Kodi's old bookmark is not used."""
+        ui, _, angel_interface_mock = ui_interface
+        project_data = copy.deepcopy(MOCK_PROJECT_DATA["multi_season_project"])
+        season = project_data["seasons"][0]
+        for episode in season["episodes"]:
+            episode["watchPosition"] = {"position": 30.0}
+            episode["source"] = {"duration": 3600}
+        angel_interface_mock.get_watch_positions.return_value = {
+            episode["guid"]: 0 for episode in season["episodes"]
+        }
+
+        with patch.object(ui.cache_manager, "_cache_enabled", return_value=True):
+            ui.cache_manager.cache.get.return_value = project_data
+            with (
+                patch.object(ui.menu_handler, "_build_list_item_for_content") as mock_build_item,
+                patch("xbmcplugin.setContent"),
+                patch("xbmcplugin.addSortMethod"),
+            ):
+                mock_build_item.return_value = MagicMock()
+                ui.episodes_menu(content_type="series", project_slug=project_data["slug"], season_id=season["id"])
+
+        info_tag = mock_build_item.return_value.getVideoInfoTag.return_value
+        assert info_tag.setResumePoint.call_count == len(season["episodes"])
+        info_tag.setResumePoint.assert_called_with(0.0, 3600.0)
 
 
 class TestContinueWatchingMenu:

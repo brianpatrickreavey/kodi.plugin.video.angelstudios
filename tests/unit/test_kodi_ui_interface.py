@@ -131,7 +131,7 @@ def test_play_episode_delegation(ui_interface):
 
     result = ui.play_episode("guid", "slug")
 
-    ui.playback_handler.play_episode.assert_called_once_with("guid", "slug")
+    ui.playback_handler.play_episode.assert_called_once_with("guid", "slug", "", False)
     assert result is None
 
 

@@ -11,6 +11,7 @@ import xbmcgui  # type: ignore
 import xbmcplugin  # type: ignore
 
 from kodi_utils import timed, TimedBlock
+from watch_progress import apply_saved_position, coerce_seconds, native_resume_point, position_from_episode
 
 try:
     from menu_projects import ProjectsMenu as ProjectsMenuClass
@@ -270,6 +271,60 @@ class KodiMenuHandler(MenuUtils):
             args[3] if len(args) > 3 else kwargs.get("season_id", "all"),
         )
     )
+    def _fresh_watch_positions(self, episodes):
+        """Read current positions for this list in one request.
+
+        None means the read failed. The cached resume time on each row stays.
+        """
+        guids = []
+        for episode in episodes or []:
+            if isinstance(episode, dict) and episode.get("guid"):
+                guids.append(episode.get("guid"))
+        interface = getattr(self.parent, "angel_interface", None)
+        getter = getattr(interface, "get_watch_positions", None) if interface else None
+        if not guids or not callable(getter):
+            return None
+        try:
+            fresh = getter(guids)
+        except Exception as exc:
+            self.log.warning(f"Could not read watch positions: {exc}")
+            return None
+        if not isinstance(fresh, dict):
+            return None
+        return fresh
+
+    def _use_fresh_watch_position(self, episode, project_slug, fresh_positions):
+        """Replace this row's cached resume time with the website's current position.
+
+        The episode list stays cached for hours. A save made in the browser is
+        not in that copy. Opening the list reads the content positions together.
+        When one changed, the cache is updated so the resume clock matches.
+        A failed batch leaves the cached time alone.
+        """
+        if not isinstance(episode, dict) or not isinstance(fresh_positions, dict):
+            return
+        guid = episode.get("guid")
+        if not guid or guid not in fresh_positions:
+            return
+        fresh = coerce_seconds(fresh_positions.get(guid))
+        if fresh is None:
+            return
+        previous = position_from_episode(episode)
+        if not apply_saved_position(episode, fresh):
+            return
+        whole = int(round(fresh))
+        if previous is not None and int(round(previous)) == whole:
+            return
+        self.log.info(f"Resume time for {guid} is {whole}s")
+        cache_manager = getattr(self.parent, "cache_manager", None)
+        remember = getattr(cache_manager, "remember_watch_position", None) if cache_manager else None
+        if not callable(remember):
+            return
+        try:
+            remember(project_slug, guid, fresh)
+        except Exception as exc:
+            self.log.warning(f"Could not update the cached resume time for {guid}: {exc}")
+
     def episodes_menu(self, content_type, project_slug, season_id=None):
         """Display a menu of episodes for a specific season, with persistent caching."""
         self.log.info(f"Fetching episodes for project: {project_slug}, season: {season_id}")
@@ -312,6 +367,9 @@ class KodiMenuHandler(MenuUtils):
             )
             self.log.info(f"Setting content type for Kodi: {content_type} ({kodi_content_type})")
             xbmcplugin.setContent(self.handle, kodi_content_type)
+            fresh_positions = None
+            if content_type in ("movies", "series", "specials"):
+                fresh_positions = self._fresh_watch_positions(episodes_list)
 
             for episode in episodes_list:
                 try:
@@ -323,8 +381,15 @@ class KodiMenuHandler(MenuUtils):
                         content_type=content_type,
                         stream_url=None,
                         is_playback=False,
-                        overlay_progress=bool(episode.get("watchPosition")),
+                        # The fraction progress helper treats position/duration as seconds.
+                        # Kodi's resume dialog needs the real second count instead.
+                        overlay_progress=False,
                     )
+                    if content_type in ("movies", "series", "specials"):
+                        self._use_fresh_watch_position(episode, project_slug, fresh_positions)
+                        point = native_resume_point(episode)
+                        if point:
+                            list_item.getVideoInfoTag().setResumePoint(point[0], point[1])
 
                     # Create URL for playback
                     url = self.create_plugin_url(
@@ -574,10 +639,6 @@ class KodiMenuHandler(MenuUtils):
             video_stream_detail.setHeight(1080)
             info_tag = list_item.getVideoInfoTag()
             info_tag.addVideoStream(video_stream_detail)
-
-            # Resume
-            if episode.get("watch_position"):
-                info_tag.setResumePoint(episode["watch_position"])
         else:
             list_item.setIsFolder(True)
 

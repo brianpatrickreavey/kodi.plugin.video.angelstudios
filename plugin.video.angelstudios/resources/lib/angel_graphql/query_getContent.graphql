@@ -1,0 +1,13 @@
+# Saved playback position for one title. This is the content record the website reads.
+# The value is seconds.
+query getContent($guid: ID!) {
+  getContent(id: $guid) {
+    ... on ContentWatchable {
+      id
+      watchPosition {
+        id
+        position
+      }
+    }
+  }
+}

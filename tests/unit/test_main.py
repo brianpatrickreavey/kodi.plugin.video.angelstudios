@@ -156,6 +156,32 @@ class TestMain:
 
         addon_mock.openSettings.assert_called_once()
 
+    def test_router_play_episode_passes_content_type(self):
+        """Catalog playback keeps content_type. Continue Watching leaves it empty."""
+        main = _fresh_main_module()
+        ui_mock = MagicMock()
+
+        main.router(
+            urlencode(
+                {
+                    "action": "play_episode",
+                    "episode_guid": "guid",
+                    "project_slug": "slug",
+                    "content_type": "series",
+                }
+            ),
+            ui_mock,
+        )
+        ui_mock.play_episode.assert_called_once_with("guid", "slug", content_type="series", resume=False)
+
+        ui_mock.reset_mock()
+        main.router(
+            urlencode({"action": "play_episode", "episode_guid": "guid", "project_slug": "slug"}),
+            ui_mock,
+            resume=True,
+        )
+        ui_mock.play_episode.assert_called_once_with("guid", "slug", content_type="", resume=True)
+
     def test_router_missing_param(self, monkeypatch):
         """Missing required params triggers error handling."""
         main = _fresh_main_module()
@@ -230,8 +256,10 @@ class TestMain:
         monkeypatch.setattr(sys.modules["xbmcvfs"], "exists", MagicMock(return_value=True))
 
         import angel_interface
+
         monkeypatch.setattr(angel_interface, "AngelStudiosInterface", MagicMock(side_effect=RuntimeError("boom")))
         import kodi_ui_interface
+
         ui_mock = MagicMock()
         monkeypatch.setattr(kodi_ui_interface, "KodiUIInterface", MagicMock(return_value=ui_mock))
 

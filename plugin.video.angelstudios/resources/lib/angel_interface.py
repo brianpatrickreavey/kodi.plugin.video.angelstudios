@@ -9,6 +9,7 @@ It provides methods for authentication, making GraphQL queries, and retrieving p
 
 import json
 import logging
+import math
 import os
 import re
 import sys
@@ -26,6 +27,8 @@ InvalidCredentialsError = angel_authentication.InvalidCredentialsError
 # Library constants
 angel_website_url = "https://www.angel.com"
 angel_graphql_url = "https://api.angelstudios.com/graphql"
+# The website player posts here. The host is the same API origin as GraphQL.
+angel_watch_positions_url = "https://api.angelstudios.com/watch-positions"
 
 
 class AngelStudiosInterface:
@@ -392,6 +395,136 @@ class AngelStudiosInterface:
         except Exception as e:
             self.log.error(f"Error fetching episode data for GUID '{episode_guid}': {e}")
             return {}
+
+    def get_watch_position(self, watchable_guid):
+        """Return the saved position in seconds.
+
+        Zero means the content record has no position. None means the read
+        failed, so a cached position must be left alone. This reads the content
+        record the website uses for the series-page link.
+        """
+        try:
+            result = self._graphql_query("getContent", variables={"guid": watchable_guid})
+        except Exception as e:
+            self.log.warning(f"Could not read watch position for {watchable_guid}: {e}")
+            return None
+        if not isinstance(result, dict):
+            return None
+        return self._position_from_content(result.get("getContent"))
+
+    def get_watch_positions(self, watchable_guids):
+        """Return saved seconds for many titles in one request.
+
+        A title whose record has no position is 0. A title missing from a
+        successful response is omitted. None means the read failed, so every
+        cached position must be left alone.
+        """
+        guids = []
+        seen = set()
+        for guid in watchable_guids or []:
+            if isinstance(guid, str) and guid and guid not in seen:
+                seen.add(guid)
+                guids.append(guid)
+        if not guids:
+            return {}
+
+        found = {}
+        # One alias per title. A long season is split so one timeout is not
+        # the whole list, and a failed chunk leaves that chunk cached.
+        chunk_size = 25
+        for start in range(0, len(guids), chunk_size):
+            chunk = guids[start : start + chunk_size]
+            part = self._fetch_watch_position_chunk(chunk)
+            if part is None:
+                if not found:
+                    return None
+                continue
+            found.update(part)
+        return found
+
+    def _position_from_content(self, content):
+        """Return seconds, 0 when the record has no position, or None when it is not a record."""
+        if not isinstance(content, dict):
+            return None
+        watch_position = content.get("watchPosition") if "watchPosition" in content else None
+        if "watchPosition" not in content or not isinstance(watch_position, dict):
+            return 0
+        if watch_position.get("position") is None:
+            return 0
+        return watch_position.get("position")
+
+    def _fetch_watch_position_chunk(self, guids):
+        """Read one batch of positions. None means this batch failed."""
+        variable_defs = []
+        fields = []
+        variables = {}
+        for index, guid in enumerate(guids):
+            key = f"id{index}"
+            variable_defs.append(f"${key}: ID!")
+            variables[key] = guid
+            fields.append(
+                f"  item_{index}: getContent(id: ${key}) {{\n"
+                "    ... on ContentWatchable { watchPosition { position } }\n"
+                "  }\n"
+            )
+        query = "query getWatchPositions(" + ", ".join(variable_defs) + ") {\n" + "".join(fields) + "}\n"
+        try:
+            result = self._graphql_query("getWatchPositions", variables=variables, raw_query=query)
+        except Exception as e:
+            self.log.warning(f"Could not read watch positions: {e}")
+            return None
+        if not isinstance(result, dict):
+            return None
+        found = {}
+        for index, guid in enumerate(guids):
+            position = self._position_from_content(result.get(f"item_{index}"))
+            if position is not None:
+                found[guid] = position
+        return found
+
+    def upsert_watch_position(self, watchable_guid, position, event_type="heartbeat"):
+        """Send the current position in seconds. Playback keeps going when this fails.
+
+        The website posts this body to /watch-positions. That is the record behind
+        the series-page position link. event_type is heartbeat, pause, stop_exit,
+        or complete. The fraction of a second is dropped, matching that player.
+        """
+        try:
+            seconds = int(math.floor(float(position)))
+        except (TypeError, ValueError, OverflowError):
+            self.log.warning(f"Watch position is not a number: {position!r}")
+            return False
+        if seconds < 0:
+            return False
+        if not isinstance(event_type, str) or not event_type:
+            event_type = "heartbeat"
+        try:
+            self.auth_core.ensure_valid_session()
+            token = self.auth_core.session_store.get_token()
+            if token:
+                self.session.headers.update({"Authorization": f"Bearer {token}"})
+            response = self.session.post(
+                angel_watch_positions_url,
+                json={
+                    "content_id": watchable_guid,
+                    "event_type": event_type,
+                    "position": seconds,
+                },
+                headers={
+                    "Content-Type": "application/json",
+                    "X-ANGEL-APP-NAME": "angel-web",
+                },
+                timeout=self.timeout,
+            )
+        except Exception as e:
+            self.log.warning(f"Could not save watch position for {watchable_guid}: {e}")
+            return False
+        if not getattr(response, "ok", False):
+            status = getattr(response, "status_code", None)
+            self.log.warning(f"Could not save watch position for {watchable_guid}: HTTP {status}")
+            return False
+        self.log.info(f"Saved watch position {seconds}s for {watchable_guid}")
+        return True
 
     def get_resume_watching(self, first=None, after=None):
         """

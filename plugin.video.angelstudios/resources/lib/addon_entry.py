@@ -22,7 +22,7 @@ import os
 import xbmcvfs  # type: ignore
 
 # Ensure the dependencies directory is in the path for bundled dependencies
-lib_path = os.path.join(os.path.dirname(__file__), '../dependencies')
+lib_path = os.path.join(os.path.dirname(__file__), "../dependencies")
 sys.path.insert(0, lib_path)
 
 from urllib.parse import parse_qsl
@@ -36,7 +36,7 @@ from kodi_utils import KodiLogger
 from kodi_ui_interface import KodiUIInterface
 
 # Ensure the dependencies directory is in the path for bundled dependencies
-lib_path = os.path.join(os.path.dirname(__file__), '../dependencies')
+lib_path = os.path.join(os.path.dirname(__file__), "../dependencies")
 sys.path.insert(0, lib_path)
 
 # Plugin constants
@@ -112,7 +112,7 @@ PASSWORD = ADDON.getSettingString("password")
 TIMEOUT = ADDON.getSettingInt("request_timeout")
 
 
-def router(paramstring, ui_interface):
+def router(paramstring, ui_interface, resume=False):
     """
     Router function that calls other functions based on the provided paramstring
     Main menu offers content browsing options and special menus mimicing the Angel.com website:
@@ -172,8 +172,14 @@ def router(paramstring, ui_interface):
                 # Show episodes for a season using individual parameters
                 ui_interface.episodes_menu(params["content_type"], params["project_slug"], params.get("season_id"))
             elif params["action"] == "play_episode":
-                # Play an episode
-                ui_interface.play_episode(params["episode_guid"], params["project_slug"])
+                # Play an episode, movie, or special. Continue Watching leaves content_type empty.
+                # resume is true when Kodi's own dialog, or the player setting, chose Resume.
+                ui_interface.play_episode(
+                    params["episode_guid"],
+                    params["project_slug"],
+                    content_type=params.get("content_type", ""),
+                    resume=resume,
+                )
             elif params["action"] == "info":
                 # Show info message for unavailable episodes
                 message = params.get("message", "This content is not available.")
@@ -251,7 +257,9 @@ def main():
 
             # Call the router with parameters from the command line
             logger.info(f"Calling router with params: {sys.argv[2][1:]}")
-            router(sys.argv[2][1:], ui_interface)
+            # Kodi always passes resume:true or resume:false. Directory listings use false.
+            resume = len(sys.argv) > 3 and sys.argv[3] == "resume:true"
+            router(sys.argv[2][1:], ui_interface, resume=resume)
 
         except Exception as e:
             logger.error(f"Addon initialization error: {e}")
