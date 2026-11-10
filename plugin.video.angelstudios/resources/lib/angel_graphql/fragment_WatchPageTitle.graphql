@@ -1,0 +1,38 @@
+# Watch-page facts for a movie, series, or special.
+# Series has no duration field. Selecting it there makes the whole catalog query fail.
+
+fragment WatchPageTitle on Project {
+    highestScore
+    theaterDescription
+    title {
+        __typename
+        ... on ContentDisplayable {
+            genres
+            shortDescription: description(version: SHORT)
+            contentRatings {
+                source
+                rating
+            }
+        }
+        ... on ContentMovie {
+            originalReleaseDate
+            duration
+            recommendedAge {
+                age
+            }
+        }
+        ... on ContentSeries {
+            originalReleaseDate
+            recommendedAge {
+                age
+            }
+        }
+        ... on ContentSpecial {
+            originalReleaseDate
+            duration
+            recommendedAge {
+                age
+            }
+        }
+    }
+}

@@ -10,6 +10,7 @@ query getProjectsForMenu {
     projects {
         ...ProjectBasic
         ...DiscoveryImages
+        ...WatchPageTitle
         theaterDescription
         metadata {
             ...ProjectMetadata
