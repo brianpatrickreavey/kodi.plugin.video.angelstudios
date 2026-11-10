@@ -9,7 +9,7 @@ from urllib.parse import urlencode
 import xbmcplugin  # type: ignore
 
 from kodi_utils import TimedBlock
-from menu_utils import MenuUtils
+from menu_utils import MenuUtils, watch_page_facts
 
 
 class ProjectsMenu(MenuUtils):
@@ -102,10 +102,13 @@ class ProjectsMenu(MenuUtils):
             self.log.info(f"Processing project: {project['name']}")
             self.log.debug(f"Project dictionary: {json.dumps(project, indent=2)}")
 
-            # Create list item using unified builder
+            # Create list item using unified builder.
+            # A movie, series, or special already has its watch-page media type.
+            # The mapper below is the directory type, and it would replace movie with video.
             list_item = self._build_list_item_for_content(project, "project")
-            info_tag = list_item.getVideoInfoTag()
-            info_tag.setMediaType(self._get_kodi_content_type(project["projectType"]))
+            if watch_page_facts(project) is None:
+                info_tag = list_item.getVideoInfoTag()
+                info_tag.setMediaType(self._get_kodi_content_type(project["projectType"]))
 
             # Create URL for seasons listing
             url = self.create_plugin_url(

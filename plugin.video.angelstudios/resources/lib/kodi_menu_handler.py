@@ -675,6 +675,7 @@ class KodiMenuHandler(MenuUtils):
                 and project["name"].strip()
             ):
                 info_tag.setTvShowTitle(project["name"])
+        self._overlay_opened_title(info_tag, project, content_type)
         return list_item  # noqa: E129
 
     def _process_attributes_to_infotags(self, list_item, info_dict):
