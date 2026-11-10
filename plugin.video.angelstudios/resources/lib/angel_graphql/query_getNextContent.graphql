@@ -1,0 +1,62 @@
+# The next title Angel names for the one that is playing.
+# The player keeps it when it is WATCHABLE, or when a Guild availability
+# action has a start time that has already passed.
+
+query getNextContent($id: ID!) {
+  getNextContent(id: $id) {
+    __typename
+    ... on ContentEpisode {
+      id
+      name
+      subtitle
+      episodeNumber
+      season {
+        seasonNumber
+        id
+      }
+      project {
+        slug
+        name
+      }
+      watchableAvailabilityStatus
+      actionsToWatch {
+        __typename
+        ... on GuildAvailabilityAction {
+          startDatetime
+        }
+      }
+    }
+    ... on ContentSpecial {
+      id
+      name
+      subtitle
+      project {
+        slug
+        name
+      }
+      watchableAvailabilityStatus
+      actionsToWatch {
+        __typename
+        ... on GuildAvailabilityAction {
+          startDatetime
+        }
+      }
+    }
+    ... on ContentMovie {
+      id
+      name
+      subtitle
+      project {
+        slug
+        name
+      }
+      watchableAvailabilityStatus
+      actionsToWatch {
+        __typename
+        ... on GuildAvailabilityAction {
+          startDatetime
+        }
+      }
+    }
+  }
+}

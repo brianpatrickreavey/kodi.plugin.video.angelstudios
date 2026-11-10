@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<window type="dialog">
+    <defaultcontrol>100</defaultcontrol>
+    <controls>
+        <!-- Focus stays here so Select still opens the player controls. Up moves to Next Episode. -->
+        <control type="button" id="100">
+            <left>-20</left>
+            <top>-20</top>
+            <width>1</width>
+            <height>1</height>
+            <label></label>
+            <font></font>
+            <texturefocus />
+            <texturenofocus />
+            <onleft>100</onleft>
+            <onright>100</onright>
+            <onup>200</onup>
+            <ondown>100</ondown>
+        </control>
+        <control type="button" id="200">
+            <left>1492</left>
+            <top>790</top>
+            <width>380</width>
+            <height>70</height>
+            <label>Next Episode</label>
+            <font>font13</font>
+            <align>center</align>
+            <aligny>center</aligny>
+            <textcolor>FFFFFFFF</textcolor>
+            <focusedcolor>FF000000</focusedcolor>
+            <texturefocus colordiffuse="FFFFFFFF">white.png</texturefocus>
+            <texturenofocus colordiffuse="E6222222">white.png</texturenofocus>
+        </control>
+        <control type="label" id="302">
+            <left>1312</left>
+            <top>848</top>
+            <width>560</width>
+            <height>40</height>
+            <label></label>
+            <font>font12</font>
+            <align>center</align>
+            <aligny>center</aligny>
+            <textcolor>FFDDDDDD</textcolor>
+            <visible>false</visible>
+        </control>
+    </controls>
+</window>

@@ -182,6 +182,29 @@ class TestMain:
         )
         ui_mock.play_episode.assert_called_once_with("guid", "slug", content_type="", resume=True)
 
+    def test_router_from_beginning_skips_resume(self):
+        """Next Episode starts at 0 even when Kodi passed resume:true."""
+        main = _fresh_main_module()
+        ui_mock = MagicMock()
+
+        main.router(
+            urlencode(
+                {
+                    "action": "play_episode",
+                    "episode_guid": "guid",
+                    "project_slug": "slug",
+                    "content_type": "series",
+                    "from_beginning": "1",
+                }
+            ),
+            ui_mock,
+            resume=True,
+        )
+
+        ui_mock.play_episode.assert_called_once_with(
+            "guid", "slug", content_type="series", resume=False, from_beginning=True
+        )
+
     def test_router_missing_param(self, monkeypatch):
         """Missing required params triggers error handling."""
         main = _fresh_main_module()

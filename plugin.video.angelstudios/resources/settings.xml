@@ -31,6 +31,19 @@
                         <formatlabel>14045</formatlabel>
                     </control>
                 </setting>
+                <setting id="offer_next_episode" type="boolean" label="30126" help="30127">
+                    <level>0</level>
+                    <default>true</default>
+                    <control type="toggle" />
+                </setting>
+                <setting id="autostart_next_episode" type="boolean" label="30128" help="30129">
+                    <level>0</level>
+                    <default>true</default>
+                    <control type="toggle" />
+                    <dependencies>
+                        <dependency type="enable" setting="offer_next_episode">true</dependency>
+                    </dependencies>
+                </setting>
             </group>
         </category>
 

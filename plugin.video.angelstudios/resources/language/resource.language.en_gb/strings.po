@@ -110,6 +110,22 @@ msgctxt "#30125"
 msgid "Content language preference; leave blank to use system default."
 msgstr "Content language preference; leave blank to use system default."
 
+msgctxt "#30126"
+msgid "Next Episode"
+msgstr "Next Episode"
+
+msgctxt "#30127"
+msgid "Offer Next Episode while an episode plays."
+msgstr "Offer Next Episode while an episode plays."
+
+msgctxt "#30128"
+msgid "Auto-start next episode"
+msgstr "Auto-start next episode"
+
+msgctxt "#30129"
+msgid "Start the next title when the episode ends."
+msgstr "Start the next title when the episode ends."
+
 # ============================================================================
 # 30200-30299: Authentication
 # ============================================================================

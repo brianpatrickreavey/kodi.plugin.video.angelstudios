@@ -79,6 +79,34 @@ class TestEpisodePlayback:
 
             mock_show_error.assert_called_once_with("No playable stream URL found for this episode")
 
+    def test_from_beginning_without_a_stream_says_not_available(self, ui_interface, mock_xbmc, mock_cache):
+        """The next title uses the public unavailable line, not the normal stream error."""
+        ui, _, _ = ui_interface
+        project_data = copy.deepcopy(MOCK_PROJECT_DATA["single_season_project"])
+        project_data["seasons"][0]["episodes"][0]["source"] = None
+
+        with (
+            patch.object(ui, "_get_project", return_value=project_data),
+            patch.object(ui, "show_error") as mock_show_error,
+        ):
+            episode_guid = project_data["seasons"][0]["episodes"][0]["guid"]
+            ui.play_episode(episode_guid, project_data["slug"], "series", resume=True, from_beginning=True)
+
+        mock_show_error.assert_called_once_with("This content is not available.")
+
+    def test_cached_from_beginning_without_a_stream_says_not_available(self, ui_interface, mock_xbmc, mock_cache):
+        ui, _, _ = ui_interface
+        episode = copy.deepcopy(MOCK_PROJECT_DATA["single_season_project"]["seasons"][0]["episodes"][0])
+        episode["source"] = None
+
+        with (
+            patch.object(ui.cache_manager, "_get_episode", return_value=episode),
+            patch.object(ui, "show_error") as mock_show_error,
+        ):
+            ui.play_episode(episode["guid"], "slug", from_beginning=True)
+
+        mock_show_error.assert_called_once_with("This content is not available.")
+
     def test_play_episode_no_url_in_source(self, ui_interface, mock_xbmc, mock_cache):
         """Test play_episode when source exists but url is missing."""
         ui, logger_mock, angel_interface_mock = ui_interface
@@ -505,16 +533,19 @@ class TestWatchProgressPlayback:
         episode = project["seasons"][0]["episodes"][0]
         return project, episode
 
-    def _play(self, ui, content_type, saved, resume, episode_extra=None):
+    def _play(self, ui, content_type, saved, resume, episode_extra=None, from_beginning=False):
         project, episode = self._project()
         if episode_extra:
             episode.update(episode_extra)
         ui.angel_interface.get_watch_position.return_value = saved
+        kwargs = {"resume": resume}
+        if from_beginning:
+            kwargs["from_beginning"] = True
         with (
             patch.object(ui, "_get_project", return_value=project),
             patch.object(ui.playback_handler, "play_video") as play_video,
         ):
-            ui.play_episode(episode["guid"], project["slug"], content_type, resume=resume)
+            ui.play_episode(episode["guid"], project["slug"], content_type, **kwargs)
         return play_video, episode, project
 
     @pytest.mark.parametrize("content_type", ["movies", "series", "specials"])
@@ -534,6 +565,18 @@ class TestWatchProgressPlayback:
         """Play from beginning still remembers the saved position for the opening guard."""
         ui, _, _ = ui_interface
         play_video, episode, project = self._play(ui, "series", 125, False)
+
+        play_video.assert_called_once_with(
+            episode_data={"episode": episode, "project": project},
+            resume_at=None,
+            saved_position=125.0,
+            clear_kodi_stop=True,
+        )
+
+    def test_from_beginning_ignores_resume_and_kodi_bookmark(self, ui_interface):
+        """The next title starts at 0 even when Angel and Kodi both have a resume point."""
+        ui, _, _ = ui_interface
+        play_video, episode, project = self._play(ui, "series", 125, True, from_beginning=True)
 
         play_video.assert_called_once_with(
             episode_data={"episode": episode, "project": project},
@@ -1216,3 +1259,349 @@ class TestWatchProgressPlayback:
 
         monitor.assert_not_called()
         show_error.assert_called_once()
+
+
+WORMS_GUID = "7db6bfd7-02f4-46d8-b13e-1b889bb81d2b"
+
+
+def _worms():
+    return {
+        "__typename": "ContentEpisode",
+        "id": WORMS_GUID,
+        "name": "Episode 2",
+        "subtitle": "War of the Worms",
+        "project": {"slug": "tuttle-twins"},
+        "watchableAvailabilityStatus": "WATCHABLE",
+    }
+
+
+def _opening_episode(**extra):
+    episode = {
+        "guid": "2f3d0382-ea82-4cdc-958e-84fbadadc710",
+        "subtitle": "In the Beginning",
+        "source": {"url": "http://example/master.m3u8", "credits": 1173, "duration": 1265},
+    }
+    episode.update(extra)
+    return episode
+
+
+class TestNextEpisodePlayback:
+    def _enable(self, ui, offer=True, autostart=True):
+        ui.addon.getSettingBool.side_effect = lambda key: {
+            "offer_next_episode": offer,
+            "autostart_next_episode": autostart,
+        }.get(key, False)
+
+    def _watch(
+        self, ui, player, episode, content, offer=True, autostart=True, ended=False, resume_at=None, choose=False
+    ):
+        import kodi_playback_handler
+
+        self._enable(ui, offer, autostart)
+        if isinstance(content, BaseException):
+            ui.angel_interface.get_next_content.side_effect = content
+        elif ui.angel_interface.get_next_content.side_effect is None:
+            ui.angel_interface.get_next_content.return_value = content
+        if ended:
+            player.ended = True
+        created = []
+
+        class RecordingOverlay:
+            def __init__(self, addon, watched, log, dialog_factory=None):
+                self.player = watched
+                self.chosen = False
+                self.updates = []
+                self.closed = 0
+                created.append(self)
+
+            def update(self, state):
+                self.updates.append(state)
+                if choose:
+                    self.chosen = True
+                    self.player.stopped = True
+
+            def close(self):
+                self.closed += 1
+
+        order = []
+
+        def save(*_args, **kwargs):
+            order.append(("save", kwargs.get("event_type")))
+            return True
+
+        def builtin(command):
+            order.append(("play", command))
+
+        ui.angel_interface.upsert_watch_position.side_effect = save
+        monitor = _ScriptedMonitor()
+        times = iter([0])
+
+        def monotonic():
+            try:
+                return next(times)
+            except StopIteration:
+                return 0
+
+        with (
+            patch("kodi_playback_handler.NextEpisodeOverlay", RecordingOverlay),
+            patch("kodi_playback_handler.xbmc.executebuiltin", side_effect=builtin),
+            patch("kodi_playback_handler._WatchProgressPlayer", return_value=player),
+            patch("kodi_playback_handler.xbmc.Monitor", return_value=monitor),
+            patch("kodi_playback_handler.time.monotonic", side_effect=monotonic),
+        ):
+            ui.playback_handler._monitor_watch_progress("title-guid", None, resume_at, episode=episode)
+        return order, created, kodi_playback_handler
+
+    def test_ending_with_both_settings_on_starts_the_next_title_after_the_save(self, ui_interface):
+        """Seek to 19:40, leave it, and the next episode starts from the beginning when this one ends."""
+        ui, logger, _angel = ui_interface
+        player = _ScriptedPlayer([False, True, True, False], times=[1180])
+        order, created, _handler = self._watch(ui, player, _opening_episode(), _worms(), ended=True)
+
+        assert created[0].updates[-1].end_card is True
+        assert created[0].updates[-1].title == "War of the Worms"
+        assert [item[0] for item in order] == ["save", "play"]
+        assert order[0][1] == "complete"
+        command = order[1][1]
+        assert WORMS_GUID in command
+        assert "from_beginning=1" in command
+        assert command.startswith('PlayMedia("plugin://plugin.video.angelstudios/?')
+        assert command.endswith('",noresume)')
+        logger.info.assert_any_call(f"Starting next episode: {command}")
+
+    def test_auto_start_off_keeps_the_offer_and_does_not_start_the_next_title(self, ui_interface):
+        ui, _, _angel = ui_interface
+        player = _ScriptedPlayer([False, True, True, False], times=[1180])
+        order, created, _handler = self._watch(ui, player, _opening_episode(), _worms(), autostart=False, ended=True)
+
+        assert created[0].updates[-1].end_card is True
+        assert order == [("save", "complete")]
+
+    def test_choosing_next_episode_starts_it_when_auto_start_is_off(self, ui_interface):
+        ui, _, _angel = ui_interface
+        player = _ScriptedPlayer([False, True, True], times=[20])
+        order, created, _handler = self._watch(ui, player, _opening_episode(), _worms(), autostart=False, choose=True)
+
+        assert created[0].chosen is True
+        assert order[0] == ("save", "stop_exit")
+        assert order[1][0] == "play"
+        assert WORMS_GUID in order[1][1]
+
+    def test_stopping_at_the_end_card_does_not_start_the_next_title(self, ui_interface):
+        ui, _, _angel = ui_interface
+        player = _ScriptedPlayer([False, True, True, False], times=[1180])
+        order, created, _handler = self._watch(ui, player, _opening_episode(), _worms(), ended=False)
+
+        assert created[0].updates[-1].end_card is True
+        assert order == [("save", "stop_exit")]
+
+    def test_offer_off_does_not_ask_for_the_next_title(self, ui_interface):
+        ui, _, angel = ui_interface
+        player = _ScriptedPlayer([False, True, True, False], times=[1180])
+        order, created, _handler = self._watch(ui, player, _opening_episode(), _worms(), offer=False, ended=True)
+
+        assert created == []
+        assert order == [("save", "complete")]
+        angel.get_next_content.assert_not_called()
+
+    def test_failed_next_read_does_not_stop_the_watch_progress_save(self, ui_interface):
+        ui, logger, _angel = ui_interface
+        player = _ScriptedPlayer([False, True, True, False], times=[30])
+        order, _created, _handler = self._watch(ui, player, _opening_episode(), RuntimeError("down"), ended=True)
+
+        assert order == [("save", "complete")]
+        logger.warning.assert_any_call("Could not load the next episode for 2f3d0382-ea82-4cdc-958e-84fbadadc710: down")
+
+    def test_auth_failure_does_not_start_another_title(self, ui_interface):
+        from angel_authentication import AuthenticationRequiredError
+
+        ui, logger, _angel = ui_interface
+        player = _ScriptedPlayer([False, True, True, False], times=[30])
+        order, _created, _handler = self._watch(
+            ui,
+            player,
+            _opening_episode(),
+            AuthenticationRequiredError("signed out"),
+            ended=True,
+        )
+
+        assert order == [("save", "complete")]
+        logger.warning.assert_any_call(
+            "Could not load the next episode for 2f3d0382-ea82-4cdc-958e-84fbadadc710: signed out"
+        )
+
+    def test_null_next_content_does_not_start_another_title(self, ui_interface):
+        ui, logger, _angel = ui_interface
+        player = _ScriptedPlayer([False, True, True, False], times=[30])
+        episode = _opening_episode()
+        order, created, _handler = self._watch(ui, player, episode, None, ended=True)
+
+        assert created == []
+        assert order == [("save", "complete")]
+        logger.info.assert_any_call(f"No next episode for {episode['guid']}")
+
+    def test_intro_hides_the_offer_while_playback_continues(self, ui_interface):
+        ui, _, _angel = ui_interface
+        episode = _opening_episode(introStartTime=127, introEndTime=169, source={"credits": 1205, "duration": 1255})
+        player = _ScriptedPlayer([False, True, True, True, True, False], times=[110, 130, 170])
+        _order, created, _handler = self._watch(ui, player, episode, _worms())
+
+        assert [(state.player_control, state.end_card) for state in created[0].updates] == [
+            (True, False),
+            (False, False),
+            (True, False),
+        ]
+
+    def test_next_title_is_loaded_after_the_resume_seek(self, ui_interface):
+        ui, _, angel = ui_interface
+        player = _ScriptedPlayer([False, True, True, False], times=[40])
+        order = []
+        player.seekTime = lambda seconds: order.append(("seek", seconds))
+
+        def getter(_guid):
+            order.append("next")
+            return _worms()
+
+        angel.get_next_content.side_effect = getter
+        self._watch(ui, player, _opening_episode(), _worms(), resume_at=40)
+        assert order[:2] == [("seek", 40.0), "next"]
+
+    def test_playback_that_never_starts_does_not_load_the_next_title(self, ui_interface, monkeypatch):
+        import kodi_playback_handler
+
+        ui, logger, angel = ui_interface
+        monkeypatch.setattr(kodi_playback_handler, "_PLAYBACK_START_TIMEOUT", 0.2)
+        monkeypatch.setattr(kodi_playback_handler, "_PLAYBACK_START_POLL", 0.2)
+        self._enable(ui, True, True)
+        player = _ScriptedPlayer([False])
+        with (
+            patch("kodi_playback_handler._WatchProgressPlayer", return_value=player),
+            patch("kodi_playback_handler.xbmc.Monitor", return_value=_ScriptedMonitor()),
+            patch("kodi_playback_handler.xbmc.executebuiltin") as builtin,
+        ):
+            ui.playback_handler._monitor_watch_progress("title-guid", 10, 10, episode=_opening_episode())
+
+        angel.get_next_content.assert_not_called()
+        builtin.assert_not_called()
+        logger.info.assert_any_call("Playback did not start; watch position was not updated")
+
+    def test_shutdown_does_not_start_the_next_title(self, ui_interface):
+        ui, _, _angel = ui_interface
+        player = _ScriptedPlayer([False, True, True], times=[1180])
+        player.ended = True
+        self._enable(ui)
+        ui.angel_interface.get_next_content.return_value = _worms()
+        ui.angel_interface.upsert_watch_position.return_value = True
+        with patch("kodi_playback_handler.xbmc.executebuiltin") as builtin:
+            self._run_until_abort(ui, player)
+
+        builtin.assert_not_called()
+        ui.angel_interface.upsert_watch_position.assert_called_once()
+
+    def _run_until_abort(self, ui, player):
+        import kodi_playback_handler
+
+        monitor = _ScriptedMonitor(abort_after=4)
+        with (
+            patch("kodi_playback_handler._WatchProgressPlayer", return_value=player),
+            patch("kodi_playback_handler.xbmc.Monitor", return_value=monitor),
+            patch("kodi_playback_handler.time.monotonic", return_value=0),
+        ):
+            ui.playback_handler._monitor_watch_progress("title-guid", None, None, episode=_opening_episode())
+        return kodi_playback_handler
+
+    def test_overlay_update_failure_still_auto_starts(self, ui_interface):
+        ui, logger, _angel = ui_interface
+        player = _ScriptedPlayer([False, True, True, False], times=[1180])
+        player.ended = True
+
+        class BadOverlay:
+            def __init__(self, *_args, **_kwargs):
+                self.chosen = False
+
+            def update(self, _state):
+                raise RuntimeError("draw")
+
+            def close(self):
+                return None
+
+        self._enable(ui)
+        ui.angel_interface.get_next_content.return_value = _worms()
+        ui.angel_interface.upsert_watch_position.return_value = True
+        with (
+            patch("kodi_playback_handler.NextEpisodeOverlay", BadOverlay),
+            patch("kodi_playback_handler.xbmc.executebuiltin") as builtin,
+            patch("kodi_playback_handler._WatchProgressPlayer", return_value=player),
+            patch("kodi_playback_handler.xbmc.Monitor", return_value=_ScriptedMonitor()),
+            patch("kodi_playback_handler.time.monotonic", return_value=0),
+        ):
+            ui.playback_handler._monitor_watch_progress("title-guid", None, None, episode=_opening_episode())
+
+        builtin.assert_called_once()
+        logger.warning.assert_any_call("Next Episode offer could not be shown: draw")
+
+    def test_a_broken_offer_still_auto_starts(self, ui_interface):
+        ui, logger, _angel = ui_interface
+        player = _ScriptedPlayer([False, True, True, False], times=[1180])
+
+        class Boom:
+            def __init__(self, *_args, **_kwargs):
+                raise RuntimeError("no dialog")
+
+        self._enable(ui)
+        ui.angel_interface.get_next_content.return_value = _worms()
+        ui.angel_interface.upsert_watch_position.return_value = True
+        player.ended = True
+        with (
+            patch("kodi_playback_handler.NextEpisodeOverlay", Boom),
+            patch("kodi_playback_handler.xbmc.executebuiltin") as builtin,
+            patch("kodi_playback_handler._WatchProgressPlayer", return_value=player),
+            patch("kodi_playback_handler.xbmc.Monitor", return_value=_ScriptedMonitor()),
+            patch("kodi_playback_handler.time.monotonic", return_value=0),
+        ):
+            ui.playback_handler._monitor_watch_progress("title-guid", None, None, episode=_opening_episode())
+
+        builtin.assert_called_once()
+        assert WORMS_GUID in builtin.call_args.args[0]
+        logger.warning.assert_any_call("Next Episode offer could not be shown: no dialog")
+
+    def test_settings_and_play_command_edges(self, ui_interface):
+        ui, logger, angel = ui_interface
+        assert ui.playback_handler._setting_enabled("offer_next_episode") is False
+        ui.addon.getSettingBool.side_effect = None
+        ui.addon.getSettingBool.return_value = MagicMock()
+        assert ui.playback_handler._setting_enabled("offer_next_episode") is False
+        ui.addon.getSettingBool.side_effect = RuntimeError("settings")
+        assert ui.playback_handler._setting_enabled("offer_next_episode") is False
+        logger.warning.assert_any_call("Could not read setting offer_next_episode: settings")
+        ui.addon = None
+        assert ui.playback_handler._setting_enabled("offer_next_episode") is False
+
+        ui.addon = MagicMock()
+        ui.addon.getSettingBool.side_effect = lambda key: key == "offer_next_episode"
+        assert ui.playback_handler._load_next_session(None) is None
+        assert ui.playback_handler._load_next_session({"name": "missing guid"}) is None
+        angel.get_next_content.assert_not_called()
+
+        ui.angel_interface = object()
+        ui.addon.getSettingBool.side_effect = lambda key: True
+        assert ui.playback_handler._load_next_session({"guid": "g"}) is None
+
+        with patch.object(ui, "show_error") as show_error:
+            ui.playback_handler._start_next_episode({"id": "x"})
+        show_error.assert_called_once_with("This content is not available.")
+
+        target = {
+            "id": WORMS_GUID,
+            "slug": "tuttle-twins",
+            "content_type": "series",
+            "title": "War of the Worms",
+            "__typename": "ContentEpisode",
+        }
+        with (
+            patch("kodi_playback_handler.xbmc.executebuiltin", side_effect=RuntimeError("busy")),
+            patch.object(ui, "show_error") as show_error,
+        ):
+            ui.playback_handler._start_next_episode(target)
+        show_error.assert_called_once_with("This content is not available.")
+        logger.warning.assert_any_call("Could not start the next episode: busy")

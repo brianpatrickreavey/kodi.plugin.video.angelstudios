@@ -964,6 +964,48 @@ class TestAngelStudiosInterface:
             assert angel_interface.get_watch_position("g1") is None
         angel_interface.log.warning.assert_called_once_with("Could not read watch position for g1: down")
 
+    def test_get_next_content_returns_the_record(self, angel_interface):
+        """The next title is whatever getNextContent names for this id."""
+        payload = {"__typename": "ContentEpisode", "id": "next"}
+        with patch.object(angel_interface, "_graphql_query", return_value={"getNextContent": payload}) as mock_query:
+            assert angel_interface.get_next_content("current") == payload
+        mock_query.assert_called_once_with("getNextContent", variables={"id": "current"}, require_auth=False)
+        angel_interface.session.headers.update.assert_any_call({"X-ANGEL-APP-NAME": "angel-web"})
+
+    def test_get_next_content_missing_record(self, angel_interface):
+        """Null and unreadable results mean there is no next title."""
+        with patch.object(angel_interface, "_graphql_query") as mock_query:
+            for payload in (None, [], {}, {"getNextContent": None}, {"getNextContent": "nope"}):
+                mock_query.return_value = payload
+                assert angel_interface.get_next_content("current") is None
+
+    def test_get_next_content_failure_returns_none(self, angel_interface):
+        """A failed read is logged and does not raise into playback."""
+        with patch.object(angel_interface, "_graphql_query", side_effect=Exception("down")):
+            assert angel_interface.get_next_content("current") is None
+        angel_interface.log.warning.assert_called_once_with("Could not load the next episode for current: down")
+
+    def test_get_next_content_works_without_a_session(self, angel_interface):
+        """Signed-out playback can still ask for the next title."""
+        from resources.lib.angel_interface import AuthenticationRequiredError
+
+        angel_interface.auth_core.ensure_valid_session.side_effect = AuthenticationRequiredError("signed out")
+        angel_interface.session.headers = {}
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = {"data": {"getNextContent": {"id": "next", "__typename": "ContentEpisode"}}}
+        angel_interface.session.post.return_value = response
+        query = "query getNextContent($id: ID!) { getNextContent(id: $id) { id } }"
+        with patch("builtins.open", mock_open(read_data=query)):
+            result = angel_interface.get_next_content("current")
+
+        assert result == {"id": "next", "__typename": "ContentEpisode"}
+        assert angel_interface.session.headers["X-ANGEL-APP-NAME"] == "angel-web"
+        assert "Authorization" not in angel_interface.session.headers
+        body = angel_interface.session.post.call_args.kwargs["json"]
+        assert body["operationName"] == "getNextContent"
+        assert body["variables"] == {"id": "current"}
+
     def test_upsert_watch_position_sends_whole_seconds(self, angel_interface):
         """The website post gets the content id, event, and whole seconds."""
         response = MagicMock()

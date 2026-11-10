@@ -174,11 +174,18 @@ def router(paramstring, ui_interface, resume=False):
             elif params["action"] == "play_episode":
                 # Play an episode, movie, or special. Continue Watching leaves content_type empty.
                 # resume is true when Kodi's own dialog, or the player setting, chose Resume.
+                # from_beginning starts the next title at 0 and skips that dialog.
+                play_kwargs = {
+                    "content_type": params.get("content_type", ""),
+                    "resume": resume,
+                }
+                if params.get("from_beginning") == "1":
+                    play_kwargs["resume"] = False
+                    play_kwargs["from_beginning"] = True
                 ui_interface.play_episode(
                     params["episode_guid"],
                     params["project_slug"],
-                    content_type=params.get("content_type", ""),
-                    resume=resume,
+                    **play_kwargs,
                 )
             elif params["action"] == "info":
                 # Show info message for unavailable episodes

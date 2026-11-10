@@ -146,7 +146,7 @@ class AngelStudiosInterface:
             # Tracing must never break main flow
             pass
 
-    def _graphql_query(self, operation: str, variables=None, raw_query=None) -> dict:
+    def _graphql_query(self, operation: str, variables=None, raw_query=None, require_auth=True) -> dict:
         """Generalized GraphQL query executor with automatic fragment loading and caching.
 
         Args:
@@ -164,8 +164,10 @@ class AngelStudiosInterface:
             if token:
                 self.session.headers.update({"Authorization": f"Bearer {token}"})
         except AuthenticationRequiredError:
-            # If proactive validation fails, re-raise for UI layer to handle
-            raise
+            # The next title is public. A signed-out player can still ask for it.
+            if require_auth:
+                raise
+            self.session.headers.pop("Authorization", None)
 
         if raw_query:
             query = raw_query
@@ -412,6 +414,24 @@ class AngelStudiosInterface:
         if not isinstance(result, dict):
             return None
         return self._position_from_content(result.get("getContent"))
+
+    def get_next_content(self, watchable_id):
+        """Return the next title for this id, or None when Angel names none or the read fails.
+
+        This works without a session. The website serves the same record to a signed-out player.
+        """
+        try:
+            self.session.headers.update({"X-ANGEL-APP-NAME": "angel-web"})
+            result = self._graphql_query("getNextContent", variables={"id": watchable_id}, require_auth=False)
+        except Exception as e:
+            self.log.warning(f"Could not load the next episode for {watchable_id}: {e}")
+            return None
+        if not isinstance(result, dict):
+            return None
+        content = result.get("getNextContent")
+        if not isinstance(content, dict):
+            return None
+        return content
 
     def get_watch_positions(self, watchable_guids):
         """Return saved seconds for many titles in one request.

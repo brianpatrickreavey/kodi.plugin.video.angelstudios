@@ -71,8 +71,12 @@ class KodiUIInterface:
         """Placeholder for top picks until API support is added."""
         return self.menu_handler.top_picks_menu()
 
-    def play_episode(self, episode_guid, project_slug, content_type="", resume=False):
+    def play_episode(self, episode_guid, project_slug, content_type="", resume=False, from_beginning=False):
         """Play an episode using cached project data (no separate API call)."""
+        if from_beginning:
+            return self.playback_handler.play_episode(
+                episode_guid, project_slug, content_type, False, from_beginning=True
+            )
         return self.playback_handler.play_episode(episode_guid, project_slug, content_type, resume)
 
     def play_video(self, stream_url=None, episode_data=None):

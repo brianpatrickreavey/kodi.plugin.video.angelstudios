@@ -135,6 +135,17 @@ def test_play_episode_delegation(ui_interface):
     assert result is None
 
 
+def test_play_episode_from_beginning_delegation(ui_interface):
+    """Only the next-title path asks the handler to ignore the saved position."""
+    ui = ui_interface
+    ui.playback_handler.play_episode.return_value = None
+
+    result = ui.play_episode("guid", "slug", "series", True, from_beginning=True)
+
+    ui.playback_handler.play_episode.assert_called_once_with("guid", "slug", "series", False, from_beginning=True)
+    assert result is None
+
+
 def test_play_video_delegation(ui_interface):
     """Test play_video delegates to playback_handler."""
     ui = ui_interface

@@ -13,6 +13,8 @@ import xbmc  # type: ignore
 import xbmcgui  # type: ignore
 import xbmcplugin  # type: ignore
 
+from next_episode import UNAVAILABLE_MESSAGE, NextEpisodeSession, next_play_command
+from next_episode_overlay import NextEpisodeOverlay
 from watch_progress import (
     REPORT_INTERVAL_SECONDS,
     coerce_seconds,
@@ -227,8 +229,10 @@ class KodiPlaybackHandler:
         self.kodi_url = parent.kodi_url
         self.log = parent.log
 
-    def play_episode(self, episode_guid, project_slug, content_type="", resume=False):
+    def play_episode(self, episode_guid, project_slug, content_type="", resume=False, from_beginning=False):
         """Play an episode using cached project data (no separate API call)."""
+        if from_beginning:
+            resume = False
         try:
             # First, check if episode is cached (e.g., from Continue Watching)
             episode = self.parent.cache_manager._get_episode(episode_guid)
@@ -237,7 +241,7 @@ class KodiPlaybackHandler:
                 # Check for playable source
                 source = episode.get("source")
                 if not source or not source.get("url"):
-                    self.parent.show_error("No playable stream URL found for this episode")
+                    self.parent.show_error(self._unplayable_message(from_beginning))
                     self.log.error(f"No stream URL for cached episode: {episode_guid}")
                     return
 
@@ -247,7 +251,7 @@ class KodiPlaybackHandler:
 
                 # Play using cached episode data
                 project = episode.get("project", {"name": episode.get("name", "Unknown")})
-                self._start_playback(episode, project, content_type, resume)
+                self._start_playback(episode, project, content_type, resume, from_beginning)
                 return
 
             # Fallback: Fetch project data and find episode in it
@@ -275,7 +279,7 @@ class KodiPlaybackHandler:
             # Check for playable source
             source = episode.get("source")
             if not source or not source.get("url"):
-                self.parent.show_error("No playable stream URL found for this episode")
+                self.parent.show_error(self._unplayable_message(from_beginning))
                 self.log.error(f"No stream URL for episode: {episode_guid} in project: {project_slug}")
                 return
 
@@ -284,7 +288,7 @@ class KodiPlaybackHandler:
             self.log.info(f"Playing episode: {episode_name} from project: {project_name}")
 
             # Play using existing episode data
-            self._start_playback(episode, project, content_type, resume)
+            self._start_playback(episode, project, content_type, resume, from_beginning)
 
         except Exception as e:
             self.log.error(f"Error playing episode {episode_guid}: {e}")
@@ -317,14 +321,20 @@ class KodiPlaybackHandler:
             return None
         return saved_position
 
-    def _start_playback(self, episode, project, content_type, resume):
+    def _unplayable_message(self, from_beginning):
+        """The next title uses the public unavailable line. A normal play keeps its own."""
+        if from_beginning:
+            return UNAVAILABLE_MESSAGE
+        return "No playable stream URL found for this episode"
+
+    def _start_playback(self, episode, project, content_type, resume, from_beginning=False):
         """Resolve the stream, then report progress for this title."""
         saved = self._lookup_saved_position(episode)
         self.play_video(
             episode_data={"episode": episode, "project": project},
-            resume_at=self._seek_target(content_type, saved, resume),
+            resume_at=None if from_beginning else self._seek_target(content_type, saved, resume),
             saved_position=saved,
-            clear_kodi_stop=content_type in _RESUME_CONTENT_TYPES,
+            clear_kodi_stop=bool(from_beginning) or content_type in _RESUME_CONTENT_TYPES,
         )
 
     def _clear_kodi_resume_bookmark(self):
@@ -373,6 +383,8 @@ class KodiPlaybackHandler:
         project_slug = None
         guid = None
         player = None
+        episode = None
+        episode_for_next = None
 
         try:
             if episode_data:
@@ -401,6 +413,7 @@ class KodiPlaybackHandler:
 
             if episode_data and isinstance(episode, dict):
                 guid = episode.get("guid") or None
+                episode_for_next = episode
             # Register before Resolve so a video that is already playing is not
             # mistaken for this episode. Its stop must not end the new watch.
             if guid:
@@ -427,7 +440,7 @@ class KodiPlaybackHandler:
         if not guid:
             return
         try:
-            self._monitor_watch_progress(guid, saved_position, resume_at, project_slug, player)
+            self._monitor_watch_progress(guid, saved_position, resume_at, project_slug, player, episode_for_next)
         except Exception as exc:
             self.log.warning(f"Watch progress stopped for {guid}: {exc}")
 
@@ -471,12 +484,87 @@ class KodiPlaybackHandler:
         except Exception as exc:
             self.log.warning(f"Could not update the cached resume time for {guid}: {exc}")
 
-    def _monitor_watch_progress(self, guid, saved_position, resume_at, project_slug=None, player=None):
+    def _setting_enabled(self, setting_id):
+        """True only for a real True. A missing setting or a test double stays off."""
+        addon = getattr(self.parent, "addon", None)
+        getter = getattr(addon, "getSettingBool", None) if addon is not None else None
+        if not callable(getter):
+            return False
+        try:
+            return getter(setting_id) is True
+        except Exception as exc:
+            self.log.warning(f"Could not read setting {setting_id}: {exc}")
+            return False
+
+    def _load_next_session(self, episode):
+        """Read the next title after this episode is actually playing.
+
+        The offer has to be on, and the episode has to be the one we started.
+        A slow or failed read must not stop playback or the watch-progress save.
+        """
+        if not isinstance(episode, dict) or not self._setting_enabled("offer_next_episode"):
+            return None
+        guid = episode.get("guid")
+        if not isinstance(guid, str) or not guid:
+            return None
+        interface = getattr(self.parent, "angel_interface", None)
+        getter = getattr(interface, "get_next_content", None) if interface is not None else None
+        if not callable(getter):
+            return None
+        try:
+            content = getter(guid)
+            session = NextEpisodeSession(
+                episode,
+                content,
+                offer_enabled=True,
+                autostart_enabled=self._setting_enabled("autostart_next_episode"),
+            )
+        except Exception as exc:
+            self.log.warning(f"Could not load the next episode for {guid}: {exc}")
+            return None
+        if session.target is None:
+            self.log.info(f"No next episode for {guid}")
+            return None
+        self.log.info(f"Next episode is {session.title}")
+        return session
+
+    def _open_next_overlay(self, player, next_session):
+        """Build the offer. A broken dialog still leaves auto-start able to run."""
+        if next_session is None:
+            return None
+        try:
+            return NextEpisodeOverlay(getattr(self.parent, "addon", None), player, self.log)
+        except Exception as exc:
+            self.log.warning(f"Next Episode offer could not be shown: {exc}")
+            return None
+
+    def _close_next_overlay(self, overlay):
+        try:
+            overlay.close()
+        except Exception as exc:
+            self.log.warning(f"Next Episode offer could not be closed: {exc}")
+
+    def _start_next_episode(self, target):
+        """Open the next title at the beginning. The current episode has already stopped."""
+        command = next_play_command(target)
+        if not command:
+            self.parent.show_error(UNAVAILABLE_MESSAGE)
+            return
+        self.log.info(f"Starting next episode: {command}")
+        try:
+            xbmc.executebuiltin(command)
+        except Exception as exc:
+            self.log.warning(f"Could not start the next episode: {exc}")
+            self.parent.show_error(UNAVAILABLE_MESSAGE)
+
+    def _monitor_watch_progress(self, guid, saved_position, resume_at, project_slug=None, player=None, episode=None):
         """Report the playhead once a minute, and again on pause or stop.
 
         This stays on the plugin thread until playback ends. setResolvedUrl has
         already returned the stream to Kodi, so the directory wait is finished.
         The player is created before that resolve when this play has a guid.
+        The next title is loaded after the resume seek, and started only after
+        the final watch position has been sent.
         """
         if player is None:
             player = _WatchProgressPlayer()
@@ -495,6 +583,10 @@ class KodiPlaybackHandler:
 
         player.on_pause = report_pause
         accepted_files = _accepted_playback_files(player)
+        next_session = None
+        overlay = None
+        chosen = False
+        aborting = False
 
         try:
             polls = int(_PLAYBACK_START_TIMEOUT / _PLAYBACK_START_POLL)
@@ -519,8 +611,14 @@ class KodiPlaybackHandler:
                 except Exception as exc:
                     self.log.warning(f"Could not resume at {resume_at}s: {exc}")
 
+            next_session = self._load_next_session(episode)
+            overlay = self._open_next_overlay(player, next_session)
+
             while True:
-                if monitor.abortRequested() is True or player.stopped is True:
+                if monitor.abortRequested() is True:
+                    aborting = True
+                    break
+                if player.stopped is True:
                     break
                 if not _is_this_playback(player, accepted_files):
                     break
@@ -528,10 +626,20 @@ class KodiPlaybackHandler:
                     position = player.getTime()
                 except Exception:
                     position = session.last_position
+                if overlay is not None and next_session is not None:
+                    try:
+                        overlay.update(next_session.view_at(position))
+                    except Exception as exc:
+                        self.log.warning(f"Next Episode offer could not be shown: {exc}")
+                        if overlay.chosen is True:
+                            chosen = True
+                        self._close_next_overlay(overlay)
+                        overlay = None
                 due = session.observe(position, time.monotonic(), paused=player.paused is True)
                 if due is not None:
                     sender.submit(due, "heartbeat")
                 if monitor.waitForAbort(1) is True:
+                    aborting = True
                     break
 
             # The heartbeat request has to finish before the stop is chosen.
@@ -544,7 +652,20 @@ class KodiPlaybackHandler:
                 event_type = "complete" if player.ended is True else "stop_exit"
                 sender.submit(sample, event_type)
         finally:
+            if overlay is not None:
+                if overlay.chosen is True:
+                    chosen = True
+                self._close_next_overlay(overlay)
             sender.close()
+
+        # A shutdown, a stop, or a different file must not open another title.
+        # Choosing Next Episode is a stop plus an explicit start. Auto-start
+        # runs only when the episode itself ends.
+        if aborting or next_session is None:
+            return
+        if next_session.should_start(player.ended is True, chosen):
+            player.on_pause = None
+            self._start_next_episode(next_session.target)
 
     def _ensure_isa_available(self, manifest_type: str = "hls") -> bool:
         """Check if InputStream Adaptive is available (and installed/enabled)."""
