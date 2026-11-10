@@ -164,7 +164,8 @@ def apply_watch_page_facts(info_tag, facts):
     if "duration" in facts:
         info_tag.setDuration(facts["duration"])
     if "rating" in facts:
-        info_tag.setRating(facts["rating"])
+        # Kodi ignores a rating above 10, so 73 is stored as 7.3.
+        info_tag.setRating(facts["rating"] / 10)
     if facts.get("plot") is not None:
         info_tag.setPlot(facts["plot"])
 

@@ -259,7 +259,7 @@ def test_list_item_uses_title_genres_instead_of_metadata():
     info_tag.setDuration.assert_called_with(5659)
     info_tag.setMediaType.assert_called_with("movie")
     info_tag.setPremiered.assert_called_with("2010-01-15")
-    info_tag.setRating.assert_called_with(73.0)
+    info_tag.setRating.assert_called_with(7.3)
 
 
 def test_series_list_item_does_not_set_a_duration():
