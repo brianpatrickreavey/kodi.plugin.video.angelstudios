@@ -13,6 +13,7 @@ import xbmc  # type: ignore
 import xbmcgui  # type: ignore
 import xbmcplugin  # type: ignore
 
+from captions import apply_playback_captions, kodi_convert_language
 from watch_progress import (
     REPORT_INTERVAL_SECONDS,
     coerce_seconds,
@@ -471,6 +472,19 @@ class KodiPlaybackHandler:
         except Exception as exc:
             self.log.warning(f"Could not update the cached resume time for {guid}: {exc}")
 
+    def _apply_captions(self, player, monitor):
+        """Turn on the preferred caption track once. Playback continues either way."""
+        try:
+            apply_playback_captions(
+                xbmc.executeJSONRPC,
+                monitor,
+                self.log,
+                kodi_convert_language,
+                stopped=lambda: player.stopped is True or player.ended is True,
+            )
+        except Exception as exc:
+            self.log.warning(f"Could not apply the caption preference: {exc}")
+
     def _monitor_watch_progress(self, guid, saved_position, resume_at, project_slug=None, player=None):
         """Report the playhead once a minute, and again on pause or stop.
 
@@ -518,6 +532,8 @@ class KodiPlaybackHandler:
                     player.seekTime(float(resume_at))
                 except Exception as exc:
                     self.log.warning(f"Could not resume at {resume_at}s: {exc}")
+
+            self._apply_captions(player, monitor)
 
             while True:
                 if monitor.abortRequested() is True or player.stopped is True:
