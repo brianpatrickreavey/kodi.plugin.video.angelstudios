@@ -8,7 +8,7 @@ sys.path.insert(
 )
 
 from notices import step_notice  # noqa: E402
-from selection import LEAVES, expand, run_order  # noqa: E402
+from selection import LEAVES, WATCHLIST, expand, run_order  # noqa: E402
 
 
 def test_one_condition_is_that_condition_only():
@@ -52,6 +52,14 @@ def test_all_runs_every_leaf_once():
 
 def test_unknown_name_is_rejected():
     assert expand("captions-spain") is None
+
+
+def test_watchlist_is_not_part_of_the_caption_run():
+    assert expand("watchlist") == list(WATCHLIST)
+    assert run_order("watchlist") == ["sign-in"] + list(WATCHLIST)
+    assert expand("watchlist-matches") == ["watchlist-matches"]
+    assert "watchlist-matches" not in expand("all")
+    assert "watchlist-add-remove" not in expand("all")
 
 
 def test_step_notice_counts_this_run():

@@ -20,6 +20,12 @@ except ImportError:
 
 from menu_utils import MenuUtils
 
+_WATCHLIST_MEDIA_TYPES = {
+    "movies": "movie",
+    "series": "tvshow",
+    "specials": "video",
+}
+
 
 class KodiMenuHandler(MenuUtils):
     """Handles menu rendering and directory operations for Kodi UI."""
@@ -46,6 +52,7 @@ class KodiMenuHandler(MenuUtils):
             "show_livestreams": False,
             "show_continue_watching": False,
             "show_top_picks": False,
+            "show_watchlist": False,
         }
 
         # Static menu definitions (settings are applied when rendering)
@@ -421,9 +428,71 @@ class KodiMenuHandler(MenuUtils):
         return True
 
     def watchlist_menu(self):
-        """Placeholder for user watchlist until API support is added."""
-        self.log.info("Watchlist menu requested, but not yet implemented.")
-        self.parent.show_error("Watchlist is not available yet.")
+        """List the signed-in viewer's saved movies, series, and specials."""
+        self.log.info("Fetching the watchlist")
+        try:
+            items = self.parent.angel_interface.get_default_watchlist()
+        except Exception as exc:
+            self.log.error(f"Error fetching watchlist: {exc}")
+            self.parent.show_error("Failed to load Watchlist")
+            return False
+        if items is None:
+            self.parent.show_error("Failed to load Watchlist")
+            return False
+
+        xbmcplugin.setContent(self.handle, "videos")
+        for item in items:
+            self._add_watchlist_item(item)
+        xbmcplugin.endOfDirectory(self.handle)
+        return True
+
+    def _add_watchlist_item(self, item):
+        """One watchlist row. Choosing it opens the same screen as the catalog."""
+        display = {
+            "name": item.get("name") or "Unknown",
+            "description": item.get("description") or "",
+        }
+        if item.get("poster_path"):
+            display["posterCloudinaryPath"] = item["poster_path"]
+        if item.get("landscape_path"):
+            display["discoveryPosterLandscapeCloudinaryPath"] = item["landscape_path"]
+
+        list_item = self._build_list_item_for_content(display, "project")
+        media_type = _WATCHLIST_MEDIA_TYPES.get(item.get("menu_content_type"), "video")
+        list_item.getVideoInfoTag().setMediaType(media_type)
+
+        url = self.create_plugin_url(
+            base_url=self.kodi_url,
+            action="seasons_menu",
+            content_type=item["menu_content_type"],
+            project_slug=item["project_slug"],
+        )
+        list_item.addContextMenuItems([self.watchlist_context_item(item["content_id"], True)])
+        xbmcplugin.addDirectoryItem(self.handle, url, list_item, True)
+
+    def add_to_watchlist(self, content_id):
+        """Save a movie, series, or special and tell the viewer."""
+        return self._update_watchlist("add_to_watchlist", content_id, "Added to Watchlist.")
+
+    def remove_from_watchlist(self, content_id):
+        """Remove a movie, series, or special and tell the viewer."""
+        return self._update_watchlist("remove_from_watchlist", content_id, "Removed from Watchlist.")
+
+    def _update_watchlist(self, method_name, content_id, success_message):
+        failure = "We ran into an issue while updating your watchlist. Please try again later."
+        updated = False
+        if content_id:
+            try:
+                updated = bool(getattr(self.parent.angel_interface, method_name)(content_id))
+            except Exception as exc:
+                self.log.error(f"Watchlist update failed: {exc}")
+                updated = False
+        if updated:
+            self.parent.show_notification(success_message)
+            xbmc.executebuiltin("Container.Refresh")
+            return True
+        self.parent.show_notification(failure)
+        return False
 
     @timed(lambda *args, **kwargs: f"after={args[1] if len(args) > 1 else kwargs.get('after', 'none')}")
     def continue_watching_menu(self, after=None):

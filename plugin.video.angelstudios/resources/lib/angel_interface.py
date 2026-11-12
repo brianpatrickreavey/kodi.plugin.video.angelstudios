@@ -31,6 +31,74 @@ angel_graphql_url = "https://api.angelstudios.com/graphql"
 # The website player posts here. The host is the same API origin as GraphQL.
 angel_watch_positions_url = "https://api.angelstudios.com/watch-positions"
 
+# Watchlist rows open the same screen as Movies, Series, or Specials.
+_WATCHLIST_MENU_TYPES = {
+    "ContentMovie": "movies",
+    "ContentSeries": "series",
+    "ContentSpecial": "specials",
+}
+
+
+def _viewer_profile_id(token: str) -> Optional[str]:
+    """The id Angel expects in the x-viewer-profile-id header.
+
+    The website sends the signed-in user id. On the Angel JWT that id is the
+    sub claim, and it matches user.viewerProfiles[].id. A catalog call does
+    not need the header. The watchlist calls do.
+    """
+    try:
+        payload = angel_authentication.decode_jwt_payload(token)
+    except Exception:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    profile_id = payload.get("sub")
+    if isinstance(profile_id, str) and profile_id:
+        return profile_id
+    return None
+
+
+def _cloudinary_path(image: Any) -> Optional[str]:
+    if not isinstance(image, dict):
+        return None
+    path = image.get("cloudinaryPath")
+    if isinstance(path, str) and path:
+        return path
+    return None
+
+
+def _watchlist_items(nodes: list) -> list:
+    """Keep movie, series, and special rows that can be opened and changed."""
+    items = []
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        content = node.get("content")
+        if not isinstance(content, dict):
+            continue
+        menu_content_type = _WATCHLIST_MENU_TYPES.get(content.get("__typename"))
+        project = content.get("project")
+        slug = project.get("slug") if isinstance(project, dict) else None
+        content_id = content.get("id")
+        if not menu_content_type or not isinstance(slug, str) or not slug:
+            continue
+        if not isinstance(content_id, str) or not content_id:
+            continue
+        name = content.get("name")
+        description = content.get("description")
+        items.append(
+            {
+                "content_id": content_id,
+                "name": name if isinstance(name, str) and name else "Unknown",
+                "description": description if isinstance(description, str) else "",
+                "project_slug": slug,
+                "menu_content_type": menu_content_type,
+                "poster_path": _cloudinary_path(content.get("imagePortrait")),
+                "landscape_path": _cloudinary_path(content.get("imageLandscape")),
+            }
+        )
+    return items
+
 
 class AngelStudiosInterface:
     """
@@ -79,11 +147,24 @@ class AngelStudiosInterface:
         # Prepare session with authentication
         self._prepare_authenticated_session()
 
+    def _apply_auth_headers(self, token):
+        """Set the bearer token and the viewer profile id, or clear both."""
+        if not token:
+            self.session.headers.pop("Authorization", None)
+            self.session.headers.pop("x-viewer-profile-id", None)
+            return
+        self.session.headers["Authorization"] = f"Bearer {token}"
+        profile_id = _viewer_profile_id(token)
+        if profile_id:
+            self.session.headers["x-viewer-profile-id"] = profile_id
+        else:
+            self.session.headers.pop("x-viewer-profile-id", None)
+
     def _prepare_authenticated_session(self):
         """Prepare the requests session with authentication headers"""
         token = self.auth_core.session_store.get_token()
         if token:
-            self.session.headers.update({"Authorization": f"Bearer {token}"})
+            self._apply_auth_headers(token)
             self.log.info("Session prepared with JWT token")
         else:
             self.log.warning("No JWT token available - session may not be authenticated")
@@ -162,7 +243,7 @@ class AngelStudiosInterface:
             # Update session headers in case token was refreshed
             token = self.auth_core.session_store.get_token()
             if token:
-                self.session.headers.update({"Authorization": f"Bearer {token}"})
+                self._apply_auth_headers(token)
         except AuthenticationRequiredError:
             # If proactive validation fails, re-raise for UI layer to handle
             raise
@@ -247,6 +328,46 @@ class AngelStudiosInterface:
         except Exception as e:
             self.log.error(f"Error fetching projects: {e}")
             return []
+
+    def get_default_watchlist(self) -> Optional[list]:
+        """Return the signed-in viewer's watchlist, in Angel's order.
+
+        An empty list means the viewer has no saved titles. None means the
+        read failed, which is not the same as an empty list.
+        """
+        try:
+            result = self._graphql_query("getMyDefaultWatchList", variables={})
+        except Exception as exc:
+            self.log.error(f"Error fetching watchlist: {exc}")
+            return None
+        if not isinstance(result, dict):
+            return None
+        watchlist = result.get("getMyDefaultWatchList")
+        if not isinstance(watchlist, dict):
+            self.log.error("Watchlist response did not include a list")
+            return None
+        return _watchlist_items(self._unwrap_relay_pagination(watchlist.get("items")))
+
+    def add_to_watchlist(self, content_id: str) -> bool:
+        """Save a title. content_id is the movie, series, or special id."""
+        return self._update_watchlist("addToWatchList", content_id)
+
+    def remove_from_watchlist(self, content_id: str) -> bool:
+        """Remove a title. content_id is the movie, series, or special id."""
+        return self._update_watchlist("deleteFromWatchList", content_id)
+
+    def _update_watchlist(self, operation: str, content_id: str) -> bool:
+        if not isinstance(content_id, str) or not content_id:
+            return False
+        try:
+            result = self._graphql_query(operation, variables={"contentId": content_id})
+        except Exception as exc:
+            self.log.error(f"Error updating watchlist with {operation}: {exc}")
+            return False
+        if not isinstance(result, dict):
+            return False
+        payload = result.get(operation)
+        return isinstance(payload, dict) and bool(payload.get("id"))
 
     def get_cloudinary_url(self, cloudinary_path=None):
         """Construct a Cloudinary URL for the given path"""
@@ -503,7 +624,7 @@ class AngelStudiosInterface:
             self.auth_core.ensure_valid_session()
             token = self.auth_core.session_store.get_token()
             if token:
-                self.session.headers.update({"Authorization": f"Bearer {token}"})
+                self._apply_auth_headers(token)
             response = self.session.post(
                 angel_watch_positions_url,
                 json={
@@ -828,7 +949,7 @@ class AngelStudiosInterface:
                 return False
             self.auth_core.logout()
             self.auth_core.session_store.clear_credentials()
-            self.session.headers.pop("Authorization", None)
+            self._apply_auth_headers(None)
             return True
         except Exception as e:
             self.log.error(f"Logout failed: {e}")

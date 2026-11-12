@@ -8,7 +8,7 @@ def sanitize_headers_for_logging(headers):
     safe_headers = {}
     for key, val in headers.items():
         key_lower = str(key).lower()
-        if key_lower in ("authorization", "cookie", "x-api-key"):
+        if key_lower in ("authorization", "cookie", "x-api-key", "x-viewer-profile-id"):
             safe_headers[key] = "[REDACTED]"
         else:
             safe_headers[key] = val

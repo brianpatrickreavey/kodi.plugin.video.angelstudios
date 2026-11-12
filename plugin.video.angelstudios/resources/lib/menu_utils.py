@@ -195,6 +195,21 @@ class MenuUtils:
         """Create a URL for calling the plugin recursively"""
         return f"{self.kodi_url}?{urlencode(kwargs)}"
 
+    def watchlist_context_item(self, content_id, saved):
+        """Context command that adds a title, or removes it when it is already saved."""
+        if saved:
+            label = "Remove from Watchlist"
+            action = "remove_from_watchlist"
+        else:
+            label = "Add to Watchlist"
+            action = "add_to_watchlist"
+        url = self.create_plugin_url(
+            base_url=self.kodi_url,
+            action=action,
+            content_id=content_id,
+        )
+        return (label, "RunPlugin({})".format(url))
+
     def _build_list_item_for_content(self, content, content_type_str, **options):
         """
         Build a Kodi ListItem for content (episode, project, season, etc.).

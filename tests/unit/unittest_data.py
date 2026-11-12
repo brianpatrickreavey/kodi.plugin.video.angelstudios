@@ -7,9 +7,30 @@ EXAMPLE_URL = "http://example.com/"
 EXAMPLE_VIDEO_URL = "http://example.com/episode1.mp4"
 
 MOCK_PROJECTS_DATA = {
-    "movies": [{"slug": "test_movie_project", "name": "Test Movie Name", "projectType": "movie"}],
-    "series": [{"slug": "test_series_project", "name": "Test Series Name", "projectType": "series"}],
-    "specials": [{"slug": "test_special_project", "name": "Test Special Name", "projectType": "special"}],
+    "movies": [
+        {
+            "slug": "test_movie_project",
+            "name": "Test Movie Name",
+            "projectType": "movie",
+            "title": {"__typename": "ContentMovie", "id": "movie-content-id"},
+        }
+    ],
+    "series": [
+        {
+            "slug": "test_series_project",
+            "name": "Test Series Name",
+            "projectType": "series",
+            "title": {"__typename": "ContentSeries", "id": "series-content-id"},
+        }
+    ],
+    "specials": [
+        {
+            "slug": "test_special_project",
+            "name": "Test Special Name",
+            "projectType": "special",
+            "title": {"__typename": "ContentSpecial", "id": "special-content-id"},
+        }
+    ],
 }
 
 MOCK_SEASON_DATA = {
@@ -225,6 +246,8 @@ ROUTER_DISPATCH_CASES = [
     ("podcast_menu", "projects_menu", {"content_type": "podcasts"}),
     ("livestream_menu", "projects_menu", {"content_type": "livestreams"}),
     ("watchlist_menu", "watchlist_menu", {}),
+    ("add_to_watchlist", "add_to_watchlist", {"content_id": "title-id"}),
+    ("remove_from_watchlist", "remove_from_watchlist", {"content_id": "title-id"}),
     ("continue_watching_menu", "continue_watching_menu", {}),
     ("top_picks_menu", "top_picks_menu", {}),
     ("all_content_menu", None, {}),

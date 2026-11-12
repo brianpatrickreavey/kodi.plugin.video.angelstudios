@@ -70,15 +70,6 @@ class TestMainMenu:
 
         mock_end_dir.assert_called_once_with(1)
 
-    def test_watchlist_menu_placeholder(self, ui_interface):
-        ui, logger_mock, angel_interface_mock = ui_interface
-
-        with patch.object(ui, "show_error") as mock_show_error:
-            ui.watchlist_menu()
-
-        mock_show_error.assert_called_once_with("Watchlist is not available yet.")
-        logger_mock.info.assert_any_call("Watchlist menu requested, but not yet implemented.")
-
     def test_top_picks_menu_placeholder(self, ui_interface):
         ui, logger_mock, angel_interface_mock = ui_interface
 
