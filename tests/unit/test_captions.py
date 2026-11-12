@@ -110,6 +110,14 @@ class TestChooseCaptionTrack:
         assert _choose("en", tracks=tracks, hearing=False) == {"enable": True, "index": 1}
         assert _choose("en", tracks=tracks, hearing=True) == {"enable": True, "index": 2}
 
+    def test_a_language_stays_off_when_the_only_track_is_forced(self):
+        tracks = [
+            _track(0, "English [Forced Narrative]", "eng", forced=True),
+            _track(1, "English [Forced Narrative]", "eng", forced=True, impaired=True),
+        ]
+        assert _choose("en", tracks=tracks, hearing=False) == {"enable": False}
+        assert _choose("en", tracks=tracks, hearing=True) == {"enable": False}
+
     def test_hearing_impaired_uses_the_only_track_when_no_pair_exists(self):
         tracks = [_track(0, "English SDH", "eng", impaired=True)]
         assert _choose("en", tracks=tracks, hearing=False) == {"enable": True, "index": 0}

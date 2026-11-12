@@ -141,12 +141,15 @@ def describe(tracks):
 
 
 def tuttle_case(tracks):
+    """Tuttle Twins is the non-forced language case. A forced track changes that case."""
+    detail = describe(tracks)
+    if any(is_forced(track) for track in tracks):
+        return False, "Tuttle Twins now has a forced caption track. " + detail
     missing = [
         name
         for code, name in (("en", "English"), ("es", "Spanish"), ("pt", "Portuguese"))
         if not has_language(tracks, code)
     ]
-    detail = describe(tracks)
     if missing:
         return False, "Tuttle Twins is missing " + " and ".join(missing) + ". " + detail
     return True, "Playlist still has English, Spanish, and Portuguese. " + detail

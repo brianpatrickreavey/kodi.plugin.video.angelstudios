@@ -122,8 +122,19 @@ def test_kensuke_fails_when_a_caption_track_was_added():
 def test_young_washington_and_tuttle_cases_match_their_playlists():
     tracks, _variants = subtitle_tracks(_MASTER, "https://cdn.example/master.m3u8")
     assert young_washington_case(tracks)[0] is True
-    assert tuttle_case(tracks)[0] is True
+    assert tuttle_case(tracks)[0] is False
     assert tuttle_case([tracks[0]])[0] is False
+    tuttle, _variants = subtitle_tracks(
+        "\n".join(
+            [
+                _media("English", "en"),
+                _media("Spanish (Latam)", "es-419"),
+                _media("Portuguese", "pt-BR"),
+            ]
+        ),
+        "https://cdn.example/master.m3u8",
+    )
+    assert tuttle_case(tuttle)[0] is True
 
 
 def test_source_url_finds_the_episode_and_hides_other_episodes():

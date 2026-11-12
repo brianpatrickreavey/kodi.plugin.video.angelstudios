@@ -31,11 +31,17 @@ def udp_local_token(host: str, port: int) -> str:
 
 
 def udp_table_has_listener(table: str, host: str, port: int) -> bool:
-    """Return True when a /proc/net/udp table has this local listener."""
-    token = udp_local_token(host, port)
+    """Return True when a /proc/net/udp table has this local listener.
+
+    A socket bound to 0.0.0.0 accepts loopback traffic. /proc/net/udp records
+    that bind as 00000000, not as 127.0.0.1.
+    """
+    tokens = {udp_local_token(host, port)}
+    if host == "127.0.0.1":
+        tokens.add(udp_local_token("0.0.0.0", port))
     for line in table.splitlines():
         fields = line.split()
-        if len(fields) >= 2 and fields[1].upper() == token:
+        if len(fields) >= 2 and fields[1].upper() in tokens:
             return True
     return False
 
@@ -153,22 +159,24 @@ class KodiApp:
         return self._gone()
 
     def _gone(self) -> bool:
-        if self._pids():
-            return False
+        """Return True when the Kodi this run started has exited.
+
+        Another kodi.bin on the machine does not keep this instance alive.
+        """
         return self._proc is None or self._proc.poll() is not None
 
     def _signal(self, sig: int) -> None:
+        """Signal the process group this run started. Leave any other Kodi alone."""
         pid = 0 if self._proc is None else self._proc.pid
-        if pid:
+        if not pid:
+            return
+        try:
+            self._killpg(pid, sig)
+        except OSError:
             try:
-                self._killpg(pid, sig)
+                self._kill(pid, sig)
             except OSError:
-                pass
-        for child in list(self._pids()):
-            try:
-                self._kill(child, sig)
-            except OSError:
-                pass
+                return
 
     def _default_popen(self, binary: str) -> "_Process":
         self._log = open(START_LOG, "wb")

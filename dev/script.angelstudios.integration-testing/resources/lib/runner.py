@@ -291,12 +291,16 @@ def write_result(result):
 
 def main(argv):
     try:
+        name, run_id, _options = parse_args(argv)
+    except Exception:
+        name, run_id = "", ""
+    try:
         result = run(argv)
     except Exception:
         result = {
             "addon": "script.angelstudios.integration-testing",
-            "test": "",
-            "run_id": "",
+            "test": name,
+            "run_id": run_id,
             "passed": False,
             "checks": [{"name": "runner", "passed": False, "detail": traceback.format_exc(limit=3)}],
         }

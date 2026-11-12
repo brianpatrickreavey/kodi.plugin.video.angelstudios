@@ -110,7 +110,11 @@ def choose_caption_track(preference, tracks, prefer_hearing_impaired, audio_lang
 
     if not usable:
         return {"wait": True}
-    matches = [track for track in usable if _same_language(preference, track, convert_language)]
+    matches = [
+        track
+        for track in usable
+        if track.get("isforced") is not True and _same_language(preference, track, convert_language)
+    ]
     if not matches:
         return {"enable": False}
     return {"enable": True, "index": _pick(matches, prefer_hearing_impaired)["index"]}
@@ -217,6 +221,7 @@ def _pick(tracks, prefer_hearing_impaired):
     unforced = [track for track in tracks if track.get("isforced") is not True]
     if unforced:
         return unforced[0]
+    # forced_only is the caller that still passes forced tracks in.
     return tracks[0]
 
 

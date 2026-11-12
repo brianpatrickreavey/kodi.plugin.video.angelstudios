@@ -46,6 +46,8 @@ def test_udp_token_matches_proc_net_udp():
     table = "   46: 0100007F:2631 00000000:0000 07 00000000:00000000 00:00000000 00000000 0 0 1 2 0\n"
     assert udp_table_has_listener(table, "127.0.0.1", 9777) is True
     assert udp_table_has_listener(table, "127.0.0.1", 1) is False
+    wildcard = "   12: 00000000:2631 00000000:0000 07 00000000:00000000 00:00000000 00000000 0 0 1 2 0\n"
+    assert udp_table_has_listener(wildcard, "127.0.0.1", 9777) is True
 
 
 def test_existing_kodi_is_left_open():
@@ -146,6 +148,24 @@ def test_sigkill_follows_a_sigterm_that_does_not_exit():
     app.open_for_test()
     app.close_if_opened()
     assert killed == [signal.SIGTERM, signal.SIGKILL]
+
+
+def test_a_replacement_kodi_is_not_signaled():
+    killed = []
+    proc = _Proc()
+    proc.returncode = 0
+
+    app = _app(
+        pids=lambda: [999],
+        port_open=lambda: True,
+        popen=lambda _binary: proc,
+        kill=lambda pid, sig: killed.append((pid, sig)),
+        killpg=lambda pid, sig: killed.append((pid, sig)),
+    )
+    app._proc = proc
+    app.started_by_us = True
+    app.close_if_opened()
+    assert killed == []
 
 
 def test_early_exit_does_not_send_quit():
