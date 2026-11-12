@@ -60,8 +60,16 @@ class KodiUIInterface:
         return self.menu_handler.episodes_menu(content_type, project_slug, season_id)
 
     def watchlist_menu(self):
-        """Placeholder for user watchlist until API support is added."""
+        """List the signed-in viewer's saved movies, series, and specials."""
         return self.menu_handler.watchlist_menu()
+
+    def add_to_watchlist(self, content_id):
+        """Save a movie, series, or special on the signed-in viewer's watchlist."""
+        return self.menu_handler.add_to_watchlist(content_id)
+
+    def remove_from_watchlist(self, content_id):
+        """Remove a movie, series, or special from the signed-in viewer's watchlist."""
+        return self.menu_handler.remove_from_watchlist(content_id)
 
     def continue_watching_menu(self, after=None):
         """Display continue watching menu with pagination."""

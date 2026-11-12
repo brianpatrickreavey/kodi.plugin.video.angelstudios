@@ -152,8 +152,11 @@ def router(paramstring, ui_interface, resume=False):
                 # Show Livestreams
                 ui_interface.projects_menu(content_type="livestreams")
             elif params["action"] == "watchlist_menu":
-                # Show Watchlist (placeholder)
                 ui_interface.watchlist_menu()
+            elif params["action"] == "add_to_watchlist":
+                ui_interface.add_to_watchlist(params.get("content_id", ""))
+            elif params["action"] == "remove_from_watchlist":
+                ui_interface.remove_from_watchlist(params.get("content_id", ""))
             elif params["action"] == "continue_watching_menu":
                 # Show Continue Watching with optional pagination cursor
                 after = params.get("after")

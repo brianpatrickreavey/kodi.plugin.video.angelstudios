@@ -1,0 +1,8 @@
+# Save a movie, series, or special on the signed-in viewer's default watchlist.
+# contentId is the title id (content.id), as a string.
+
+mutation addToWatchList($contentId: String!) {
+  addToWatchList(contentId: $contentId) {
+    id
+  }
+}

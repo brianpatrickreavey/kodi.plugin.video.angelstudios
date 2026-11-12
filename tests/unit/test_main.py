@@ -156,6 +156,22 @@ class TestMain:
 
         addon_mock.openSettings.assert_called_once()
 
+    def test_router_watchlist_updates_pass_the_title_id(self):
+        """Add and remove send the title id. A missing id is an empty string."""
+        main = _fresh_main_module()
+        ui_mock = MagicMock()
+
+        main.router(urlencode({"action": "add_to_watchlist", "content_id": "spy-id"}), ui_mock)
+        ui_mock.add_to_watchlist.assert_called_once_with("spy-id")
+
+        ui_mock.reset_mock()
+        main.router(urlencode({"action": "remove_from_watchlist", "content_id": "tuttle-id"}), ui_mock)
+        ui_mock.remove_from_watchlist.assert_called_once_with("tuttle-id")
+
+        ui_mock.reset_mock()
+        main.router(urlencode({"action": "add_to_watchlist"}), ui_mock)
+        ui_mock.add_to_watchlist.assert_called_once_with("")
+
     def test_router_play_episode_passes_content_type(self):
         """Catalog playback keeps content_type. Continue Watching leaves it empty."""
         main = _fresh_main_module()

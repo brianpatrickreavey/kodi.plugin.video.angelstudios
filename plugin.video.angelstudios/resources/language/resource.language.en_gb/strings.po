@@ -226,6 +226,14 @@ msgctxt "#30325"
 msgid "Show Other Content on the main menu"
 msgstr "Show Other Content on the main menu"
 
+msgctxt "#30326"
+msgid "Watchlist"
+msgstr "Watchlist"
+
+msgctxt "#30327"
+msgid "Show Watchlist on the main menu"
+msgstr "Show Watchlist on the main menu"
+
 # ============================================================================
 # 30400-30499: Advanced & Debug
 # ============================================================================

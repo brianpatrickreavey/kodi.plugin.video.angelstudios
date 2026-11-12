@@ -29,6 +29,7 @@ def test_sanitize_headers_for_logging():
         "Authorization": "Bearer secret_token",
         "Cookie": "session=abc123",
         "X-API-Key": "api_key_value",
+        "x-viewer-profile-id": "profile-1",
         "Content-Type": "application/json",
         "Accept": "text/html",
         "User-Agent": "test-agent",
@@ -40,6 +41,7 @@ def test_sanitize_headers_for_logging():
     assert result["Authorization"] == "[REDACTED]"
     assert result["Cookie"] == "[REDACTED]"
     assert result["X-API-Key"] == "[REDACTED]"
+    assert result["x-viewer-profile-id"] == "[REDACTED]"
 
     # Non-sensitive headers should pass through unchanged
     assert result["Content-Type"] == "application/json"

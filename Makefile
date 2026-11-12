@@ -7,7 +7,7 @@ PACKAGE_DIR := auth0-ciam-client/
 TEST_DIRS := tests/
 ADDON_MODULES := plugin.video.angelstudios
 
-.PHONY: lint black flake8 format format-and-lint unittest unittest-with-coverage coverage kodi-test kodi-test-look zip
+.PHONY: lint black flake8 format format-and-lint unittest unittest-with-coverage coverage kodi-test kodi-test-look kodi-test-watchlist zip
 .PHONY: lint-all test-all clean-all help
 
 # === HELP ===
@@ -22,6 +22,7 @@ help:
 	@echo "  unittest-with-coverage - Test with coverage (addon only)"
 	@echo "  kodi-test         - Start Kodi if it is closed, run KODI_CAPTION_TEST (default all), then quit it"
 	@echo "  kodi-test-look    - Same, and leave each play on screen for a person to watch"
+	@echo "  kodi-test-watchlist - Read the signed-in watchlist in Kodi. One check adds a title and removes it"
 	@echo "  zip               - Create addon zip"
 	@echo "  clean-all         - Clean all build artifacts"
 	@echo "  help              - Show this help"
@@ -55,6 +56,7 @@ unittest:
 # the result file. Quits Kodi only when this run started it. Not part of unittest.
 # Angel has to be signed in, and the program addon has to be enabled.
 KODI_CAPTION_TEST ?= all
+KODI_WATCHLIST_TEST ?= watchlist
 
 kodi-test:
 	KODI_CAPTION_TEST="$(KODI_CAPTION_TEST)" pytest $(TEST_DIRS)kodi/test_event_packet.py $(TEST_DIRS)kodi/test_kodi_app.py $(TEST_DIRS)kodi/test_playlist.py $(TEST_DIRS)kodi/test_notices.py $(TEST_DIRS)kodi/test_captions_live.py -v
@@ -62,6 +64,11 @@ kodi-test:
 # Same checks, and the watched plays stay on screen. Not part of unittest.
 kodi-test-look:
 	KODI_CAPTION_LOOK=1 KODI_CAPTION_TEST="$(KODI_CAPTION_TEST)" pytest $(TEST_DIRS)kodi/test_event_packet.py $(TEST_DIRS)kodi/test_kodi_app.py $(TEST_DIRS)kodi/test_playlist.py $(TEST_DIRS)kodi/test_notices.py $(TEST_DIRS)kodi/test_captions_live.py -v
+
+# Reads the signed-in watchlist. Does not play video. watchlist-add-remove saves
+# one title that is not already saved, then removes it. Not part of unittest.
+kodi-test-watchlist:
+	KODI_WATCHLIST_TEST="$(KODI_WATCHLIST_TEST)" pytest $(TEST_DIRS)kodi/test_notices.py $(TEST_DIRS)kodi/test_watchlist_expect.py $(TEST_DIRS)kodi/test_watchlist_live.py -v
 
 unittest-with-coverage:
 	python -m pytest --cov=$(ADDON_MODULES) --cov-report=term-missing --cov-fail-under=90 $(TEST_DIRS)unit

@@ -11,6 +11,10 @@ import xbmcplugin  # type: ignore
 from kodi_utils import TimedBlock
 from menu_utils import MenuUtils, watch_page_facts
 
+# Movies, series, and specials can be saved. Episodes, seasons, and trailers cannot.
+_WATCHLIST_CONTENT_TYPES = ("movies", "series", "specials")
+_TITLE_PROJECT_TYPES = ("movie", "series", "special")
+
 
 class ProjectsMenu(MenuUtils):
     """Handles project menu operations with granular performance tracking."""
@@ -65,6 +69,13 @@ class ProjectsMenu(MenuUtils):
         else:
             self.log.debug("Cache disabled; bypassing projects cache")
 
+        # A catalog cached before title ids were requested cannot add or remove.
+        # Read it again once. Membership itself is not taken from this cache.
+        if projects and content_type in _WATCHLIST_CONTENT_TYPES and projects_need_title_ids(projects):
+            self.log.info("Cached projects are missing title ids; fetching the catalog again")
+            projects = None
+            was_cached = False
+
         if projects:
             self.log.info(f"Using cached projects for content type: {content_type}")
         else:
@@ -97,6 +108,7 @@ class ProjectsMenu(MenuUtils):
             "movies" if content_type == "movies" else "tvshows" if content_type == "series" else "videos"
         )
         xbmcplugin.setContent(self.kodi_handle, kodi_content_type)
+        saved_ids = self._saved_watchlist_ids() if content_type in _WATCHLIST_CONTENT_TYPES else set()
 
         for project in projects:
             self.log.info(f"Processing project: {project['name']}")
@@ -117,6 +129,11 @@ class ProjectsMenu(MenuUtils):
                 content_type=content_type,
                 project_slug=project["slug"],
             )
+
+            if content_type in _WATCHLIST_CONTENT_TYPES:
+                content_id = title_content_id(project)
+                if content_id:
+                    list_item.addContextMenuItems([self.watchlist_context_item(content_id, content_id in saved_ids)])
 
             # Add to directory
             xbmcplugin.addDirectoryItem(self.kodi_handle, url, list_item, True)
@@ -157,3 +174,55 @@ class ProjectsMenu(MenuUtils):
     def create_plugin_url(self, **kwargs):
         """Create a URL for calling the plugin recursively"""
         return f"{self.kodi_url}?{urlencode(kwargs)}"
+
+    def _saved_watchlist_ids(self):
+        """Title ids on the watchlist. An unread list leaves every title as Add."""
+        getter = getattr(self.parent.angel_interface, "get_default_watchlist", None)
+        if not callable(getter):
+            return set()
+        try:
+            items = getter()
+        except Exception as exc:
+            self.log.warning(f"Could not read the watchlist: {exc}")
+            return set()
+        if not isinstance(items, list):
+            return set()
+        saved = set()
+        for item in items:
+            if isinstance(item, dict) and item.get("content_id"):
+                saved.add(item["content_id"])
+        return saved
+
+
+def title_content_id(project):
+    """Return the movie, series, or special id Angel uses for the watchlist."""
+    if not isinstance(project, dict):
+        return None
+    title = project.get("title")
+    if not isinstance(title, dict):
+        return None
+    content_id = title.get("id")
+    if isinstance(content_id, str) and content_id:
+        return content_id
+    return None
+
+
+def projects_need_title_ids(projects):
+    """True when this catalog was stored before title ids were requested.
+
+    A title that is present and includes an id key is a current response, even
+    when that id is empty. Fetching that catalog again would not add the key.
+    """
+    if not isinstance(projects, list):
+        return False
+    for project in projects:
+        if not isinstance(project, dict):
+            continue
+        if project.get("projectType") not in _TITLE_PROJECT_TYPES:
+            continue
+        if "title" not in project:
+            return True
+        title = project.get("title")
+        if isinstance(title, dict) and "id" not in title:
+            return True
+    return False

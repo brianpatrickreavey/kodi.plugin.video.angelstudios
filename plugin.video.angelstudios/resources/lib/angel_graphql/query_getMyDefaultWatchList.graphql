@@ -1,0 +1,46 @@
+# The signed-in viewer's default watchlist.
+# The site asks for the first 100 items, in the order Angel returns them.
+# Each item wraps a movie, series, or special. The title id is content.id.
+# The project slug is content.project.slug.
+
+query getMyDefaultWatchList {
+  getMyDefaultWatchList {
+    id
+    items(first: 100) {
+      edges {
+        node {
+          id
+          content {
+            __typename
+            ... on ContentDisplayable {
+              id
+              name
+              description(version: SHORT)
+              imageLandscape: image(category: ANGEL_KEY_ART_1, aspect: "16:9") {
+                cloudinaryPath
+              }
+              imagePortrait: image(category: ANGEL_KEY_ART_1, aspect: "2:3") {
+                cloudinaryPath
+              }
+            }
+            ... on ContentMovie {
+              project {
+                slug
+              }
+            }
+            ... on ContentSeries {
+              project {
+                slug
+              }
+            }
+            ... on ContentSpecial {
+              project {
+                slug
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

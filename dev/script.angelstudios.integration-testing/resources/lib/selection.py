@@ -1,6 +1,7 @@
-"""Names for one caption condition, a bundle of them, or every condition.
+"""Names for one check, a bundle of them, or every caption check.
 
-A leaf is one play. A bundle runs its leaves in order. all runs every leaf once.
+A leaf is one check. A bundle runs its leaves in order. all runs every caption
+leaf once. The watchlist bundle is separate, so all does not open the watchlist.
 sign-in runs first on every selection and is not one of the watched plays.
 The leaf names here match the @register names in resources/lib/tests.
 """
@@ -18,8 +19,18 @@ LEAVES = (
     "hearing-impaired-off",
 )
 
+# Not part of LEAVES. all stays the caption run.
+WATCHLIST = (
+    "watchlist-hidden",
+    "watchlist-shown",
+    "watchlist-matches",
+    "watchlist-open",
+    "watchlist-add-remove",
+)
+
 GROUPS = {
     "all": LEAVES,
+    "watchlist": WATCHLIST,
     "captions": (
         "captions-english",
         "captions-off",
@@ -50,6 +61,9 @@ def expand(name):
         return list(GROUPS[name])
     if name in LEAVES:
         return [name]
+    for leaves in GROUPS.values():
+        if name in leaves:
+            return [name]
     return None
 
 
@@ -65,4 +79,7 @@ def run_order(name):
 
 def known_names():
     """Return every name a run can ask for, in alphabetical order."""
-    return sorted(set(LEAVES) | set(GROUPS) | {SIGN_IN})
+    names = set(LEAVES) | set(GROUPS) | {SIGN_IN}
+    for leaves in GROUPS.values():
+        names.update(leaves)
+    return sorted(names)
