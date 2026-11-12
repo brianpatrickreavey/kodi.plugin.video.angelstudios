@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.9.0] - 2026-11-11
+- Play closed captions from the Angel stream.
+
 ## [0.8.0] - 2026-11-10
 - Show the watch-page title tags on movies, series, and specials.
 
