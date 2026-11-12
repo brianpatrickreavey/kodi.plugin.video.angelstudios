@@ -1216,3 +1216,73 @@ class TestWatchProgressPlayback:
 
         monitor.assert_not_called()
         show_error.assert_called_once()
+
+    def test_monitor_turns_on_the_preferred_caption_track(self, ui_interface):
+        """Once the episode is playing, the preferred caption track is turned on."""
+        ui, logger, angel = ui_interface
+        angel.upsert_watch_position.return_value = True
+        player = _ScriptedPlayer([True, True, False], times=[40])
+        requests = []
+
+        def rpc(raw):
+            request = json.loads(raw)
+            requests.append(request)
+            method = request["method"]
+            if method == "Settings.GetSettingValue":
+                setting = request["params"]["setting"]
+                if setting == "locale.subtitlelanguage":
+                    return json.dumps({"result": {"value": "en"}})
+                return json.dumps({"result": {"value": False}})
+            if method == "Player.GetActivePlayers":
+                return json.dumps({"result": [{"playerid": 1, "type": "video"}]})
+            if method == "Player.GetProperties":
+                tracks = [
+                    {
+                        "index": 0,
+                        "name": "English",
+                        "language": "eng",
+                        "isdefault": False,
+                        "isforced": False,
+                        "isimpaired": False,
+                    },
+                    {
+                        "index": 1,
+                        "name": "Spanish (Latam)",
+                        "language": "es-419",
+                        "isdefault": False,
+                        "isforced": False,
+                        "isimpaired": False,
+                    },
+                ]
+                return json.dumps(
+                    {
+                        "result": {
+                            "subtitles": tracks,
+                            "currentaudiostream": {"language": "eng"},
+                        }
+                    }
+                )
+            if method == "Player.SetSubtitle":
+                return json.dumps({"result": "OK"})
+            raise AssertionError(method)
+
+        with patch("kodi_playback_handler.xbmc.executeJSONRPC", side_effect=rpc):
+            self._run_monitor(ui, player, saved=None, resume_at=None, now_values=[0, 0])
+
+        set_subtitle = requests[-1]
+        assert set_subtitle["method"] == "Player.SetSubtitle"
+        assert set_subtitle["params"] == {"playerid": 1, "subtitle": 0, "enable": True}
+        logger.info.assert_any_call("Captions on: English")
+        angel.upsert_watch_position.assert_called()
+
+    def test_caption_failure_still_reports_the_stop(self, ui_interface):
+        """A caption failure does not stop the watch-position report."""
+        ui, logger, angel = ui_interface
+        angel.upsert_watch_position.return_value = True
+        player = _ScriptedPlayer([True, True, False], times=[40])
+
+        with patch("kodi_playback_handler.apply_playback_captions", side_effect=RuntimeError("captions down")):
+            self._run_monitor(ui, player, saved=None, resume_at=None, now_values=[0, 0])
+
+        logger.warning.assert_any_call("Could not apply the caption preference: captions down")
+        angel.upsert_watch_position.assert_called()
