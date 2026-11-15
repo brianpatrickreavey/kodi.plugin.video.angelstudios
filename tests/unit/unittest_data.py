@@ -250,8 +250,16 @@ ROUTER_DISPATCH_CASES = [
     ("remove_from_watchlist", "remove_from_watchlist", {"content_id": "title-id"}),
     ("continue_watching_menu", "continue_watching_menu", {}),
     ("top_picks_menu", "top_picks_menu", {}),
+    ("guild_voting_menu", "guild_voting_menu", {}),
+    ("guild_voted_menu", "guild_voted_menu", {}),
+    ("play_torch", "play_torch", {"torch_id": "torch-1"}),
+    ("play_voted_torch", "play_voted_torch", {"torch_id": "torch-1"}),
     ("all_content_menu", None, {}),
     ("seasons_menu", "seasons_menu", {"content_type": "series", "project_slug": "slug"}),
-    ("episodes_menu", "episodes_menu", {"content_type": "series", "project_slug": "slug", "season_id": "1"}),
+    (
+        "episodes_menu",
+        "episodes_menu",
+        {"content_type": "series", "project_slug": "slug", "season_id": "1"},
+    ),
     ("play_episode", "play_episode", {"episode_guid": "guid", "project_slug": "slug"}),
 ]

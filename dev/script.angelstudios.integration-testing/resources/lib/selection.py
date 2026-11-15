@@ -1,7 +1,8 @@
 """Names for one check, a bundle of them, or every caption check.
 
 A leaf is one check. A bundle runs its leaves in order. all runs every caption
-leaf once. The watchlist bundle is separate, so all does not open the watchlist.
+leaf once. The watchlist bundle and the Guild Voting bundle are separate, so
+all does not open the watchlist or Guild Voting.
 sign-in runs first on every selection and is not one of the watched plays.
 The leaf names here match the @register names in resources/lib/tests.
 """
@@ -28,9 +29,16 @@ WATCHLIST = (
     "watchlist-add-remove",
 )
 
+# Not part of LEAVES. This bundle does not open a torch and does not send a vote.
+GUILD = (
+    "guild-menu",
+    "guild-list",
+)
+
 GROUPS = {
     "all": LEAVES,
     "watchlist": WATCHLIST,
+    "guild": GUILD,
     "captions": (
         "captions-english",
         "captions-off",

@@ -3,6 +3,7 @@ Kodi Playback Handler for Angel Studios addon.
 Handles all Kodi-specific playback operations and stream resolution.
 """
 
+import base64
 import json
 import queue
 import sys
@@ -27,6 +28,63 @@ _RESUME_CONTENT_TYPES = {"movies", "series", "specials"}
 # How long to wait for the stream to start before giving up on progress reports.
 _PLAYBACK_START_TIMEOUT = 30
 _PLAYBACK_START_POLL = 0.2
+
+
+# Angel encrypts a torch's 1080p rendition with a hardware Widevine key.
+# The software CDM receives the 720p key and the lower ones.
+_SOFTWARE_WIDEVINE_MAX_HEIGHT = 720
+
+
+def _widevine_hardware_cdm():
+    """True when the device CDM can hold a hardware Widevine key.
+
+    Android and webOS use the platform CDM. Desktop Kodi uses the software
+    library from InputStream Helper.
+    """
+    try:
+        android = xbmc.getCondVisibility("System.Platform.Android") is True
+        webos = xbmc.getCondVisibility("System.Platform.WebOS") is True
+    except Exception:
+        return False
+    return android or webos
+
+
+def _software_widevine_height(target_height):
+    """Highest torch height the software CDM can decrypt.
+
+    A height the viewer already chose below 720 stays. Auto, manual, and
+    1080 become 720.
+    """
+    if isinstance(target_height, int) and 0 < target_height < _SOFTWARE_WIDEVINE_MAX_HEIGHT:
+        return target_height
+    return _SOFTWARE_WIDEVINE_MAX_HEIGHT
+
+
+def _widevine_license_url(widevine):
+    """A license URL that can sit in an InputStream Adaptive property."""
+    if not isinstance(widevine, dict):
+        return None
+    url = widevine.get("license_url")
+    if not isinstance(url, str) or not url or "|" in url:
+        return None
+    return url
+
+
+def _widevine_certificate_b64(body):
+    """The certificate InputStream Adaptive expects, as base64 text."""
+    if not isinstance(body, (bytes, bytearray)) or not body:
+        return None
+    try:
+        text = body.decode("ascii")
+    except UnicodeDecodeError:
+        text = ""
+    begin = "-----BEGIN CERTIFICATE-----"
+    end = "-----END CERTIFICATE-----"
+    if begin in text and end in text:
+        inner = text.split(begin, 1)[1].split(end, 1)[0]
+        extracted = "".join(inner.split())
+        return extracted or None
+    return base64.b64encode(bytes(body)).decode("ascii")
 
 
 def _plugin_play_url():
@@ -244,7 +302,9 @@ class KodiPlaybackHandler:
 
                 episode_name = episode.get("subtitle") or episode.get("name", "Unknown")
                 project_name = episode.get("projectSlug", "Unknown")
-                self.log.info(f"Playing cached episode: {episode_name} from project: {project_name}")
+                self.log.info(
+                    f"Playing cached episode: {episode_name} from project: {project_name}"
+                )
 
                 # Play using cached episode data
                 project = episode.get("project", {"name": episode.get("name", "Unknown")})
@@ -277,7 +337,9 @@ class KodiPlaybackHandler:
             source = episode.get("source")
             if not source or not source.get("url"):
                 self.parent.show_error("No playable stream URL found for this episode")
-                self.log.error(f"No stream URL for episode: {episode_guid} in project: {project_slug}")
+                self.log.error(
+                    f"No stream URL for episode: {episode_guid} in project: {project_slug}"
+                )
                 return
 
             episode_name = episode.get("subtitle") or episode.get("name", "Unknown")
@@ -362,7 +424,14 @@ class KodiPlaybackHandler:
         self.log.warning(f"Could not clear Kodi's stored stop: {raw}")
 
     def play_video(
-        self, stream_url=None, episode_data=None, resume_at=None, saved_position=None, clear_kodi_stop=False
+        self,
+        stream_url=None,
+        episode_data=None,
+        resume_at=None,
+        saved_position=None,
+        clear_kodi_stop=False,
+        manifest_type=None,
+        widevine=None,
     ):
         """Play a video stream with optional enhanced metadata"""
         if stream_url and episode_data:
@@ -389,7 +458,9 @@ class KodiPlaybackHandler:
 
                 episode_name = episode.get("subtitle", "Unknown")
                 project_name = project.get("name", "Unknown")
-                self.log.info(f"Playing enhanced video: {episode_name} from project: {project_name}")
+                self.log.info(
+                    f"Playing enhanced video: {episode_name} from project: {project_name}"
+                )
             elif stream_url:
                 # Basic playback (fallback for play_content)
                 list_item = xbmcgui.ListItem(offscreen=True)
@@ -397,8 +468,10 @@ class KodiPlaybackHandler:
                 list_item.setIsFolder(False)
                 list_item.setProperty("IsPlayable", "true")
                 list_item.addStreamInfo("video", {"codec": "h264"})
+                if manifest_type in ("hls", "mpd"):
+                    self._apply_adaptive_manifest(list_item, manifest_type, widevine=widevine)
 
-                self.log.info(f"Playing basic video from URL: {stream_url}")
+                self.log.info("Playing basic video")
 
             if episode_data and isinstance(episode, dict):
                 guid = episode.get("guid") or None
@@ -418,15 +491,18 @@ class KodiPlaybackHandler:
 
             # Resolve and play
             xbmcplugin.setResolvedUrl(self.handle, True, listitem=list_item)
-            self.log.info(f"Playing stream: {list_item.getPath()}")
+            if widevine:
+                self.log.info("Playing protected stream")
+            else:
+                self.log.info(f"Playing stream: {list_item.getPath()}")
 
         except Exception as e:
             self.parent.show_error(f"Error playing video: {e}")
             self.log.error(f"Error playing video: {e}")
-            return
+            return False
 
         if not guid:
-            return
+            return True
         try:
             self._monitor_watch_progress(guid, saved_position, resume_at, project_slug, player)
         except Exception as exc:
@@ -445,7 +521,9 @@ class KodiPlaybackHandler:
             return nested.get("slug") or None
         return None
 
-    def _send_watch_position(self, guid, position, session, project_slug=None, event_type="heartbeat"):
+    def _send_watch_position(
+        self, guid, position, session, project_slug=None, event_type="heartbeat"
+    ):
         """Send one position. A failure is logged and playback continues."""
         interface = getattr(self.parent, "angel_interface", None)
         sender = getattr(interface, "upsert_watch_position", None) if interface else None
@@ -464,7 +542,9 @@ class KodiPlaybackHandler:
     def _remember_saved_position(self, project_slug, guid, position):
         """Keep the episode-list cache aligned with a position Angel accepted."""
         cache_manager = getattr(self.parent, "cache_manager", None)
-        remember = getattr(cache_manager, "remember_watch_position", None) if cache_manager else None
+        remember = (
+            getattr(cache_manager, "remember_watch_position", None) if cache_manager else None
+        )
         if not callable(remember):
             return
         try:
@@ -485,7 +565,9 @@ class KodiPlaybackHandler:
         except Exception as exc:
             self.log.warning(f"Could not apply the caption preference: {exc}")
 
-    def _monitor_watch_progress(self, guid, saved_position, resume_at, project_slug=None, player=None):
+    def _monitor_watch_progress(
+        self, guid, saved_position, resume_at, project_slug=None, player=None
+    ):
         """Report the playhead once a minute, and again on pause or stop.
 
         This stays on the plugin thread until playback ends. setResolvedUrl has
@@ -554,7 +636,9 @@ class KodiPlaybackHandler:
             # Otherwise a slow save could still be the position Angel keeps.
             sender.flush()
             ending = getattr(player, "stop_position", None)
-            sample = session.on_pause_or_stop(ending if ending is not None else session.last_position)
+            sample = session.on_pause_or_stop(
+                ending if ending is not None else session.last_position
+            )
             if sample is not None:
                 # The website uses complete when the video finishes, and stop_exit when the player closes.
                 event_type = "complete" if player.ended is True else "stop_exit"
@@ -562,32 +646,147 @@ class KodiPlaybackHandler:
         finally:
             sender.close()
 
-    def _ensure_isa_available(self, manifest_type: str = "hls") -> bool:
-        """Check if InputStream Adaptive is available (and installed/enabled)."""
+    def _apply_adaptive_manifest(self, list_item, manifest_type: str, widevine=None):
+        """Mark a direct stream as HLS or DASH when InputStream Adaptive is on.
+
+        A DRM torch uses InputStream Adaptive even when that setting is off.
+        """
+        license_url = _widevine_license_url(widevine)
+        if license_url is None:
+            try:
+                use_isa = self.parent.addon.getSettingBool("use_isa") is True
+            except Exception:
+                use_isa = False
+            if not use_isa:
+                return
+        drm = "widevine" if license_url else None
+        isa_ready = self._ensure_isa_available(manifest_type, drm=drm)
+        # The addon alone cannot decrypt. A failed Widevine check must not fall through.
+        if not isa_ready and not license_url:
+            isa_ready = xbmc.getCondVisibility("System.HasAddon(inputstream.adaptive)")
+        if not isa_ready:
+            return
+        quality_pref = self._get_quality_pref()
+        quality_mode = quality_pref["mode"]
+        target_height = quality_pref["target_height"]
+        if license_url and not _widevine_hardware_cdm():
+            capped_height = _software_widevine_height(target_height)
+            if quality_mode != "fixed" or capped_height != target_height:
+                self.log.info(
+                    "Software Widevine cannot decrypt the 1080p torch track. "
+                    f"Playing {capped_height}p."
+                )
+                quality_mode = "fixed"
+            target_height = capped_height
+        if quality_mode == "manual":
+            stream_selection_type = "ask-quality"
+        elif quality_mode == "fixed":
+            stream_selection_type = "fixed-res"
+        else:
+            stream_selection_type = "adaptive"
+        list_item.setProperty("inputstream", "inputstream.adaptive")
+        list_item.setProperty("inputstream.adaptive.manifest_type", manifest_type)
+        list_item.setProperty("inputstream.adaptive.stream_selection_type", stream_selection_type)
+        if isinstance(target_height, int) and quality_mode != "manual":
+            chooser_map = {1080: "1080p", 720: "720p", 480: "480p", 360: "360p"}
+            chooser_value = chooser_map.get(target_height)
+            if chooser_value:
+                list_item.setProperty("inputstream.adaptive.chooser_resolution_max", chooser_value)
+                list_item.setProperty(
+                    "inputstream.adaptive.chooser_resolution_secure_max", chooser_value
+                )
+        if manifest_type == "hls":
+            list_item.setMimeType("application/vnd.apple.mpegurl")
+        else:
+            list_item.setMimeType("application/dash+xml")
+        list_item.setContentLookup(False)
+        if license_url:
+            list_item.setProperty("inputstream.adaptive.license_type", "com.widevine.alpha")
+            # The last field must be R. An empty one leaves the CDM with no key.
+            list_item.setProperty(
+                "inputstream.adaptive.license_key",
+                license_url + "|Content-Type=application%2Foctet-stream|R{SSM}|R",
+            )
+            certificate = None
+            if isinstance(widevine, dict):
+                certificate = widevine.get("server_certificate")
+            if isinstance(certificate, str) and certificate:
+                list_item.setProperty("inputstream.adaptive.server_certificate", certificate)
+
+    def widevine_ready(self, manifest_type: str = "hls") -> bool:
+        """True when Widevine can decrypt. Kodi prompts to install it when it is missing."""
+        return self._ensure_isa_available(manifest_type, drm="widevine")
+
+    def widevine_certificate(self, url):
+        """Base64 certificate for InputStream Adaptive. None when it cannot be read."""
+        if not isinstance(url, str) or not url:
+            return None
+        encoded = None
+        try:
+            import requests
+
+            response = requests.get(url, timeout=15)
+            response.raise_for_status()
+            encoded = _widevine_certificate_b64(response.content)
+        except Exception:
+            encoded = None
+        if not encoded:
+            self.log.warning("Could not read the Widevine certificate")
+            return None
+        return encoded
+
+    def install_widevine(self):
+        """Settings action. A cancel leaves Kodi's own dialog as the only message."""
+        has_helper = xbmc.getCondVisibility("System.HasAddon(script.module.inputstreamhelper)")
+        if not has_helper:
+            self.parent.show_error("InputStream Helper is not installed.")
+            return
+        if self.widevine_ready("hls"):
+            self.parent.show_notification("Widevine is installed.")
+
+    def _ensure_isa_available(self, manifest_type: str = "hls", drm=None) -> bool:
+        """Check if InputStream Adaptive is available (and installed/enabled).
+
+        drm='widevine' asks the helper to install the Widevine library when it is missing.
+        """
         has_helper = xbmc.getCondVisibility("System.HasAddon(script.module.inputstreamhelper)")
         has_isa = xbmc.getCondVisibility("System.HasAddon(inputstream.adaptive)")
 
         if not has_helper:
+            if drm == "widevine":
+                self.log.info("inputstreamhelper not installed; Widevine cannot be installed")
+                return False
             if has_isa:
-                self.log.info("inputstreamhelper not installed; inputstream.adaptive present via System.HasAddon")
+                self.log.info(
+                    "inputstreamhelper not installed; inputstream.adaptive present via System.HasAddon"
+                )
             else:
-                self.log.info("inputstreamhelper not installed; inputstream.adaptive not detected; skipping ISA setup")
+                self.log.info(
+                    "inputstreamhelper not installed; inputstream.adaptive not detected; skipping ISA setup"
+                )
             return has_isa
 
         try:
             from inputstreamhelper import Helper  # type: ignore
         except Exception as exc:  # pragma: no cover - defensive
             self.log.warning(f"inputstreamhelper present but import failed: {exc}")
+            if drm == "widevine":
+                return False
             return has_isa
 
         try:
-            is_helper = Helper(manifest_type)
+            if drm:
+                is_helper = Helper(manifest_type, drm=drm)
+            else:
+                is_helper = Helper(manifest_type)
             result = bool(is_helper.check_inputstream())
             if not result:
                 self.log.info("inputstreamhelper check_inputstream returned False; ISA unavailable")
             return result
         except Exception as exc:  # pragma: no cover - defensive
             self.log.warning(f"inputstreamhelper check failed: {exc}")
+            if drm == "widevine":
+                return False
             return has_isa
 
     def _get_quality_pref(self):
@@ -595,11 +794,15 @@ class KodiPlaybackHandler:
         try:
             addon = self.parent.addon
             getter = getattr(addon, "getSettingString", None)
-            quality_value = getter("video_quality") if callable(getter) else addon.getSetting("video_quality")
+            quality_value = (
+                getter("video_quality") if callable(getter) else addon.getSetting("video_quality")
+            )
         except Exception:
             quality_value = "auto"
 
-        quality_value = (quality_value or "auto").lower() if isinstance(quality_value, str) else "auto"
+        quality_value = (
+            (quality_value or "auto").lower() if isinstance(quality_value, str) else "auto"
+        )
         mapping = {
             "1080p": {"mode": "fixed", "target_height": 1080},
             "720p": {"mode": "fixed", "target_height": 720},

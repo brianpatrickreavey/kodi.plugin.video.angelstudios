@@ -1,0 +1,27 @@
+# Same torch read as the website ballot, without the age fields.
+# Used when the richer read is refused.
+
+query getTorchVoteTorchCore($torchId: ID!, $streamingArgs: TorchStreamingUrlArgs) {
+  torch(id: $torchId) {
+    id
+    title
+    torchVotes {
+      id
+      torchId
+      alignment
+      interest
+      ageGroups
+      skipped
+      watchLater
+      finalized
+      voterId
+    }
+    session(streamingArgs: $streamingArgs) {
+      id
+      url
+      drmRequired
+      drmLicenseUrl
+      drmCertificateUrl
+    }
+  }
+}

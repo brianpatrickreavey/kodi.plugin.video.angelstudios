@@ -30,7 +30,9 @@ class KodiUIInterface:
 
         self.addon = xbmcaddon.Addon()
         addon_path = xbmcvfs.translatePath(self.addon.getAddonInfo("path"))
-        self.default_icon = os.path.join(addon_path, "resources", "images", "icons", "Angel_Studios_Logo.png")
+        self.default_icon = os.path.join(
+            addon_path, "resources", "images", "icons", "Angel_Studios_Logo.png"
+        )
         self.default_settings_icon = "DefaultAddonService.png"
 
         # Initialize handlers
@@ -79,13 +81,38 @@ class KodiUIInterface:
         """Placeholder for top picks until API support is added."""
         return self.menu_handler.top_picks_menu()
 
+    def guild_voting_menu(self):
+        """List the torches Angel is offering this viewer."""
+        return self.menu_handler.guild_voting_menu()
+
+    def guild_voted_menu(self, after=None):
+        """List torches this viewer already finalized."""
+        return self.menu_handler.guild_voted_menu(after)
+
+    def play_torch(self, torch_id):
+        """Play one Guild torch and ask the two vote questions."""
+        return self.menu_handler.play_torch(torch_id)
+
+    def play_voted_torch(self, torch_id):
+        """Play a finalized torch again without asking the vote questions."""
+        return self.menu_handler.play_voted_torch(torch_id)
+
     def play_episode(self, episode_guid, project_slug, content_type="", resume=False):
         """Play an episode using cached project data (no separate API call)."""
         return self.playback_handler.play_episode(episode_guid, project_slug, content_type, resume)
 
-    def play_video(self, stream_url=None, episode_data=None):
+    def play_video(self, stream_url=None, episode_data=None, manifest_type=None, widevine=None):
         """Play a video stream with optional enhanced metadata"""
-        return self.playback_handler.play_video(stream_url, episode_data)
+        kwargs = {}
+        if manifest_type:
+            kwargs["manifest_type"] = manifest_type
+        if widevine:
+            kwargs["widevine"] = widevine
+        return self.playback_handler.play_video(stream_url, episode_data, **kwargs)
+
+    def install_widevine(self):
+        """Install Widevine from the addon settings."""
+        return self.playback_handler.install_widevine()
 
     def _ensure_isa_available(self, manifest_type: str = "hls") -> bool:
         """Check if InputStream Adaptive is available (and installed/enabled)."""
@@ -131,12 +158,16 @@ class KodiUIInterface:
                 self.log.debug(f"Cache miss for {cache_key}", category="cache")
 
         # Fetch from API
-        self.log.info(f"Fetching resume watching data from AngelStudiosInterface: first={first}, after={after}")
+        self.log.info(
+            f"Fetching resume watching data from AngelStudiosInterface: first={first}, after={after}"
+        )
         data = self.angel_interface.get_resume_watching(first=first, after=after)
 
         # Cache the result
         if data and cache_enabled:
-            self.cache_manager.cache.set(cache_key, data, expiration=self._resume_watching_cache_ttl())
+            self.cache_manager.cache.set(
+                cache_key, data, expiration=self._resume_watching_cache_ttl()
+            )
 
         return data
 

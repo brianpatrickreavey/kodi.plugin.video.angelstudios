@@ -1,4 +1,5 @@
 from unittest.mock import patch, MagicMock
+import base64
 import json
 import pytest
 from .unittest_data import MOCK_PROJECT_DATA, MOCK_EPISODE_DATA, TEST_EXCEPTION_MESSAGE
@@ -436,6 +437,94 @@ class TestInputStreamAdaptive:
 
         monkeypatch.setattr(builtins, "__import__", _fake_import)
         assert ui.playback_handler._ensure_isa_available("hls") is True
+
+    def test_widevine_check_passes_drm_to_the_helper(self, ui_interface, monkeypatch):
+        ui, _logger, _angel = ui_interface
+        seen = {}
+
+        class DummyHelper:
+            def __init__(self, manifest_type, drm=None):
+                seen["manifest_type"] = manifest_type
+                seen["drm"] = drm
+
+            def check_inputstream(self):
+                return True
+
+        monkeypatch.setattr("xbmc.getCondVisibility", self._make_cond_visibility(True, True))
+        self._install_helper_module(monkeypatch, DummyHelper)
+        assert ui.playback_handler.widevine_ready("hls") is True
+        assert seen == {"manifest_type": "hls", "drm": "widevine"}
+
+    def test_widevine_ready_is_false_without_the_helper(self, ui_interface, monkeypatch):
+        ui, _logger, _angel = ui_interface
+        monkeypatch.setattr("xbmc.getCondVisibility", self._make_cond_visibility(False, True))
+        assert ui.playback_handler.widevine_ready("hls") is False
+
+    def test_install_widevine_notifies_when_it_is_already_there(self, ui_interface, monkeypatch):
+        ui, _logger, _angel = ui_interface
+        monkeypatch.setattr("xbmc.getCondVisibility", self._make_cond_visibility(True, True))
+
+        with (
+            patch.object(ui.playback_handler, "widevine_ready", return_value=True),
+            patch.object(ui, "show_notification") as notify,
+            patch.object(ui, "show_error") as show_error,
+        ):
+            ui.install_widevine()
+
+        notify.assert_called_once_with("Widevine is installed.")
+        show_error.assert_not_called()
+
+    def test_install_widevine_stays_quiet_when_cancelled(self, ui_interface, monkeypatch):
+        ui, _logger, _angel = ui_interface
+        monkeypatch.setattr("xbmc.getCondVisibility", self._make_cond_visibility(True, True))
+
+        with (
+            patch.object(ui.playback_handler, "widevine_ready", return_value=False) as ready,
+            patch.object(ui, "show_notification") as notify,
+            patch.object(ui, "show_error") as show_error,
+        ):
+            ui.install_widevine()
+
+        ready.assert_called_once_with("hls")
+        notify.assert_not_called()
+        show_error.assert_not_called()
+
+    def test_install_widevine_reports_a_missing_helper(self, ui_interface, monkeypatch):
+        ui, _logger, _angel = ui_interface
+        monkeypatch.setattr("xbmc.getCondVisibility", self._make_cond_visibility(False, True))
+
+        with (
+            patch.object(ui.playback_handler, "widevine_ready") as ready,
+            patch.object(ui, "show_error") as show_error,
+        ):
+            ui.install_widevine()
+
+        ready.assert_not_called()
+        show_error.assert_called_once_with("InputStream Helper is not installed.")
+
+
+class TestWidevineCertificate:
+    def test_pem_certificate_is_the_inner_base64(self):
+        from kodi_playback_handler import _widevine_certificate_b64
+
+        pem = b"-----BEGIN CERTIFICATE-----\nQUJD\nREVGR0g=\n-----END CERTIFICATE-----\n"
+        assert _widevine_certificate_b64(pem) == "QUJDREVGR0g="
+
+    def test_binary_certificate_is_base64(self):
+        from kodi_playback_handler import _widevine_certificate_b64
+
+        assert _widevine_certificate_b64(b"\x00\x01") == base64.b64encode(b"\x00\x01").decode("ascii")
+
+    def test_certificate_fetch_failure_does_not_log_the_url(self, ui_interface):
+        ui, logger, _angel = ui_interface
+        url = "https://example.test/secret-cert"
+
+        with patch("requests.get", side_effect=Exception("boom " + url)):
+            assert ui.playback_handler.widevine_certificate(url) is None
+
+        logger.warning.assert_any_call("Could not read the Widevine certificate")
+        logged = " ".join(str(call) for call in logger.warning.call_args_list)
+        assert url not in logged
 
 
 class _ScriptedPlayer:

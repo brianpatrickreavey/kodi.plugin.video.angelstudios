@@ -1,0 +1,7 @@
+# Guild membership for this viewer. Do not request email.
+
+query guildMemberStatus {
+  user {
+    isGuildMember
+  }
+}

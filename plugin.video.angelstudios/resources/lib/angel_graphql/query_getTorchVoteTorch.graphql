@@ -1,0 +1,28 @@
+# One torch, its stream, and this viewer's saved vote.
+# recommendedAgeReason is not a field on TorchVote. Asking for it makes Angel
+# reject the whole read with HTTP 400. getTorchVoteTorchCore is the fallback.
+
+query getTorchVoteTorch($torchId: ID!, $streamingArgs: TorchStreamingUrlArgs) {
+  torch(id: $torchId) {
+    id
+    title
+    torchVotes {
+      id
+      torchId
+      alignment
+      interest
+      ageGroups
+      skipped
+      watchLater
+      finalized
+      voterId
+    }
+    session(streamingArgs: $streamingArgs) {
+      id
+      url
+      drmRequired
+      drmLicenseUrl
+      drmCertificateUrl
+    }
+  }
+}

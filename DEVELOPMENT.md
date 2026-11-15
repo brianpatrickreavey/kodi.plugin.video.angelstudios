@@ -79,6 +79,8 @@ This document outlines a trunk-based workflow that keeps changes small and fast 
   - Create GitHub release with auto-generated notes
   - Dispatch to central addon repository
 
+GitHub Actions does not start Kodi. Before a push to `main`, this machine also runs the Kodi check for the area that changed (`make kodi-test`, `make kodi-test-watchlist`, or `make kodi-test-guild`). Rows a person still has to watch are in [docs/dev/manual-tests.md](docs/dev/manual-tests.md). The ship steps are in the process repo README.
+
 ## Changelog Discipline
 - `kodi-addon-builder` automatically manages CHANGELOG.md entries.
 - The tool creates dated sections like `## [0.5.0] - YYYY-MM-DD` for each release.

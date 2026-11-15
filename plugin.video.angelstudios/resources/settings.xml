@@ -145,6 +145,11 @@
                     <default>true</default>
                     <control type="toggle" />
                 </setting>
+                <setting id="install_widevine" type="action" label="30106" help="30107">
+                    <level>0</level>
+                    <data>RunPlugin(plugin://plugin.video.angelstudios/?action=install_widevine)</data>
+                    <control type="button" format="action" />
+                </setting>
                 <setting id="disable_cache" type="boolean" label="30407" help="30408">
                     <level>3</level>
                     <default>false</default>

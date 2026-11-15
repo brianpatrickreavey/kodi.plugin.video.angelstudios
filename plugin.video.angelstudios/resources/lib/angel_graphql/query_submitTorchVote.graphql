@@ -1,0 +1,5 @@
+# Save the Guild ballot. The website sends a partial vote, then finalizes it.
+
+mutation submitTorchVote($vote: TorchVoteInput) {
+  submitVote(vote: $vote)
+}
