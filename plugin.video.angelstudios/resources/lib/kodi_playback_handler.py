@@ -11,6 +11,7 @@ import sys
 import threading
 import time
 import urllib.request
+from typing import Optional
 from urllib.parse import parse_qs, urlparse
 
 import xbmc  # type: ignore
@@ -139,7 +140,7 @@ def _fits(width: int, height: int, cap_width: int, cap_height: int) -> bool:
     return width <= cap_width and height <= cap_height
 
 
-def _cap_for_rows(rows, software_tracks, target_height) -> str | None:
+def _cap_for_rows(rows, software_tracks, target_height) -> Optional[str]:
     """Chooser value for the highest software row that fits a known cap.
 
     A fixed quality below that row is kept when a software row still fits it.
