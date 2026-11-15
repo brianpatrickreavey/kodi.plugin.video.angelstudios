@@ -1,0 +1,16 @@
+# Torches this viewer already finalized, one page at a time.
+# The addon keeps items in the order Angel returns them.
+
+query getTorchVoteHistory($input: TorchVotesInput) {
+  torchVotes(input: $input) {
+    hasNext
+    nextCursor
+    items {
+      finalized
+      torch {
+        id
+        title
+      }
+    }
+  }
+}

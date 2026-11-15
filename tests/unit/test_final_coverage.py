@@ -49,10 +49,14 @@ class TestKodiUIInterfaceLines1399_1400:
 
             with patch.object(ui.log, "debug") as mock_debug:
                 # This calls the code path at lines 1399-1400
-                ui.menu_handler._create_list_item_from_episode(episode, project=project, content_type="series")
+                ui.menu_handler._create_list_item_from_episode(
+                    episode, project=project, content_type="series"
+                )
 
             # Verify logo injection was logged
-            mock_debug.assert_any_call("[ART] Injecting project logo into episode: project_logo.png", category="art")
+            mock_debug.assert_any_call(
+                "[ART] Injecting project logo into episode: project_logo.png", category="art"
+            )
 
 
 class TestKodiUIInterfaceLines1583_1587:
@@ -69,7 +73,9 @@ class TestKodiUIInterfaceLines1583_1587:
 
             logger_mock = MagicMock()
             angel_interface_mock = MagicMock()
-            angel_interface_mock.get_cloudinary_url.return_value = "http://cdn.example.com/portrait.jpg"
+            angel_interface_mock.get_cloudinary_url.return_value = (
+                "http://cdn.example.com/portrait.jpg"
+            )
 
             ui = KodiUIInterface(
                 handle=1,
@@ -90,7 +96,9 @@ class TestKodiUIInterfaceLines1583_1587:
                 ui.menu_handler._process_attributes_to_infotags(list_item, info_dict)
 
             # Verify the debug log at line 1587
-            mock_debug.assert_any_call("[ART] Using portraitStill1: portrait_still_1.jpg", category="art")
+            mock_debug.assert_any_call(
+                "[ART] Using portraitStill1: portrait_still_1.jpg", category="art"
+            )
 
 
 class TestKodiUIInterfaceLines1589_1597:
@@ -107,7 +115,9 @@ class TestKodiUIInterfaceLines1589_1597:
 
             logger_mock = MagicMock()
             angel_interface_mock = MagicMock()
-            angel_interface_mock.get_cloudinary_url.return_value = "http://cdn.example.com/portrait.jpg"
+            angel_interface_mock.get_cloudinary_url.return_value = (
+                "http://cdn.example.com/portrait.jpg"
+            )
 
             ui = KodiUIInterface(
                 handle=1,
@@ -129,9 +139,12 @@ class TestKodiUIInterfaceLines1589_1597:
 
             # Verify the debug log at lines 1583-1587
             mock_debug.assert_any_call(
-                "[ART] direct portraitTitleImage: " "{'cloudinaryPath': 'direct_portrait.jpg'}", category="art"
+                "[ART] direct portraitTitleImage: " "{'cloudinaryPath': 'direct_portrait.jpg'}",
+                category="art",
             )
-            mock_debug.assert_any_call("[ART] Using direct portraitTitleImage: direct_portrait.jpg", category="art")
+            mock_debug.assert_any_call(
+                "[ART] Using direct portraitTitleImage: direct_portrait.jpg", category="art"
+            )
 
 
 class TestKodiUIInterfaceLines1622_1624:
@@ -148,7 +161,9 @@ class TestKodiUIInterfaceLines1622_1624:
 
             logger_mock = MagicMock()
             angel_interface_mock = MagicMock()
-            angel_interface_mock.get_cloudinary_url.return_value = "http://cdn.example.com/landscape.jpg"
+            angel_interface_mock.get_cloudinary_url.return_value = (
+                "http://cdn.example.com/landscape.jpg"
+            )
 
             ui = KodiUIInterface(
                 handle=1,
@@ -175,7 +190,7 @@ class TestMainLine122:
     """Test to cover main.py line 122."""
 
     def test_main_shows_error_when_credentials_missing(self):
-        """Test main module initialization shows error dialog when credentials are missing (line 122)."""
+        """A catalog action still asks for a username and password when they are empty."""
         import os
         import sys
         import runpy
@@ -189,7 +204,7 @@ class TestMainLine122:
         old_path = sys.path.copy()
         try:
             # Set up argv as if Kodi is calling the plugin
-            sys.argv = ["plugin://plugin.video.angelstudios/", "1", "?"]
+            sys.argv = ["plugin://plugin.video.angelstudios/", "1", "?action=movies_menu"]
 
             # Add plugin directory to path
             plugin_path = os.path.abspath(
@@ -206,13 +221,25 @@ class TestMainLine122:
             ):
                 # Mock addon to return empty credentials
                 mock_addon = MagicMock()
-                mock_addon.getSettingString.side_effect = lambda key: "" if key in ["username", "password"] else "off"
+                mock_addon.getSettingString.side_effect = lambda key: (
+                    "" if key in ["username", "password"] else "off"
+                )
                 mock_addon.getSettingBool.return_value = False
                 mock_addon.getSettingInt.return_value = 12
                 mock_addon_class.return_value = mock_addon
 
                 mock_dialog = MagicMock()
                 mock_dialog_class.return_value = mock_dialog
+
+                # Drop a copy imported by an earlier test so this load reads
+                # the empty username from the mock above.
+                for name in (
+                    "addon_entry",
+                    "kodi_ui_interface",
+                    "angel_interface",
+                    "angel_authentication",
+                ):
+                    sys.modules.pop(name, None)
 
                 # Run main as __main__ - this triggers line 122
                 try:

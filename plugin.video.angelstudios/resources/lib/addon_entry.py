@@ -111,6 +111,63 @@ USERNAME = ADDON.getSettingString("username")
 PASSWORD = ADDON.getSettingString("password")
 TIMEOUT = ADDON.getSettingInt("request_timeout")
 
+# The main menu still opens when the username or password is empty, so Guild
+# Voting can say "Sign in to vote." Catalog actions keep the configure dialog.
+_ACTIONS_WITHOUT_CREDENTIALS = {
+    None,
+    "settings",
+    "show_information",
+    "guild_voting_menu",
+    "guild_voted_menu",
+    "play_torch",
+    "play_voted_torch",
+    "install_widevine",
+}
+
+# These actions do not read the catalog or the Guild. Signing in first would
+# delay them, and logout must not create a new session on the way out.
+# "info" is the unavailable-episode message. "show_information" is the
+# session dialog. Both stay on the token that is already saved.
+_ACTIONS_WITHOUT_LOGIN_REFRESH = {
+    "settings",
+    "clear_cache",
+    "install_widevine",
+    "force_logout",
+    "clear_debug_data",
+    "info",
+    "show_information",
+}
+
+
+def refresh_saved_login(auth_core, action):
+    """Sign in again when the saved token is missing or expired.
+
+    A token that is still valid does not contact Angel. A failed sign-in
+    leaves the addon open. The new token is saved before the interface is built.
+    """
+    if not USERNAME or not PASSWORD:
+        return
+    if action in _ACTIONS_WITHOUT_LOGIN_REFRESH:
+        return
+    try:
+        already_valid = auth_core.validate_session() is True
+    except Exception as exc:
+        logger.warning(f"Saved login check failed ({type(exc).__name__})")
+        already_valid = False
+    if already_valid:
+        return
+    logger.info("Saved login expired. Signing in again.")
+    try:
+        auth_core.ensure_valid_session()
+        refreshed = auth_core.validate_session() is True
+    except Exception as exc:
+        logger.warning(f"Could not refresh the saved login ({type(exc).__name__})")
+        return
+    if refreshed:
+        logger.info("Saved login refreshed")
+    else:
+        logger.warning("Could not refresh the saved login")
+
 
 def router(paramstring, ui_interface, resume=False):
     """
@@ -132,10 +189,8 @@ def router(paramstring, ui_interface, resume=False):
     try:
         # Route to appropriate function
         if not params:
-            # Main entry point - show main menu with fresh authentication
             ui_interface.main_menu()
         else:
-            # Subsequent navigation - use existing session if available
             if params["action"] == "movies_menu":
                 # Show movies
                 ui_interface.projects_menu(content_type="movies")
@@ -164,6 +219,14 @@ def router(paramstring, ui_interface, resume=False):
             elif params["action"] == "top_picks_menu":
                 # Show Top Picks (placeholder)
                 ui_interface.top_picks_menu()
+            elif params["action"] == "guild_voting_menu":
+                ui_interface.guild_voting_menu()
+            elif params["action"] == "guild_voted_menu":
+                ui_interface.guild_voted_menu(after=params.get("after"))
+            elif params["action"] == "play_torch":
+                ui_interface.play_torch(params["torch_id"])
+            elif params["action"] == "play_voted_torch":
+                ui_interface.play_voted_torch(params["torch_id"])
             elif params["action"] == "all_content_menu":
                 # Show all content (except podcasts & livestreams)
                 # all_content_menu()
@@ -173,7 +236,9 @@ def router(paramstring, ui_interface, resume=False):
                 ui_interface.seasons_menu(params["content_type"], params["project_slug"])
             elif params["action"] == "episodes_menu":
                 # Show episodes for a season using individual parameters
-                ui_interface.episodes_menu(params["content_type"], params["project_slug"], params.get("season_id"))
+                ui_interface.episodes_menu(
+                    params["content_type"], params["project_slug"], params.get("season_id")
+                )
             elif params["action"] == "play_episode":
                 # Play an episode, movie, or special. Continue Watching leaves content_type empty.
                 # resume is true when Kodi's own dialog, or the player setting, chose Resume.
@@ -193,6 +258,9 @@ def router(paramstring, ui_interface, resume=False):
             elif params["action"] == "clear_cache":
                 logger.info("Settings: clear_cache button pressed")
                 ui_interface.clear_cache_with_notification()
+            elif params["action"] == "install_widevine":
+                logger.info("Settings: install_widevine button pressed")
+                ui_interface.install_widevine()
             elif params["action"] == "force_logout":
                 logger.info("Settings: force_logout button pressed")
                 ui_interface.force_logout_with_notification()
@@ -218,7 +286,7 @@ def main():
     logger.info(f"Addon invoked with argv: {sys.argv}")
 
     action = dict(parse_qsl(sys.argv[2][1:])).get("action")
-    if (not USERNAME or not PASSWORD) and action != "show_information":
+    if (not USERNAME or not PASSWORD) and action not in _ACTIONS_WITHOUT_CREDENTIALS:
         # Show error if credentials are not set
         xbmcgui.Dialog().ok(
             "Angel Studios",
@@ -233,7 +301,9 @@ def main():
             # Initialize Angel Studios authentication with session management
 
             # Get the query path for GraphQL queries (relatvie to the addon path)
-            query_path = xbmcvfs.translatePath(ADDON.getAddonInfo("path") + "/resources/lib/angel_graphql/")
+            query_path = xbmcvfs.translatePath(
+                ADDON.getAddonInfo("path") + "/resources/lib/angel_graphql/"
+            )
             logger.info(f"Using query path: {query_path}")
 
             # Initialize AuthenticationCore with Kodi session store
@@ -246,6 +316,9 @@ def main():
             auth_core = AuthenticationCore(  # type: ignore
                 session_store=KodiSessionStore(ADDON), config=config, logger=auth_logger
             )
+            # Refresh before the interface reads the token, so the menu and
+            # the next request both see the new login.
+            refresh_saved_login(auth_core, action)
 
             # Initialize Angel Studios interface with authentication core
             asi = AngelStudiosInterface(

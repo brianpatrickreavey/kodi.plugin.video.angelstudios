@@ -4,6 +4,7 @@ Handles all Kodi-specific menu rendering and directory operations.
 """
 
 import json
+import time
 from urllib.parse import urlencode
 
 import xbmc  # type: ignore
@@ -11,7 +12,12 @@ import xbmcgui  # type: ignore
 import xbmcplugin  # type: ignore
 
 from kodi_utils import timed, TimedBlock
-from watch_progress import apply_saved_position, coerce_seconds, native_resume_point, position_from_episode
+from watch_progress import (
+    apply_saved_position,
+    coerce_seconds,
+    native_resume_point,
+    position_from_episode,
+)
 
 try:
     from menu_projects import ProjectsMenu as ProjectsMenuClass
@@ -25,6 +31,205 @@ _WATCHLIST_MEDIA_TYPES = {
     "series": "tvshow",
     "specials": "video",
 }
+
+_ALIGNMENT_CHOICES = ("Yes", "No", "Neutral")
+_ALIGNMENT_VALUES = ("SUPPORTS", "HINDERS", "NEUTRAL")
+_INTEREST_CHOICES = ("Very disappointed", "Somewhat disappointed", "Not disappointed")
+_INTEREST_VALUES = ("INTERESTED", "SOMEWHAT_INTERESTED", "NOT_INTERESTED")
+
+_GUILD_ACCESS_MESSAGES = {
+    "sign-in": "Sign in to vote.",
+    "join": "Join the Guild to vote.",
+    "failed": "Failed to load Guild Voting.",
+}
+_CANNOT_PLAY = "This torch cannot be played yet."
+_ALREADY_VOTED = "Already voted on"
+_DRM_NOT_INSTALLED = (
+    "This torch is protected by DRM. Widevine was not installed. "
+    "Install it from the addon settings, under Install Widevine."
+)
+
+
+def _choice_index(values, saved):
+    """Index of a saved answer, or -1 when Angel has not stored one."""
+    try:
+        return values.index(saved)
+    except ValueError:
+        return -1
+
+
+def _guild_vote_extras(vote):
+    """Age values to send back. Absent values are left out of the vote."""
+    extras = {}
+    if isinstance(vote.get("age_groups"), str):
+        extras["ageGroups"] = vote["age_groups"]
+    if isinstance(vote.get("recommended_age"), int) and not isinstance(
+        vote.get("recommended_age"), bool
+    ):
+        extras["recommendedAge"] = vote["recommended_age"]
+    reason = vote.get("recommended_age_reason")
+    if isinstance(reason, str) and reason:
+        extras["recommendedAgeReason"] = reason
+    return extras
+
+
+def _torch_manifest_type(stream_url):
+    """hls or mpd from the URL path. The signed query is ignored."""
+    if not isinstance(stream_url, str):
+        return None
+    path = stream_url.split("?", 1)[0].lower()
+    if path.endswith(".mpd"):
+        return "mpd"
+    if path.endswith(".m3u8"):
+        return "hls"
+    return None
+
+
+def _fullscreen_picture():
+    """True when the fullscreen video window is open.
+
+    isPlayingVideo is also true while a torch fails to decrypt and shows
+    nothing. Kodi's check returns a bool. Anything else is not that answer.
+    """
+    try:
+        visible = xbmc.getCondVisibility("VideoPlayer.IsFullscreen")
+    except Exception:
+        return False
+    if isinstance(visible, bool):
+        return visible
+    return True
+
+
+def _player_is_playing(player):
+    try:
+        return bool(player.isPlayingVideo())
+    except Exception:
+        return False
+
+
+def _is_this_playback(player, torch_id, stream_url):
+    """True when the current file is this torch, or the file cannot be read.
+
+    A later episode has a different file. Stopping that file is what closed
+    Dry Bar while this torch's wait was still running.
+    """
+    getter = getattr(player, "getPlayingFile", None)
+    if not callable(getter):
+        return True
+    try:
+        path = getter()
+    except Exception:
+        return True
+    if not isinstance(path, str) or not path:
+        return True
+    if isinstance(torch_id, str) and torch_id and torch_id in path:
+        return True
+    if isinstance(stream_url, str) and stream_url:
+        if path.split("?", 1)[0] == stream_url.split("?", 1)[0]:
+            return True
+    return False
+
+
+def _stop_failed_playback(player):
+    """Close a player that started without a picture."""
+    try:
+        if player.isPlayingVideo():
+            player.stop()
+    except Exception:
+        return
+
+
+def _player_answered_bool(player):
+    """True when isPlayingVideo returns a real bool.
+
+    The unit-test stand-in returns another object. That is not a player to
+    wait on.
+    """
+    try:
+        return isinstance(player.isPlayingVideo(), bool)
+    except Exception:
+        return False
+
+
+def _wait_for_picture(torch_id=None, stream_url=None, timeout=20):
+    """True when this torch's fullscreen picture has stayed up.
+
+    None means another video replaced this torch, or Kodi is closing. A file
+    that is already playing stays up until this torch replaces it. A stop
+    before any picture is also None. False means this torch never showed a
+    picture. A stop after the picture was up is True, so the vote can follow.
+    """
+    monitor = xbmc.Monitor()
+    player = xbmc.Player()
+    deadline = time.monotonic() + timeout
+    saw_this_torch = False
+    while time.monotonic() < deadline:
+        if monitor.abortRequested() is True:
+            return None
+        playing = _player_is_playing(player)
+        this_torch = playing and _is_this_playback(player, torch_id, stream_url)
+        # setResolvedUrl can still report the previous file for a moment.
+        # A different file counts only after this torch has been seen.
+        if playing and not this_torch and saw_this_torch:
+            return None
+        if saw_this_torch and not playing:
+            return None
+        if this_torch:
+            saw_this_torch = True
+        if this_torch and _fullscreen_picture():
+            # A one-frame flicker is not a picture.
+            if monitor.waitForAbort(1.0) is True:
+                return None
+            playing = _player_is_playing(player)
+            this_torch = playing and _is_this_playback(player, torch_id, stream_url)
+            if this_torch and _fullscreen_picture():
+                return True
+            if playing and not this_torch:
+                return None
+            if not playing:
+                return True
+            _stop_failed_playback(player)
+            return False
+        if monitor.waitForAbort(0.2) is True:
+            return None
+    playing = _player_is_playing(player)
+    this_torch = playing and _is_this_playback(player, torch_id, stream_url)
+    if this_torch:
+        _stop_failed_playback(player)
+        return False
+    if playing or saw_this_torch:
+        return None
+    return False
+
+
+def _wait_for_playback_end(torch_id=None, stream_url=None):
+    """True when this torch stops after its picture was up.
+
+    Finishing the torch and pressing stop both count. None means another
+    video took over, or Kodi is closing.
+    """
+    monitor = xbmc.Monitor()
+    player = xbmc.Player()
+    if not _player_answered_bool(player):
+        return True
+    while True:
+        if monitor.abortRequested() is True:
+            return None
+        playing = _player_is_playing(player)
+        if not playing:
+            return True
+        if not _is_this_playback(player, torch_id, stream_url):
+            return None
+        if monitor.waitForAbort(0.2) is True:
+            return None
+
+
+def _drm_license_url(torch):
+    """A license URL InputStream Adaptive can parse. A pipe breaks that parse."""
+    url = torch.get("drm_license_url") if isinstance(torch, dict) else None
+    if not isinstance(url, str) or not url or "|" in url:
+        return None
+    return url
 
 
 class KodiMenuHandler(MenuUtils):
@@ -138,7 +343,9 @@ class KodiMenuHandler(MenuUtils):
             info_tag.setPlot(item["description"])
 
             # Create URL
-            self.log.debug(f"Creating URL for action: {item['action']}, content_type: {item['content_type']}")
+            self.log.debug(
+                f"Creating URL for action: {item['action']}, content_type: {item['content_type']}"
+            )
             url = self.create_plugin_url(
                 base_url=self.kodi_url,
                 action=item["action"],
@@ -168,6 +375,19 @@ class KodiMenuHandler(MenuUtils):
 
             if enabled:
                 self.menu_items.append(item)
+
+        # Guild Voting is not a setting. It sits above Settings only while the
+        # saved token is still valid. This check does not log the viewer in.
+        if self._guild_session_is_valid():
+            self.menu_items.append(
+                {
+                    "label": "Guild Voting",
+                    "content_type": "video",
+                    "action": "guild_voting_menu",
+                    "description": "Watch a Guild torch and vote",
+                    "icon": "DefaultVideo.png",
+                }
+            )
 
         # Settings is always shown
         self.menu_items.append(
@@ -203,7 +423,9 @@ class KodiMenuHandler(MenuUtils):
                 self.parent.show_error(f"Project not found: {project_slug}")
                 return
             self.log.debug(f"Project details: {json.dumps(project, indent=2)}")
-            self.log.info(f"Processing {len(project.get('seasons', []))} seasons for project: {project_slug}")
+            self.log.info(
+                f"Processing {len(project.get('seasons', []))} seasons for project: {project_slug}"
+            )
 
             kodi_content_type = self.parent._get_kodi_content_type(content_type)
             self.log.info(f"Setting content type for Kodi: {content_type} ({kodi_content_type})")
@@ -211,16 +433,24 @@ class KodiMenuHandler(MenuUtils):
 
             # If there is only one season, go straight to episodes menu in all-episodes mode
             if len(project.get("seasons", [])) == 1:
-                self.log.info(f"Single season found: {project['seasons'][0]['name']}, using all-episodes mode")
+                self.log.info(
+                    f"Single season found: {project['seasons'][0]['name']}, using all-episodes mode"
+                )
                 self.episodes_menu(content_type, project["slug"])
             else:
                 for season in project.get("seasons", []):
                     self.log.info(f"Processing season: {season['name']}")
                     self.log.debug(f"Season dictionary: {json.dumps(season, indent=2)}")
                     # Create list item using unified builder
-                    list_item = self._build_list_item_for_content(season, "season", content_type=content_type)
+                    list_item = self._build_list_item_for_content(
+                        season, "season", content_type=content_type
+                    )
                     # Set sort title for proper ordering
-                    season_number = season["episodes"][0].get("seasonNumber", 0) if season.get("episodes") else 0
+                    season_number = (
+                        season["episodes"][0].get("seasonNumber", 0)
+                        if season.get("episodes")
+                        else 0
+                    )
                     sort_title = f"Season {season_number:03d}"
                     info_tag = list_item.getVideoInfoTag()
                     info_tag.setSortTitle(sort_title)
@@ -324,7 +554,9 @@ class KodiMenuHandler(MenuUtils):
             return
         self.log.info(f"Resume time for {guid} is {whole}s")
         cache_manager = getattr(self.parent, "cache_manager", None)
-        remember = getattr(cache_manager, "remember_watch_position", None) if cache_manager else None
+        remember = (
+            getattr(cache_manager, "remember_watch_position", None) if cache_manager else None
+        )
         if not callable(remember):
             return
         try:
@@ -352,7 +584,9 @@ class KodiMenuHandler(MenuUtils):
                         if ep and isinstance(ep, dict):
                             all_episodes.append(ep)
                 # Sort by season number, then episode number
-                all_episodes.sort(key=lambda e: (e.get("seasonNumber", 0), e.get("episodeNumber", 0)))
+                all_episodes.sort(
+                    key=lambda e: (e.get("seasonNumber", 0), e.get("episodeNumber", 0))
+                )
                 episodes_list = all_episodes
                 sort_episodic = True  # Assume episodic for aggregated view
             else:
@@ -364,13 +598,21 @@ class KodiMenuHandler(MenuUtils):
                     self.log.error(f"Season not found: {season_id}")
                     self.parent.show_error(f"Season not found: {season_id}")
                     return
-                episodes_list = [ep for ep in season.get("episodes", []) if ep and isinstance(ep, dict)]
-                sort_episodic = episodes_list[0].get("seasonNumber", 0) > 0 if episodes_list else False
+                episodes_list = [
+                    ep for ep in season.get("episodes", []) if ep and isinstance(ep, dict)
+                ]
+                sort_episodic = (
+                    episodes_list[0].get("seasonNumber", 0) > 0 if episodes_list else False
+                )
 
             episode_count = len(episodes_list)
-            self.log.info(f"Processing {episode_count} episodes for project: {project_slug}, season: {season_id}")
+            self.log.info(
+                f"Processing {episode_count} episodes for project: {project_slug}, season: {season_id}"
+            )
             kodi_content_type = (
-                "movies" if content_type == "movies" else "tvshows" if content_type == "series" else "videos"
+                "movies"
+                if content_type == "movies"
+                else "tvshows" if content_type == "series" else "videos"
             )
             self.log.info(f"Setting content type for Kodi: {content_type} ({kodi_content_type})")
             xbmcplugin.setContent(self.handle, kodi_content_type)
@@ -410,7 +652,9 @@ class KodiMenuHandler(MenuUtils):
                     xbmcplugin.addDirectoryItem(self.handle, url, list_item, False)
 
                 except Exception as e:
-                    self.log.error(f"Error processing episode {episode.get('guid', 'unknown')}: {e}")
+                    self.log.error(
+                        f"Error processing episode {episode.get('guid', 'unknown')}: {e}"
+                    )
                     continue
 
             if sort_episodic:
@@ -476,7 +720,9 @@ class KodiMenuHandler(MenuUtils):
 
     def remove_from_watchlist(self, content_id):
         """Remove a movie, series, or special and tell the viewer."""
-        return self._update_watchlist("remove_from_watchlist", content_id, "Removed from Watchlist.")
+        return self._update_watchlist(
+            "remove_from_watchlist", content_id, "Removed from Watchlist."
+        )
 
     def _update_watchlist(self, method_name, content_id, success_message):
         failure = "We ran into an issue while updating your watchlist. Please try again later."
@@ -494,7 +740,9 @@ class KodiMenuHandler(MenuUtils):
         self.parent.show_notification(failure)
         return False
 
-    @timed(lambda *args, **kwargs: f"after={args[1] if len(args) > 1 else kwargs.get('after', 'none')}")
+    @timed(
+        lambda *args, **kwargs: f"after={args[1] if len(args) > 1 else kwargs.get('after', 'none')}"
+    )
     def continue_watching_menu(self, after=None):
         """Display continue watching menu with pagination."""
         try:
@@ -528,7 +776,9 @@ class KodiMenuHandler(MenuUtils):
             # Render menu
             for episode in episodes:
                 guid = episode.get("guid", "")
-                project_slug = episode.get("projectSlug") or episode.get("project", {}).get("slug", "")
+                project_slug = episode.get("projectSlug") or episode.get("project", {}).get(
+                    "slug", ""
+                )
 
                 # Create a copy for display modifications
                 episode_display = dict(episode)
@@ -541,7 +791,9 @@ class KodiMenuHandler(MenuUtils):
                 if has_project_name:
                     season_num = episode_display.get("seasonNumber")
                     episode_num = episode_display.get("episodeNumber")
-                    current_subtitle = episode_display.get("subtitle") or episode_display.get("name", "Unknown")
+                    current_subtitle = episode_display.get("subtitle") or episode_display.get(
+                        "name", "Unknown"
+                    )
                     if season_num is not None and episode_num is not None:
                         subtitle_text = (
                             f"{current_subtitle} "
@@ -550,7 +802,9 @@ class KodiMenuHandler(MenuUtils):
                         )
                         episode_display["subtitle"] = subtitle_text
                     else:
-                        episode_display["subtitle"] = f"{current_subtitle} ({episode_display['project']['name']})"
+                        episode_display["subtitle"] = (
+                            f"{current_subtitle} ({episode_display['project']['name']})"
+                        )
 
                 # Create list item using unified builder
                 list_item = self._build_list_item_for_content(
@@ -600,6 +854,244 @@ class KodiMenuHandler(MenuUtils):
         """Placeholder for top picks until API support is added."""
         self.log.info("Top picks menu requested, but not yet implemented.")
         self.parent.show_error("Top Picks is not available yet.")
+
+    def _guild_session_is_valid(self):
+        """True only when a token is present and not expired.
+
+        validate_session does not log the viewer in. A missing interface,
+        a missing method, or an error is signed out.
+        """
+        interface = getattr(self.parent, "angel_interface", None)
+        auth = getattr(interface, "auth_core", None) if interface else None
+        validate = getattr(auth, "validate_session", None) if auth else None
+        if not callable(validate):
+            return False
+        try:
+            return validate() is True
+        except Exception as exc:
+            self.log.warning(f"Guild Voting session check failed: {exc}")
+            return False
+
+    def _guild_access(self):
+        """sign-in, join, failed, or ok. A failed membership read is not 'join'."""
+        if not self._guild_session_is_valid():
+            return "sign-in"
+        interface = getattr(self.parent, "angel_interface", None)
+        member_check = getattr(interface, "is_guild_member", None) if interface else None
+        if not callable(member_check):
+            return "failed"
+        try:
+            member = member_check()
+        except Exception as exc:
+            self.log.error(f"Error reading Guild membership: {exc}")
+            member = None
+        if member is None:
+            return "failed"
+        if member is not True:
+            return "join"
+        return "ok"
+
+    def guild_voting_menu(self):
+        """List the torches Angel is offering this viewer."""
+        access = self._guild_access()
+        if access != "ok":
+            self.parent.show_error(_GUILD_ACCESS_MESSAGES[access])
+            return False
+
+        try:
+            torches = self.parent.angel_interface.get_guild_voting_torches()
+        except Exception as exc:
+            self.log.error(f"Error fetching Guild Voting: {exc}")
+            torches = None
+        if torches is None:
+            self.parent.show_error("Failed to load Guild Voting.")
+            return False
+
+        xbmcplugin.setContent(self.handle, "videos")
+        folder = xbmcgui.ListItem(label=_ALREADY_VOTED)
+        folder_url = self.create_plugin_url(
+            base_url=self.kodi_url,
+            action="guild_voted_menu",
+        )
+        xbmcplugin.addDirectoryItem(self.handle, folder_url, folder, True)
+        for torch in torches:
+            list_item = xbmcgui.ListItem(label=torch["title"])
+            list_item.setProperty("IsPlayable", "true")
+            info_tag = list_item.getVideoInfoTag()
+            info_tag.setTitle(torch["title"])
+            url = self.create_plugin_url(
+                base_url=self.kodi_url,
+                action="play_torch",
+                torch_id=torch["id"],
+            )
+            xbmcplugin.addDirectoryItem(self.handle, url, list_item, False)
+        xbmcplugin.endOfDirectory(self.handle)
+        return True
+
+    def guild_voted_menu(self, after=None):
+        """List torches this viewer already finalized. Playing one does not vote."""
+        access = self._guild_access()
+        if access != "ok":
+            self.parent.show_error(_GUILD_ACCESS_MESSAGES[access])
+            return False
+        try:
+            page = self.parent.angel_interface.get_guild_voted_torches(after)
+        except Exception as exc:
+            self.log.error(f"Error fetching voted torches: {exc}")
+            page = None
+        if page is None:
+            self.parent.show_error("Failed to load Already voted on.")
+            return False
+        torches = page["torches"]
+        if not torches and not page["has_next"]:
+            self.parent.show_error("You haven't voted on anything yet.")
+            return False
+
+        xbmcplugin.setContent(self.handle, "videos")
+        for torch in torches:
+            list_item = xbmcgui.ListItem(label=torch["title"])
+            list_item.setProperty("IsPlayable", "true")
+            info_tag = list_item.getVideoInfoTag()
+            info_tag.setTitle(torch["title"])
+            url = self.create_plugin_url(
+                base_url=self.kodi_url,
+                action="play_voted_torch",
+                torch_id=torch["id"],
+            )
+            xbmcplugin.addDirectoryItem(self.handle, url, list_item, False)
+        if page["has_next"]:
+            more = xbmcgui.ListItem(label="[Load More...]")
+            more_url = self.create_plugin_url(
+                base_url=self.kodi_url,
+                action="guild_voted_menu",
+                after=page["cursor"],
+            )
+            xbmcplugin.addDirectoryItem(self.handle, more_url, more, True)
+        xbmcplugin.endOfDirectory(self.handle)
+        return True
+
+    def play_voted_torch(self, torch_id):
+        """Play a finalized torch again. The ballot stays closed."""
+        access = self._guild_access()
+        if access != "ok":
+            self.parent.show_error(_GUILD_ACCESS_MESSAGES[access])
+            return False
+        try:
+            torch = self.parent.angel_interface.get_guild_torch(torch_id)
+        except Exception as exc:
+            self.log.error(f"Error fetching Guild torch: {exc}")
+            torch = None
+        if not torch:
+            self.parent.show_error("Failed to load Already voted on.")
+            return False
+        return self._play_torch_stream(torch)
+
+    def play_torch(self, torch_id):
+        """Play one torch, then ask the two Guild questions."""
+        access = self._guild_access()
+        if access != "ok":
+            self.parent.show_error(_GUILD_ACCESS_MESSAGES[access])
+            return False
+        try:
+            torch = self.parent.angel_interface.get_guild_torch(torch_id)
+        except Exception as exc:
+            self.log.error(f"Error fetching Guild torch: {exc}")
+            torch = None
+        if not torch:
+            self.parent.show_error("Failed to load Guild Voting.")
+            return False
+        if not self._play_torch_stream(torch):
+            return False
+        # The vote dialog blocks Kodi's window. Wait until this torch ends.
+        # None means the viewer left. Do not stop whatever is playing now.
+        torch_id = torch.get("id")
+        stream_url = torch.get("stream_url")
+        picture = _wait_for_picture(torch_id, stream_url)
+        if picture is None:
+            return False
+        if picture is not True:
+            self.parent.show_error(_CANNOT_PLAY)
+            return False
+        if _wait_for_playback_end(torch_id, stream_url) is not True:
+            return False
+        return self._ask_guild_vote(torch)
+
+    def _play_torch_stream(self, torch):
+        """Play the torch. The vote questions open only when this returns True."""
+        stream_url = torch.get("stream_url")
+        if not stream_url:
+            self.parent.show_error(_CANNOT_PLAY)
+            return False
+        manifest_type = _torch_manifest_type(stream_url)
+        if torch.get("drm_required") is True:
+            return self._play_drm_torch(torch, stream_url, manifest_type)
+        return self._start_torch_playback(stream_url, manifest_type)
+
+    def _play_drm_torch(self, torch, stream_url, manifest_type):
+        """Play an encrypted torch once Widevine is installed."""
+        license_url = _drm_license_url(torch)
+        if not license_url or manifest_type not in ("hls", "mpd"):
+            self.parent.show_error(_CANNOT_PLAY)
+            return False
+        if not self.parent.playback_handler.widevine_ready(manifest_type):
+            self.parent.show_error(_DRM_NOT_INSTALLED)
+            return False
+        certificate = self.parent.playback_handler.widevine_certificate(
+            torch.get("drm_certificate_url")
+        )
+        widevine = {"license_url": license_url}
+        if certificate:
+            widevine["server_certificate"] = certificate
+        return self._start_torch_playback(stream_url, manifest_type, widevine)
+
+    def _start_torch_playback(self, stream_url, manifest_type, widevine=None):
+        """Hand the stream to Kodi. True means the vote questions can open."""
+        try:
+            kwargs = {"stream_url": stream_url, "manifest_type": manifest_type}
+            if widevine:
+                kwargs["widevine"] = widevine
+            return bool(self.parent.play_video(**kwargs))
+        except Exception as exc:
+            self.log.error(f"Error playing Guild torch: {exc}")
+            self.parent.show_error(_CANNOT_PLAY)
+            return False
+
+    def _ask_guild_vote(self, torch):
+        """Three dialogs. Cancel or No sends nothing."""
+        vote = torch.get("vote") if isinstance(torch.get("vote"), dict) else {}
+        dialog = xbmcgui.Dialog()
+        alignment_index = _choice_index(_ALIGNMENT_VALUES, vote.get("alignment"))
+        interest_index = _choice_index(_INTEREST_VALUES, vote.get("interest"))
+        chosen_alignment = dialog.select(
+            "Does this project amplify light?",
+            list(_ALIGNMENT_CHOICES),
+            preselect=alignment_index,
+        )
+        if chosen_alignment not in (0, 1, 2):
+            return False
+        chosen_interest = dialog.select(
+            "How would you feel if this never became an Angel Studios movie?",
+            list(_INTEREST_CHOICES),
+            preselect=interest_index,
+        )
+        if chosen_interest not in (0, 1, 2):
+            return False
+        if not dialog.yesno("Guild Voting", "Submit this vote?"):
+            return False
+        try:
+            saved = self.parent.angel_interface.submit_guild_torch_vote(
+                torch["id"],
+                _ALIGNMENT_VALUES[chosen_alignment],
+                _INTEREST_VALUES[chosen_interest],
+                _guild_vote_extras(vote),
+            )
+        except Exception as exc:
+            self.log.error(f"Error submitting Guild vote: {exc}")
+            saved = False
+        if saved is not True:
+            self.parent.show_error("Vote failed. Please try again.")
+            return False
+        return True
 
     def create_plugin_url(self, **kwargs):
         """Create a URL for calling the plugin recursively"""
@@ -652,7 +1144,9 @@ class KodiMenuHandler(MenuUtils):
                 if not isa_ready:
                     isa_ready = xbmc.getCondVisibility("System.HasAddon(inputstream.adaptive)")
                     if isa_ready:
-                        self.log.info("ISA detected via System.HasAddon; proceeding without inputstreamhelper")
+                        self.log.info(
+                            "ISA detected via System.HasAddon; proceeding without inputstreamhelper"
+                        )
 
                 if isa_ready:
                     if quality_mode == "manual":
@@ -717,7 +1211,8 @@ class KodiMenuHandler(MenuUtils):
             if project and isinstance(project, dict) and "logoCloudinaryPath" in project:
                 if "logoCloudinaryPath" not in art_info:
                     self.log.debug(
-                        f"[ART] Injecting project logo into episode: {project['logoCloudinaryPath']}", category="art"
+                        f"[ART] Injecting project logo into episode: {project['logoCloudinaryPath']}",
+                        category="art",
                     )
                     art_info["logoCloudinaryPath"] = project["logoCloudinaryPath"]
         except Exception:
@@ -834,7 +1329,9 @@ class KodiMenuHandler(MenuUtils):
 
         # Handle artwork with URL reuse
         art_dict = {}
-        poster_path = info_dict.get("discoveryPosterCloudinaryPath") or info_dict.get("posterCloudinaryPath")
+        poster_path = info_dict.get("discoveryPosterCloudinaryPath") or info_dict.get(
+            "posterCloudinaryPath"
+        )
         if poster_path:
             art_dict["poster"] = self.parent.angel_interface.get_cloudinary_url(poster_path)
 
@@ -873,10 +1370,16 @@ class KodiMenuHandler(MenuUtils):
                     url = self.parent.angel_interface.get_cloudinary_url(cp)
                     self.log.debug(f"[ART] url: {url}", category="art")
                     if still_key == "portraitTitleImage":
-                        self.log.debug(f"[ART] direct portraitTitleImage: {still_dict}", category="art")
-                        self.log.debug(f"[ART] Using direct portraitTitleImage: {cp}", category="art")
+                        self.log.debug(
+                            f"[ART] direct portraitTitleImage: {still_dict}", category="art"
+                        )
+                        self.log.debug(
+                            f"[ART] Using direct portraitTitleImage: {cp}", category="art"
+                        )
                         art_dict["poster"] = url
-                        self.log.debug(f"[ART] Set poster to portraitTitleImage: {url}", category="art")
+                        self.log.debug(
+                            f"[ART] Set poster to portraitTitleImage: {url}", category="art"
+                        )
                     elif still_key == "portraitStill1":
                         self.log.debug(f"[ART] Using {still_key}: {cp}", category="art")
                         art_dict["poster"] = url

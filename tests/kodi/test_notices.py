@@ -8,7 +8,7 @@ sys.path.insert(
 )
 
 from notices import step_notice  # noqa: E402
-from selection import LEAVES, WATCHLIST, expand, run_order  # noqa: E402
+from selection import GUILD, LEAVES, WATCHLIST, expand, run_order  # noqa: E402
 
 
 def test_one_condition_is_that_condition_only():
@@ -60,6 +60,14 @@ def test_watchlist_is_not_part_of_the_caption_run():
     assert expand("watchlist-matches") == ["watchlist-matches"]
     assert "watchlist-matches" not in expand("all")
     assert "watchlist-add-remove" not in expand("all")
+
+
+def test_guild_is_not_part_of_the_caption_run():
+    assert expand("guild") == list(GUILD)
+    assert run_order("guild") == ["sign-in"] + list(GUILD)
+    assert expand("guild-menu") == ["guild-menu"]
+    assert "guild-menu" not in expand("all")
+    assert "guild-list" not in expand("all")
 
 
 def test_step_notice_counts_this_run():

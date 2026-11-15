@@ -1,0 +1,5 @@
+# Finish the ballot. The website treats only a true result as saved.
+
+mutation finalizeGuildTorchVote($torchId: String!) {
+  finalizeTorchVote(torchId: $torchId)
+}

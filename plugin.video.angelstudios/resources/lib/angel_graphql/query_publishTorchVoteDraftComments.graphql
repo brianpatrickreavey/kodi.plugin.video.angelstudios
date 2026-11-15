@@ -1,0 +1,6 @@
+# Publish draft filmmaker comments already stored for this torch.
+# parentType is the string TORCH. This does not write a new comment.
+
+mutation publishTorchVoteDraftComments($parentType: String!, $parentId: String!) {
+  publishUserDraftCommentsByParent(parentType: $parentType, parentId: $parentId)
+}

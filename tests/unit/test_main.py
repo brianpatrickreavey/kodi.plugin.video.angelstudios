@@ -11,8 +11,20 @@ import pytest
 
 from .unittest_data import ROUTER_DISPATCH_CASES
 
-MAIN_PATH = Path(__file__).resolve().parents[2] / "plugin.video.angelstudios" / "resources" / "lib" / "addon_entry.py"
-MAIN_ENTRY_PATH = Path(__file__).resolve().parents[2] / "plugin.video.angelstudios" / "resources" / "lib" / "main.py"
+MAIN_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "plugin.video.angelstudios"
+    / "resources"
+    / "lib"
+    / "addon_entry.py"
+)
+MAIN_ENTRY_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "plugin.video.angelstudios"
+    / "resources"
+    / "lib"
+    / "main.py"
+)
 RES_LIB = MAIN_PATH.parent / "resources" / "lib"
 
 
@@ -80,6 +92,15 @@ class TestMain:
 
         ui_mock.clear_cache_with_notification.assert_called_once()
 
+    def test_router_install_widevine(self, monkeypatch):
+        """The settings button installs Widevine without opening a catalog screen."""
+        main = _fresh_main_module()
+        ui_mock = MagicMock()
+
+        main.router(urlencode({"action": "install_widevine"}), ui_mock)
+
+        ui_mock.install_widevine.assert_called_once_with()
+
     def test_router_clear_cache_failure(self, monkeypatch):
         """clear_cache failure surfaces failure notification."""
         main = _fresh_main_module()
@@ -129,7 +150,9 @@ class TestMain:
         """Missing interface raises and is caught as navigation error."""
         main = _fresh_main_module()
         ui_mock = MagicMock()
-        ui_mock.force_logout_with_notification.side_effect = ValueError("Angel interface not initialized")
+        ui_mock.force_logout_with_notification.side_effect = ValueError(
+            "Angel interface not initialized"
+        )
 
         main.router(urlencode({"action": "force_logout"}), ui_mock)
 
@@ -165,7 +188,9 @@ class TestMain:
         ui_mock.add_to_watchlist.assert_called_once_with("spy-id")
 
         ui_mock.reset_mock()
-        main.router(urlencode({"action": "remove_from_watchlist", "content_id": "tuttle-id"}), ui_mock)
+        main.router(
+            urlencode({"action": "remove_from_watchlist", "content_id": "tuttle-id"}), ui_mock
+        )
         ui_mock.remove_from_watchlist.assert_called_once_with("tuttle-id")
 
         ui_mock.reset_mock()
@@ -188,7 +213,9 @@ class TestMain:
             ),
             ui_mock,
         )
-        ui_mock.play_episode.assert_called_once_with("guid", "slug", content_type="series", resume=False)
+        ui_mock.play_episode.assert_called_once_with(
+            "guid", "slug", content_type="series", resume=False
+        )
 
         ui_mock.reset_mock()
         main.router(
@@ -197,6 +224,18 @@ class TestMain:
             resume=True,
         )
         ui_mock.play_episode.assert_called_once_with("guid", "slug", content_type="", resume=True)
+
+    def test_router_voted_torch_passes_the_cursor_and_id(self):
+        """Already voted on keeps the page cursor and plays one torch by id."""
+        main = _fresh_main_module()
+        ui_mock = MagicMock()
+
+        main.router(urlencode({"action": "guild_voted_menu", "after": "page-2"}), ui_mock)
+        ui_mock.guild_voted_menu.assert_called_once_with(after="page-2")
+
+        ui_mock.reset_mock()
+        main.router(urlencode({"action": "play_voted_torch", "torch_id": "land"}), ui_mock)
+        ui_mock.play_voted_torch.assert_called_once_with("land")
 
     def test_router_missing_param(self, monkeypatch):
         """Missing required params triggers error handling."""
@@ -211,18 +250,24 @@ class TestMain:
     def test_main_guard_shows_dialog_on_missing_credentials(self, monkeypatch):
         """__main__ guard shows dialog when credentials are absent."""
         addon = MagicMock()
-        addon.getSettingString.side_effect = lambda k: "" if k in ["username", "password"] else "off"
+        addon.getSettingString.side_effect = lambda k: (
+            "" if k in ["username", "password"] else "off"
+        )
         addon.getAddonInfo.return_value = "/addon"
         monkeypatch.setattr(sys.modules["xbmcaddon"], "Addon", MagicMock(return_value=addon))
 
         dialog = MagicMock()
         monkeypatch.setattr(sys.modules["xbmcgui"], "Dialog", MagicMock(return_value=dialog))
-        monkeypatch.setattr(sys.modules["xbmcvfs"], "translatePath", MagicMock(side_effect=lambda p: p))
+        monkeypatch.setattr(
+            sys.modules["xbmcvfs"], "translatePath", MagicMock(side_effect=lambda p: p)
+        )
 
-        sys.argv = ["plugin://", "1", "?"]
+        sys.argv = ["plugin://", "1", "?action=movies_menu"]
 
         kodi_ui_mock = MagicMock()
-        monkeypatch.setattr("kodi_ui_interface.KodiUIInterface", MagicMock(return_value=kodi_ui_mock))
+        monkeypatch.setattr(
+            "kodi_ui_interface.KodiUIInterface", MagicMock(return_value=kodi_ui_mock)
+        )
         monkeypatch.setattr("angel_interface.AngelStudiosInterface", MagicMock())
 
         sys.path.insert(0, str(MAIN_PATH.parent))
@@ -230,8 +275,135 @@ class TestMain:
         runpy.run_path(str(MAIN_PATH), run_name="__main__")
 
         dialog.ok.assert_called_once_with(
-            "Angel Studios", "Please configure your Angel.com username and password in the addon settings."
+            "Angel Studios",
+            "Please configure your Angel.com username and password in the addon settings.",
         )
+
+    def test_main_menu_opens_without_credentials(self, monkeypatch):
+        """A missing username still opens the main menu."""
+        main = _fresh_main_module()
+        monkeypatch.setattr(main, "USERNAME", "")
+        monkeypatch.setattr(main, "PASSWORD", "")
+        ui = MagicMock()
+        monkeypatch.setattr(main, "KodiUIInterface", MagicMock(return_value=ui))
+        monkeypatch.setattr(main, "AuthenticationCore", MagicMock())
+        monkeypatch.setattr(main, "AngelStudiosInterface", MagicMock())
+        monkeypatch.setattr(sys, "argv", ["plugin://", "1", "?"])
+
+        main.main()
+
+        ui.main_menu.assert_called_once_with()
+        main.AuthenticationCore.return_value.ensure_valid_session.assert_not_called()
+
+    def _open_with_saved_login(self, monkeypatch, argv, signed_in):
+        """Run main() with a saved username and password and a fake auth core."""
+        main = _fresh_main_module()
+        monkeypatch.setattr(main, "USERNAME", "user")
+        monkeypatch.setattr(main, "PASSWORD", "secret")
+        addon = MagicMock()
+        addon.getSettingBool.return_value = False
+        monkeypatch.setattr(main, "ADDON", addon)
+        ui = MagicMock()
+        auth = MagicMock()
+        auth.validate_session.return_value = signed_in
+        monkeypatch.setattr(main, "KodiUIInterface", MagicMock(return_value=ui))
+        monkeypatch.setattr(main, "AuthenticationCore", MagicMock(return_value=auth))
+        monkeypatch.setattr(main, "AngelStudiosInterface", MagicMock())
+        monkeypatch.setattr(sys, "argv", argv)
+        return main, ui, auth
+
+    def test_expired_login_refreshes_before_the_menu_is_built(self, monkeypatch):
+        """Entering the addon signs in again before the interface reads the token."""
+        main, ui, auth = self._open_with_saved_login(monkeypatch, ["plugin://", "1", "?"], False)
+        order = []
+        auth.ensure_valid_session.side_effect = lambda: order.append("refresh")
+        auth.validate_session.side_effect = [False, True]
+
+        def build_interface(*_args, **_kwargs):
+            order.append("interface")
+            return MagicMock()
+
+        monkeypatch.setattr(main, "AngelStudiosInterface", build_interface)
+
+        main.main()
+
+        assert order == ["refresh", "interface"]
+        ui.main_menu.assert_called_once_with()
+
+    def test_valid_login_is_left_alone(self, monkeypatch):
+        """A token that is still valid does not start a new sign-in."""
+        main, ui, auth = self._open_with_saved_login(monkeypatch, ["plugin://", "1", "?"], True)
+
+        main.main()
+
+        auth.ensure_valid_session.assert_not_called()
+        ui.main_menu.assert_called_once_with()
+
+    def test_failed_refresh_still_opens_the_menu(self, monkeypatch):
+        """A failed sign-in does not block the rest of the addon."""
+        main, ui, auth = self._open_with_saved_login(monkeypatch, ["plugin://", "1", "?"], False)
+        auth.ensure_valid_session.side_effect = RuntimeError("nope")
+
+        main.main()
+
+        ui.main_menu.assert_called_once_with()
+        ui.show_error.assert_not_called()
+
+    def test_movies_menu_refreshes_an_expired_login(self, monkeypatch):
+        """A catalog menu signs in again before it loads."""
+        main, ui, auth = self._open_with_saved_login(
+            monkeypatch, ["plugin://", "1", "?action=movies_menu"], False
+        )
+        auth.validate_session.side_effect = [False, True]
+
+        main.main()
+
+        auth.ensure_valid_session.assert_called_once_with()
+        ui.projects_menu.assert_called_once_with(content_type="movies")
+
+    def test_guild_menu_refreshes_an_expired_login(self, monkeypatch):
+        """Guild Voting signs in again before it checks the saved token."""
+        main, ui, auth = self._open_with_saved_login(
+            monkeypatch, ["plugin://", "1", "?action=guild_voting_menu"], False
+        )
+        auth.validate_session.side_effect = [False, True]
+
+        main.main()
+
+        auth.ensure_valid_session.assert_called_once_with()
+        ui.guild_voting_menu.assert_called_once_with()
+
+    def test_settings_and_logout_do_not_refresh(self, monkeypatch):
+        """Settings and logout do not sign in on the way through."""
+        main, ui, auth = self._open_with_saved_login(
+            monkeypatch, ["plugin://", "1", "?action=settings"], False
+        )
+        main.main()
+        auth.ensure_valid_session.assert_not_called()
+        main.ADDON.openSettings.assert_called_once_with()
+
+        main, ui, auth = self._open_with_saved_login(
+            monkeypatch, ["plugin://", "1", "?action=force_logout"], False
+        )
+        main.main()
+        auth.ensure_valid_session.assert_not_called()
+        ui.force_logout_with_notification.assert_called_once_with()
+
+    def test_session_details_do_not_refresh(self, monkeypatch):
+        """The session dialog inspects the token that is already saved."""
+        main, ui, auth = self._open_with_saved_login(
+            monkeypatch, ["plugin://", "1", "?action=show_information"], False
+        )
+        main.main()
+        auth.ensure_valid_session.assert_not_called()
+        ui.show_auth_details_dialog.assert_called_once_with()
+
+        main, ui, auth = self._open_with_saved_login(
+            monkeypatch, ["plugin://", "1", "?action=info&message=hi"], False
+        )
+        main.main()
+        auth.ensure_valid_session.assert_not_called()
+        ui.show_error.assert_called_once_with("hi")
 
     def test_session_details_available_without_credentials(self, monkeypatch):
         main = _fresh_main_module()
@@ -247,6 +419,20 @@ class TestMain:
 
         ui.show_auth_details_dialog.assert_called_once_with()
 
+    def test_install_widevine_runs_without_credentials(self, monkeypatch):
+        main = _fresh_main_module()
+        monkeypatch.setattr(main, "USERNAME", "")
+        monkeypatch.setattr(main, "PASSWORD", "")
+        ui = MagicMock()
+        monkeypatch.setattr(main, "KodiUIInterface", MagicMock(return_value=ui))
+        monkeypatch.setattr(main, "AuthenticationCore", MagicMock())
+        monkeypatch.setattr(main, "AngelStudiosInterface", MagicMock())
+        monkeypatch.setattr(sys, "argv", ["plugin://", "1", "?action=install_widevine"])
+
+        main.main()
+
+        ui.install_widevine.assert_called_once_with()
+
     def test_main_guard_calls_router_with_credentials(self, monkeypatch):
         """__main__ guard initializes interfaces and routes when creds exist."""
         sys.path.insert(0, str(RES_LIB))
@@ -258,7 +444,9 @@ class TestMain:
         addon.getAddonInfo.return_value = "/addon"
         monkeypatch.setattr(sys.modules["xbmcaddon"], "Addon", MagicMock(return_value=addon))
 
-        monkeypatch.setattr(sys.modules["xbmcvfs"], "translatePath", MagicMock(side_effect=lambda p: p))
+        monkeypatch.setattr(
+            sys.modules["xbmcvfs"], "translatePath", MagicMock(side_effect=lambda p: p)
+        )
         monkeypatch.setattr(sys.modules["xbmcvfs"], "exists", MagicMock(return_value=True))
 
         asi = MagicMock()
@@ -284,12 +472,16 @@ class TestMain:
         addon.getAddonInfo.return_value = "/addon"
         monkeypatch.setattr(sys.modules["xbmcaddon"], "Addon", MagicMock(return_value=addon))
 
-        monkeypatch.setattr(sys.modules["xbmcvfs"], "translatePath", MagicMock(side_effect=lambda p: p))
+        monkeypatch.setattr(
+            sys.modules["xbmcvfs"], "translatePath", MagicMock(side_effect=lambda p: p)
+        )
         monkeypatch.setattr(sys.modules["xbmcvfs"], "exists", MagicMock(return_value=True))
 
         import angel_interface
 
-        monkeypatch.setattr(angel_interface, "AngelStudiosInterface", MagicMock(side_effect=RuntimeError("boom")))
+        monkeypatch.setattr(
+            angel_interface, "AngelStudiosInterface", MagicMock(side_effect=RuntimeError("boom"))
+        )
         import kodi_ui_interface
 
         ui_mock = MagicMock()

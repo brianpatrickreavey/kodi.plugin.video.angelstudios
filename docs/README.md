@@ -26,6 +26,7 @@ This directory contains documentation for the Kodi Angel Studios plugin.
 
 ### Development Practices
 - [Testing Strategy](dev/testing-strategy.md) - Testing norms, coverage requirements, and best practices
+- [Manual tests](dev/manual-tests.md) - Checks a person runs because the unit suite and the Kodi script cannot see them
 - [Workflow Guidelines](dev/workflow_guidelines.md) - Commit practices, branching strategy, and development workflow
 - [Performance Considerations](dev/performance-considerations.md) - Performance optimization guidelines
 

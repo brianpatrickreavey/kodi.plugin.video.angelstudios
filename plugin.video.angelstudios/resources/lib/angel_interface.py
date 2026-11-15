@@ -38,6 +38,22 @@ _WATCHLIST_MENU_TYPES = {
     "ContentSpecial": "specials",
 }
 
+# The website player asks for DASH (M4S), not HLS. LEVEL_0 keeps the stream
+# H.264. WIDEVINE_L3 is the site's fallback DRM type. A DRM torch plays through
+# InputStream Adaptive when Widevine is installed.
+_TORCH_STREAMING_ARGS = {
+    "segmentFormat": "M4S",
+    "maxResolution": "RESOLUTION_1080",
+    "defaultResolution": "RESOLUTION_1080",
+    "maxH264Level": "LEVEL_4_1",
+    "maxAudioChannels": "CHANNEL_2",
+    "drmType": "WIDEVINE_L3",
+    "maxHevcLevel": "LEVEL_0",
+}
+
+_ALIGNMENT_VALUES = ("SUPPORTS", "HINDERS", "NEUTRAL")
+_INTEREST_VALUES = ("INTERESTED", "SOMEWHAT_INTERESTED", "NOT_INTERESTED")
+
 
 def _viewer_profile_id(token: str) -> Optional[str]:
     """The id Angel expects in the x-viewer-profile-id header.
@@ -56,6 +72,137 @@ def _viewer_profile_id(token: str) -> Optional[str]:
     if isinstance(profile_id, str) and profile_id:
         return profile_id
     return None
+
+
+def _viewer_torch_vote(votes: Any) -> dict[str, Any]:
+    """The viewer's own ballot. The website uses the vote with no voterId."""
+    if not isinstance(votes, list):
+        return {}
+    kept = [vote for vote in votes if isinstance(vote, dict)]
+    for vote in kept:
+        if not vote.get("voterId"):
+            return vote
+    if kept:
+        return kept[0]
+    return {}
+
+
+def _saved_age(value: Any) -> Optional[int]:
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
+
+def _guild_vote_input(torch_id: str, alignment: str, interest: str, extras: Any) -> dict[str, Any]:
+    """The two answers, plus age values Angel already stored.
+
+    A first vote has no extras, so only the two answers are sent. A later vote
+    repeats ageGroups, recommendedAge, and recommendedAgeReason when they were
+    read. Omitting one that was not read leaves the stored value in place.
+    Comment text is not a field on this mutation.
+    """
+    vote: dict[str, Any] = {"torchId": torch_id, "alignment": alignment, "interest": interest}
+    if not isinstance(extras, dict):
+        return vote
+    age_groups = extras.get("ageGroups")
+    if isinstance(age_groups, str):
+        vote["ageGroups"] = age_groups
+    age = _saved_age(extras.get("recommendedAge"))
+    if age is not None:
+        vote["recommendedAge"] = age
+    reason = extras.get("recommendedAgeReason")
+    if isinstance(reason, str) and reason:
+        vote["recommendedAgeReason"] = reason
+    return vote
+
+
+# The website history asks for 24 votes, then the next page by nextCursor.
+_VOTED_TORCH_PAGE_SIZE = 24
+
+
+def _guild_voted_torches(items: list) -> list[dict[str, str]]:
+    """Keep finalized votes that have a torch, in the order Angel returned them."""
+    torches: list[dict[str, str]] = []
+    for item in items:
+        if not isinstance(item, dict) or item.get("finalized") is not True:
+            continue
+        torch = item.get("torch")
+        if not isinstance(torch, dict):
+            continue
+        torch_id = torch.get("id")
+        if not isinstance(torch_id, str) or not torch_id:
+            continue
+        title = torch.get("title")
+        if not isinstance(title, str) or not title:
+            title = "Torch"
+        torches.append({"id": torch_id, "title": title})
+    return torches
+
+
+def _guild_voting_torches(rows: list) -> list[dict[str, Any]]:
+    """Keep rows that have a torch, in the order Angel returned them."""
+    torches: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        torch = row.get("torch")
+        if not isinstance(torch, dict):
+            continue
+        torch_id = torch.get("id")
+        if not isinstance(torch_id, str) or not torch_id:
+            continue
+        title = torch.get("title")
+        if not isinstance(title, str) or not title:
+            title = "Torch"
+        torches.append({"id": torch_id, "title": title, "category": row.get("category")})
+    return torches
+
+
+def _guild_torch_details(torch: Any) -> Optional[dict[str, Any]]:
+    if not isinstance(torch, dict):
+        return None
+    torch_id = torch.get("id")
+    if not isinstance(torch_id, str) or not torch_id:
+        return None
+    title = torch.get("title")
+    if not isinstance(title, str) or not title:
+        title = "Torch"
+    session = torch.get("session")
+    if not isinstance(session, dict):
+        session = {}
+    url = session.get("url")
+    if not isinstance(url, str) or not url:
+        url = None
+    license_url = session.get("drmLicenseUrl")
+    if not isinstance(license_url, str) or not license_url:
+        license_url = None
+    certificate_url = session.get("drmCertificateUrl")
+    if not isinstance(certificate_url, str) or not certificate_url:
+        certificate_url = None
+    vote = _viewer_torch_vote(torch.get("torchVotes"))
+    age_groups = vote.get("ageGroups")
+    if not isinstance(age_groups, str):
+        age_groups = None
+    reason = vote.get("recommendedAgeReason")
+    if not isinstance(reason, str) or not reason:
+        reason = None
+    alignment = vote.get("alignment")
+    interest = vote.get("interest")
+    return {
+        "id": torch_id,
+        "title": title,
+        "stream_url": url,
+        "drm_required": session.get("drmRequired") is True,
+        "drm_license_url": license_url,
+        "drm_certificate_url": certificate_url,
+        "vote": {
+            "alignment": alignment if isinstance(alignment, str) else None,
+            "interest": interest if isinstance(interest, str) else None,
+            "age_groups": age_groups,
+            "recommended_age": _saved_age(vote.get("recommendedAge")),
+            "recommended_age_reason": reason,
+        },
+    }
 
 
 def _cloudinary_path(image: Any) -> Optional[str]:
@@ -368,6 +515,141 @@ class AngelStudiosInterface:
             return False
         payload = result.get(operation)
         return isinstance(payload, dict) and bool(payload.get("id"))
+
+    def is_guild_member(self) -> Optional[bool]:
+        """True, False, or None when the membership read failed."""
+        try:
+            result = self._graphql_query("guildMemberStatus", variables={})
+        except Exception as exc:
+            self.log.error(f"Error reading Guild membership: {exc}")
+            return None
+        if not isinstance(result, dict):
+            return None
+        user = result.get("user")
+        if not isinstance(user, dict) or "isGuildMember" not in user:
+            return None
+        return user.get("isGuildMember") is True
+
+    def get_guild_voting_torches(self) -> Optional[list]:
+        """Torches Angel is offering this viewer, in Angel's order.
+
+        An empty list means there is nothing to vote on. None means the read
+        failed, which is not the same as an empty list.
+        """
+        try:
+            result = self._graphql_query("getGuildVotingCategories", variables={})
+        except Exception as exc:
+            self.log.error(f"Error fetching Guild Voting: {exc}")
+            return None
+        if not isinstance(result, dict):
+            return None
+        categories = result.get("guildVotingCategories")
+        if not isinstance(categories, dict):
+            return None
+        rows = categories.get("nextInCategory")
+        if not isinstance(rows, list):
+            return None
+        return _guild_voting_torches(rows)
+
+    def get_guild_voted_torches(self, after=None) -> Optional[dict[str, Any]]:
+        """One page of finalized votes. None means the read failed.
+
+        after is the nextCursor from the previous page. An empty torches list
+        means this page has no finalized votes.
+        """
+        vote_input: dict[str, Any] = {"take": _VOTED_TORCH_PAGE_SIZE}
+        if isinstance(after, str) and after:
+            vote_input["nextCursor"] = after
+        try:
+            result = self._graphql_query("getTorchVoteHistory", variables={"input": vote_input})
+        except Exception as exc:
+            self.log.error(f"Error fetching voted torches: {exc}")
+            return None
+        if not isinstance(result, dict):
+            return None
+        page = result.get("torchVotes")
+        if not isinstance(page, dict):
+            return None
+        items = page.get("items")
+        if not isinstance(items, list):
+            return None
+        cursor = page.get("nextCursor")
+        if not isinstance(cursor, str) or not cursor:
+            cursor = None
+        return {
+            "torches": _guild_voted_torches(items),
+            "has_next": page.get("hasNext") is True and cursor is not None,
+            "cursor": cursor,
+        }
+
+    def get_guild_torch(self, torch_id: str) -> Optional[dict]:
+        """One torch, its stream, and the saved vote. None means the read failed."""
+        if not isinstance(torch_id, str) or not torch_id:
+            return None
+        variables = {"torchId": torch_id, "streamingArgs": dict(_TORCH_STREAMING_ARGS)}
+        # The site sends this on the torch read. Without it Angel returns no stream.
+        self.session.headers["x-drm-type"] = _TORCH_STREAMING_ARGS["drmType"]
+        try:
+            return self._read_guild_torch(variables)
+        finally:
+            self.session.headers.pop("x-drm-type", None)
+
+    def _read_guild_torch(self, variables: dict[str, Any]) -> Optional[dict]:
+        """Read the torch. A refused richer query is tried again without it."""
+        try:
+            result = self._graphql_query("getTorchVoteTorch", variables=variables)
+        except AuthenticationRequiredError:
+            result = None
+        except Exception as exc:
+            self.log.error(f"Error fetching Guild torch: {exc}")
+            return None
+        torch = _guild_torch_details(result.get("torch")) if isinstance(result, dict) else None
+        if torch is not None:
+            return torch
+        self.log.warning("Guild torch read was refused; reading the ballot without the extra fields")
+        try:
+            result = self._graphql_query("getTorchVoteTorchCore", variables=variables)
+        except Exception as exc:
+            self.log.error(f"Error fetching Guild torch: {exc}")
+            return None
+        if not isinstance(result, dict):
+            return None
+        return _guild_torch_details(result.get("torch"))
+
+    def submit_guild_torch_vote(self, torch_id: str, alignment: str, interest: str, extras=None) -> bool:
+        """Send the two answers, publish saved drafts, and finalize.
+
+        extras may repeat age values Angel already stored. A comment is not
+        sent here. publishTorchVoteDraftComments publishes a draft the website
+        already saved, and does not replace its text.
+        """
+        if not isinstance(torch_id, str) or not torch_id:
+            return False
+        if alignment not in _ALIGNMENT_VALUES or interest not in _INTEREST_VALUES:
+            return False
+        vote = _guild_vote_input(torch_id, alignment, interest, extras)
+        try:
+            submitted = self._graphql_query("submitTorchVote", variables={"vote": vote})
+        except Exception as exc:
+            self.log.error(f"Error submitting Guild vote: {exc}")
+            return False
+        if not isinstance(submitted, dict) or "submitVote" not in submitted:
+            return False
+        if submitted.get("submitVote") is False:
+            return False
+        try:
+            self._graphql_query(
+                "publishTorchVoteDraftComments",
+                variables={"parentType": "TORCH", "parentId": torch_id},
+            )
+        except Exception as exc:
+            self.log.error(f"Guild vote drafts were not published: {exc}")
+        try:
+            finalized = self._graphql_query("finalizeGuildTorchVote", variables={"torchId": torch_id})
+        except Exception as exc:
+            self.log.error(f"Error finalizing Guild vote: {exc}")
+            return False
+        return isinstance(finalized, dict) and finalized.get("finalizeTorchVote") is True
 
     def get_cloudinary_url(self, cloudinary_path=None):
         """Construct a Cloudinary URL for the given path"""

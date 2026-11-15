@@ -1,0 +1,14 @@
+# The torches Angel is offering this viewer, one current torch per category.
+# The addon keeps nextInCategory in the order Angel returns it.
+
+query getGuildVotingCategories($category: [GuildVotingCategoriesEnum]) {
+  guildVotingCategories {
+    nextInCategory(category: $category) {
+      category
+      torch {
+        id
+        title
+      }
+    }
+  }
+}
