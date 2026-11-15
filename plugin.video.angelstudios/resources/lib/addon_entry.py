@@ -126,6 +126,8 @@ _ACTIONS_WITHOUT_CREDENTIALS = {
 
 # These actions do not read the catalog or the Guild. Signing in first would
 # delay them, and logout must not create a new session on the way out.
+# "info" is the unavailable-episode message. "show_information" is the
+# session dialog. Both stay on the token that is already saved.
 _ACTIONS_WITHOUT_LOGIN_REFRESH = {
     "settings",
     "clear_cache",
@@ -133,6 +135,7 @@ _ACTIONS_WITHOUT_LOGIN_REFRESH = {
     "force_logout",
     "clear_debug_data",
     "info",
+    "show_information",
 }
 
 

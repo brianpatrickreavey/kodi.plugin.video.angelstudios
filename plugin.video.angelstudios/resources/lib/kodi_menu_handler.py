@@ -154,9 +154,10 @@ def _player_answered_bool(player):
 def _wait_for_picture(torch_id=None, stream_url=None, timeout=20):
     """True when this torch's fullscreen picture has stayed up.
 
-    None means another video has started, or Kodi is closing. A stop before
-    any picture is also None. False means this torch never showed a picture.
-    A stop after the picture was up is True, so the vote can follow.
+    None means another video replaced this torch, or Kodi is closing. A file
+    that is already playing stays up until this torch replaces it. A stop
+    before any picture is also None. False means this torch never showed a
+    picture. A stop after the picture was up is True, so the vote can follow.
     """
     monitor = xbmc.Monitor()
     player = xbmc.Player()
@@ -167,7 +168,9 @@ def _wait_for_picture(torch_id=None, stream_url=None, timeout=20):
             return None
         playing = _player_is_playing(player)
         this_torch = playing and _is_this_playback(player, torch_id, stream_url)
-        if playing and not this_torch:
+        # setResolvedUrl can still report the previous file for a moment.
+        # A different file counts only after this torch has been seen.
+        if playing and not this_torch and saw_this_torch:
             return None
         if saw_this_torch and not playing:
             return None

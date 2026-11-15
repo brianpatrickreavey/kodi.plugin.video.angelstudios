@@ -18,6 +18,11 @@
                     </constraints>
                     <control type="spinner" format="string" />
                 </setting>
+                <setting id="torch_viewer_quality" type="boolean" label="30108" help="30109">
+                    <level>0</level>
+                    <default>false</default>
+                    <control type="toggle" />
+                </setting>
                 <setting id="request_timeout" type="integer" label="30116" help="30117">
                     <level>0</level>
                     <default>30</default>

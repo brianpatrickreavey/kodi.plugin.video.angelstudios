@@ -6,9 +6,12 @@ Handles all Kodi-specific playback operations and stream resolution.
 import base64
 import json
 import queue
+import re
 import sys
 import threading
 import time
+import urllib.request
+from urllib.parse import parse_qs, urlparse
 
 import xbmc  # type: ignore
 import xbmcgui  # type: ignore
@@ -30,34 +33,157 @@ _PLAYBACK_START_TIMEOUT = 30
 _PLAYBACK_START_POLL = 0.2
 
 
-# Angel encrypts a torch's 1080p rendition with a hardware Widevine key.
-# The software CDM receives the 720p key and the lower ones.
-_SOFTWARE_WIDEVINE_MAX_HEIGHT = 720
+# InputStream Adaptive accepts these caps, as width x height. A row is included
+# only when both dimensions fit. 360p is not one of them.
+_WIDEVINE_CAPS = (
+    ("480p", 640, 480),
+    ("640p", 960, 640),
+    ("720p", 1280, 720),
+    ("1080p", 1920, 1080),
+)
+_RESOLUTION = re.compile(r"RESOLUTION=(\d+)x(\d+)")
+_TRACK_TYPE = re.compile(r"[?&]drm_track_type=([^&\s]+)")
 
 
-def _widevine_hardware_cdm():
-    """True when the device CDM can hold a hardware Widevine key.
-
-    Android and webOS use the platform CDM. Desktop Kodi uses the software
-    library from InputStream Helper.
-    """
+def _torch_viewer_quality(addon) -> bool:
+    """True when the viewer chose their quality setting for a torch."""
     try:
-        android = xbmc.getCondVisibility("System.Platform.Android") is True
-        webos = xbmc.getCondVisibility("System.Platform.WebOS") is True
+        return addon.getSettingBool("torch_viewer_quality") is True
     except Exception:
         return False
-    return android or webos
 
 
-def _software_widevine_height(target_height):
-    """Highest torch height the software CDM can decrypt.
+def _json_segment(token: str):
+    parts = token.split(".")
+    if len(parts) < 2:
+        return None
+    segment = parts[1] + "=" * (-len(parts[1]) % 4)
+    try:
+        data = json.loads(base64.urlsafe_b64decode(segment))
+    except Exception:
+        return None
+    return data if isinstance(data, dict) else None
 
-    A height the viewer already chose below 720 stays. Auto, manual, and
-    1080 become 720.
+
+def _software_track_types(license_url: str) -> set[str]:
+    """Playlist track types whose key policy is SW_SECURE_CRYPTO.
+
+    The license URL already carries this. An empty set means the token could
+    not be read, so the caller keeps the 720p cap.
     """
-    if isinstance(target_height, int) and 0 < target_height < _SOFTWARE_WIDEVINE_MAX_HEIGHT:
-        return target_height
-    return _SOFTWARE_WIDEVINE_MAX_HEIGHT
+    query = parse_qs(urlparse(license_url).query)
+    token = (query.get("AxDrmMessage") or [None])[0]
+    if not isinstance(token, str):
+        return set()
+    claims = _json_segment(token)
+    if not isinstance(claims, dict):
+        return set()
+    message = claims.get("message")
+    if isinstance(message, str):
+        try:
+            message = json.loads(message)
+        except Exception:
+            return set()
+    if not isinstance(message, dict):
+        return set()
+    policies = message.get("content_key_usage_policies")
+    if not isinstance(policies, list):
+        return set()
+    names = set()
+    for policy in policies:
+        if not isinstance(policy, dict):
+            continue
+        widevine = policy.get("widevine")
+        if not isinstance(widevine, dict):
+            continue
+        if widevine.get("device_security_level") != "SW_SECURE_CRYPTO":
+            continue
+        name = policy.get("name")
+        if isinstance(name, str) and name.lower().startswith("policy_"):
+            names.add(name[7:].lower())
+    return names
+
+
+def _playlist_text(url: str) -> str:
+    """The master playlist. Empty when it cannot be read."""
+    if not isinstance(url, str) or not url.startswith("https://"):
+        return ""
+    try:
+        with urllib.request.urlopen(url, timeout=10) as response:
+            raw = response.read(1_000_001)
+    except Exception:
+        return ""
+    if len(raw) > 1_000_000:
+        return ""
+    return raw.decode("utf-8", errors="replace")
+
+
+def _playlist_rows(text: str) -> list[tuple[int, int, str]]:
+    """Width, height, and drm_track_type for each HLS video row."""
+    rows = []
+    pending = None
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("#EXT-X-STREAM-INF"):
+            match = _RESOLUTION.search(line)
+            pending = (int(match.group(1)), int(match.group(2))) if match else None
+            continue
+        if pending and line and not line.startswith("#"):
+            track = _TRACK_TYPE.search(line)
+            rows.append((pending[0], pending[1], track.group(1) if track else ""))
+            pending = None
+    return rows
+
+
+def _fits(width: int, height: int, cap_width: int, cap_height: int) -> bool:
+    return width <= cap_width and height <= cap_height
+
+
+def _cap_for_rows(rows, software_tracks, target_height) -> str | None:
+    """Chooser value for the highest software row that fits a known cap.
+
+    A fixed quality below that row is kept when a software row still fits it.
+    """
+    software = [
+        (width, height)
+        for width, height, track in rows
+        if width > 0 and height > 0 and track.lower() in software_tracks
+    ]
+    if not software:
+        return None
+    best_width, best_height = max(software, key=lambda row: (row[1], row[0]))
+    best_index = None
+    for index, (_name, cap_width, cap_height) in enumerate(_WIDEVINE_CAPS):
+        if _fits(best_width, best_height, cap_width, cap_height):
+            best_index = index
+            break
+    if best_index is None:
+        return None
+    chosen = best_index
+    if isinstance(target_height, int) and target_height > 0:
+        for index, (_name, cap_width, cap_height) in enumerate(_WIDEVINE_CAPS):
+            if cap_height > target_height or index > best_index:
+                break
+            if any(_fits(width, height, cap_width, cap_height) for width, height in software):
+                chosen = index
+    return _WIDEVINE_CAPS[chosen][0]
+
+
+def _fallback_widevine_cap(target_height) -> str:
+    """720p, or the viewer's lower choice, when the playlist cannot be read."""
+    if isinstance(target_height, int) and 0 < target_height < 720:
+        return "480p"
+    return "720p"
+
+
+def _software_widevine_cap(license_url: str, stream_url, target_height) -> str:
+    """Chooser value for a software CDM. 720p when the ladder cannot be read."""
+    tracks = _software_track_types(license_url)
+    text = _playlist_text(stream_url) if tracks else ""
+    cap = _cap_for_rows(_playlist_rows(text), tracks, target_height) if text else None
+    if cap:
+        return cap
+    return _fallback_widevine_cap(target_height)
 
 
 def _widevine_license_url(widevine):
@@ -469,7 +595,9 @@ class KodiPlaybackHandler:
                 list_item.setProperty("IsPlayable", "true")
                 list_item.addStreamInfo("video", {"codec": "h264"})
                 if manifest_type in ("hls", "mpd"):
-                    self._apply_adaptive_manifest(list_item, manifest_type, widevine=widevine)
+                    self._apply_adaptive_manifest(
+                        list_item, manifest_type, widevine=widevine, stream_url=stream_url
+                    )
 
                 self.log.info("Playing basic video")
 
@@ -646,7 +774,9 @@ class KodiPlaybackHandler:
         finally:
             sender.close()
 
-    def _apply_adaptive_manifest(self, list_item, manifest_type: str, widevine=None):
+    def _apply_adaptive_manifest(
+        self, list_item, manifest_type: str, widevine=None, stream_url=None
+    ):
         """Mark a direct stream as HLS or DASH when InputStream Adaptive is on.
 
         A DRM torch uses InputStream Adaptive even when that setting is off.
@@ -669,15 +799,16 @@ class KodiPlaybackHandler:
         quality_pref = self._get_quality_pref()
         quality_mode = quality_pref["mode"]
         target_height = quality_pref["target_height"]
-        if license_url and not _widevine_hardware_cdm():
-            capped_height = _software_widevine_height(target_height)
-            if quality_mode != "fixed" or capped_height != target_height:
+        software_cap = None
+        if license_url and not _torch_viewer_quality(self.parent.addon):
+            software_cap = _software_widevine_cap(license_url, stream_url, target_height)
+            viewer_value = {1080: "1080p", 720: "720p", 480: "480p", 360: "360p"}.get(target_height)
+            if quality_mode != "fixed" or viewer_value != software_cap:
                 self.log.info(
-                    "Software Widevine cannot decrypt the 1080p torch track. "
-                    f"Playing {capped_height}p."
+                    f"Playing this torch at {software_cap}. "
+                    "A higher row needs a hardware key."
                 )
-                quality_mode = "fixed"
-            target_height = capped_height
+            quality_mode = "fixed"
         if quality_mode == "manual":
             stream_selection_type = "ask-quality"
         elif quality_mode == "fixed":
@@ -687,7 +818,12 @@ class KodiPlaybackHandler:
         list_item.setProperty("inputstream", "inputstream.adaptive")
         list_item.setProperty("inputstream.adaptive.manifest_type", manifest_type)
         list_item.setProperty("inputstream.adaptive.stream_selection_type", stream_selection_type)
-        if isinstance(target_height, int) and quality_mode != "manual":
+        if software_cap:
+            list_item.setProperty("inputstream.adaptive.chooser_resolution_max", software_cap)
+            list_item.setProperty(
+                "inputstream.adaptive.chooser_resolution_secure_max", software_cap
+            )
+        elif isinstance(target_height, int) and quality_mode != "manual":
             chooser_map = {1080: "1080p", 720: "720p", 480: "480p", 360: "360p"}
             chooser_value = chooser_map.get(target_height)
             if chooser_value:

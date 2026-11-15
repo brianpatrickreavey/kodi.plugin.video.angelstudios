@@ -70,6 +70,14 @@ msgctxt "#30107"
 msgid "Kodi asks before it installs Widevine, so DRM videos can play."
 msgstr "Kodi asks before it installs Widevine, so DRM videos can play."
 
+msgctxt "#30108"
+msgid "Use preferred quality for torches"
+msgstr "Use preferred quality for torches"
+
+msgctxt "#30109"
+msgid "Off plays the highest torch resolution this device can decrypt. On uses Preferred video quality, including a hardware-only track."
+msgstr "Off plays the highest torch resolution this device can decrypt. On uses Preferred video quality, including a hardware-only track."
+
 msgctxt "#30110"
 msgid "Auto"
 msgstr "Auto"

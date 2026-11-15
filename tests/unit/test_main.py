@@ -389,6 +389,22 @@ class TestMain:
         auth.ensure_valid_session.assert_not_called()
         ui.force_logout_with_notification.assert_called_once_with()
 
+    def test_session_details_do_not_refresh(self, monkeypatch):
+        """The session dialog inspects the token that is already saved."""
+        main, ui, auth = self._open_with_saved_login(
+            monkeypatch, ["plugin://", "1", "?action=show_information"], False
+        )
+        main.main()
+        auth.ensure_valid_session.assert_not_called()
+        ui.show_auth_details_dialog.assert_called_once_with()
+
+        main, ui, auth = self._open_with_saved_login(
+            monkeypatch, ["plugin://", "1", "?action=info&message=hi"], False
+        )
+        main.main()
+        auth.ensure_valid_session.assert_not_called()
+        ui.show_error.assert_called_once_with("hi")
+
     def test_session_details_available_without_credentials(self, monkeypatch):
         main = _fresh_main_module()
         monkeypatch.setattr(main, "USERNAME", "")

@@ -1,7 +1,10 @@
 """Guild Voting menu, ballot, and the Angel calls behind them."""
 
+import base64
+import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+from urllib.parse import urlencode
 
 import pytest
 
@@ -25,6 +28,38 @@ DRM_NOT_INSTALLED = (
 )
 VOTE_FAILED = "Vote failed. Please try again."
 LICENSE_URL = "https://example.test/license"
+
+
+def _quality_addon(quality, viewer_quality=False, use_isa=True):
+    addon = MagicMock()
+
+    def setting_bool(name):
+        if name == "torch_viewer_quality":
+            return viewer_quality
+        if name == "use_isa":
+            return use_isa
+        return False
+
+    addon.getSettingBool.side_effect = setting_bool
+    addon.getSettingString.return_value = quality
+    return addon
+
+
+def _license_url(software_tracks):
+    policies = []
+    for track in software_tracks:
+        policies.append(
+            {
+                "name": f"policy_{track}",
+                "widevine": {"device_security_level": "SW_SECURE_CRYPTO"},
+            }
+        )
+    policies.append(
+        {"name": "policy_uhd1", "widevine": {"device_security_level": "HW_SECURE_ALL"}}
+    )
+    payload = {"message": {"content_key_usage_policies": policies}}
+    segment = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip("=")
+    return "https://example.test/license?" + urlencode({"AxDrmMessage": f"e30.{segment}.sig"})
 
 SPY = {
     "content_id": "spy-id",
@@ -943,6 +978,100 @@ class TestGuildVotingMenu:
         show_error.assert_not_called()
         player.stop.assert_not_called()
 
+    def test_a_previous_file_still_reaches_the_questions(self, ui_interface):
+        """The previous file can still be reported when this torch starts."""
+        ui, _logger, angel = ui_interface
+        _prepare_ballot(ui, angel)
+        dialog = MagicMock()
+        dialog.select.return_value = -1
+        torch_file = "plugin://plugin.video.angelstudios/?action=play_torch&torch_id=torch-1"
+        other_file = "plugin://plugin.video.angelstudios/?action=play_episode&episode_guid=other"
+        state = {"file": other_file, "playing": True, "window": False, "phase": "previous"}
+
+        class Player:
+            def isPlayingVideo(self):
+                return state["playing"]
+
+            def getPlayingFile(self):
+                return state["file"]
+
+            def stop(self):
+                state["stopped"] = True
+
+        class Monitor:
+            def abortRequested(self):
+                return False
+
+            def waitForAbort(self, seconds):
+                if state["phase"] == "previous" and seconds == 0.2:
+                    state["file"] = torch_file
+                    state["window"] = True
+                    state["phase"] = "torch"
+                elif state["phase"] == "torch" and seconds == 0.2:
+                    state["playing"] = False
+                return False
+
+        def visible(condition):
+            assert condition == "VideoPlayer.IsFullscreen"
+            return state["window"] is True
+
+        with (
+            patch("kodi_menu_handler.xbmc.Player", Player),
+            patch("kodi_menu_handler.xbmc.Monitor", Monitor),
+            patch("kodi_menu_handler.xbmc.getCondVisibility", visible),
+            patch("kodi_menu_handler.xbmcgui.Dialog", return_value=dialog),
+            patch.object(ui, "play_video", return_value=True),
+            patch.object(ui, "show_error") as show_error,
+        ):
+            assert ui.play_torch("torch-1") is False
+
+        dialog.select.assert_called_once()
+        show_error.assert_not_called()
+        assert state.get("stopped") is not True
+
+    def test_a_different_file_after_this_torch_starts_is_left_alone(self, ui_interface):
+        """A video that replaces this torch is not stopped, and gets no ballot."""
+        ui, _logger, angel = ui_interface
+        _prepare_ballot(ui, angel)
+        dialog = MagicMock()
+        torch_file = "plugin://plugin.video.angelstudios/?action=play_torch&torch_id=torch-1"
+        other_file = "plugin://plugin.video.angelstudios/?action=play_episode&episode_guid=other"
+        state = {"file": torch_file, "polls": 0}
+
+        class Player:
+            def isPlayingVideo(self):
+                return True
+
+            def getPlayingFile(self):
+                return state["file"]
+
+            def stop(self):
+                state["stopped"] = True
+
+        class Monitor:
+            def abortRequested(self):
+                return state["polls"] > 5
+
+            def waitForAbort(self, seconds):
+                state["polls"] += 1
+                if seconds == 0.2:
+                    state["file"] = other_file
+                return False
+
+        with (
+            patch("kodi_menu_handler.xbmc.Player", Player),
+            patch("kodi_menu_handler.xbmc.Monitor", Monitor),
+            patch("kodi_menu_handler.xbmc.getCondVisibility", return_value=False),
+            patch("kodi_menu_handler.xbmcgui.Dialog", return_value=dialog),
+            patch.object(ui, "play_video", return_value=True),
+            patch.object(ui, "show_error") as show_error,
+        ):
+            assert ui.play_torch("torch-1") is False
+
+        dialog.select.assert_not_called()
+        show_error.assert_not_called()
+        assert state.get("stopped") is not True
+
     def test_playback_failure_skips_the_questions(self, ui_interface):
         ui, _logger, angel = ui_interface
         _prepare_ballot(ui, angel)
@@ -1178,14 +1307,12 @@ class TestTorchManifestPlayback:
         assert stream_url not in logged
         logger.info.assert_any_call("Playing protected stream")
         logger.info.assert_any_call(
-            "Software Widevine cannot decrypt the 1080p torch track. Playing 720p."
+            "Playing this torch at 720p. A higher row needs a hardware key."
         )
 
     def test_software_widevine_caps_1080_at_720(self, ui_interface):
         ui, _logger, _angel = ui_interface
-        addon = MagicMock()
-        addon.getSettingBool.return_value = True
-        addon.getSettingString.return_value = "1080p"
+        addon = _quality_addon("1080p")
         list_item = MagicMock()
 
         with (
@@ -1210,9 +1337,7 @@ class TestTorchManifestPlayback:
 
     def test_software_widevine_keeps_a_lower_quality_choice(self, ui_interface):
         ui, logger, _angel = ui_interface
-        addon = MagicMock()
-        addon.getSettingBool.return_value = True
-        addon.getSettingString.return_value = "480p"
+        addon = _quality_addon("480p")
         list_item = MagicMock()
 
         with (
@@ -1232,28 +1357,19 @@ class TestTorchManifestPlayback:
         capped = [
             call
             for call in logger.info.call_args_list
-            if call.args and "1080p torch track" in str(call.args[0])
+            if call.args and "hardware key" in str(call.args[0])
         ]
         assert capped == []
 
-    def test_hardware_widevine_keeps_1080(self, ui_interface):
+    def test_viewer_quality_setting_keeps_1080(self, ui_interface):
         ui, logger, _angel = ui_interface
-        addon = MagicMock()
-        addon.getSettingBool.return_value = True
-        addon.getSettingString.return_value = "1080p"
+        addon = _quality_addon("1080p", viewer_quality=True)
         list_item = MagicMock()
-
-        def platform(name):
-            return name == "System.Platform.Android"
 
         with (
             patch.object(ui, "addon", addon),
             patch("xbmcgui.ListItem", return_value=list_item),
             patch("xbmcplugin.setResolvedUrl"),
-            patch(
-                "resources.lib.kodi_playback_handler.xbmc.getCondVisibility",
-                side_effect=platform,
-            ),
             patch.object(ui.playback_handler, "_ensure_isa_available", return_value=True),
         ):
             ui.play_video(
@@ -1268,6 +1384,78 @@ class TestTorchManifestPlayback:
         capped = [
             call
             for call in logger.info.call_args_list
-            if call.args and "1080p torch track" in str(call.args[0])
+            if call.args and "hardware key" in str(call.args[0])
         ]
         assert capped == []
+
+    def test_software_ladder_picks_the_highest_software_row(self, ui_interface):
+        ui, logger, _angel = ui_interface
+        addon = _quality_addon("auto")
+        list_item = MagicMock()
+        playlist = "\n".join(
+            [
+                "#EXTM3U",
+                "#EXT-X-STREAM-INF:BANDWIDTH=900,RESOLUTION=1920x1080",
+                "uhd.m3u8?drm_track_type=UHD1",
+                "#EXT-X-STREAM-INF:BANDWIDTH=700,RESOLUTION=1280x720",
+                "hd.m3u8?drm_track_type=HD",
+                "#EXT-X-STREAM-INF:BANDWIDTH=400,RESOLUTION=854x480",
+                "sd.m3u8?drm_track_type=SD",
+            ]
+        )
+
+        with (
+            patch.object(ui, "addon", addon),
+            patch("xbmcgui.ListItem", return_value=list_item),
+            patch("xbmcplugin.setResolvedUrl"),
+            patch.object(ui.playback_handler, "_ensure_isa_available", return_value=True),
+            patch(
+                "kodi_playback_handler._playlist_text",
+                return_value=playlist,
+            ) as playlist_text,
+        ):
+            ui.play_video(
+                stream_url="https://example.test/torch.m3u8",
+                manifest_type="hls",
+                widevine={"license_url": _license_url(("hd", "sd"))},
+            )
+
+        playlist_text.assert_called_once_with("https://example.test/torch.m3u8")
+        list_item.setProperty.assert_any_call("inputstream.adaptive.chooser_resolution_max", "720p")
+        logger.info.assert_any_call(
+            "Playing this torch at 720p. A higher row needs a hardware key."
+        )
+
+    def test_software_ladder_uses_640_when_720_is_hardware(self, ui_interface):
+        ui, _logger, _angel = ui_interface
+        addon = _quality_addon("1080p")
+        list_item = MagicMock()
+        playlist = "\n".join(
+            [
+                "#EXTM3U",
+                "#EXT-X-STREAM-INF:BANDWIDTH=900,RESOLUTION=1920x1080",
+                "uhd.m3u8?drm_track_type=UHD1",
+                "#EXT-X-STREAM-INF:BANDWIDTH=700,RESOLUTION=1280x720",
+                "hd.m3u8?drm_track_type=HD",
+                "#EXT-X-STREAM-INF:BANDWIDTH=400,RESOLUTION=854x480",
+                "sd.m3u8?drm_track_type=SD",
+            ]
+        )
+
+        with (
+            patch.object(ui, "addon", addon),
+            patch("xbmcgui.ListItem", return_value=list_item),
+            patch("xbmcplugin.setResolvedUrl"),
+            patch.object(ui.playback_handler, "_ensure_isa_available", return_value=True),
+            patch(
+                "kodi_playback_handler._playlist_text",
+                return_value=playlist,
+            ),
+        ):
+            ui.play_video(
+                stream_url="https://example.test/torch.m3u8",
+                manifest_type="hls",
+                widevine={"license_url": _license_url(("sd",))},
+            )
+
+        list_item.setProperty.assert_any_call("inputstream.adaptive.chooser_resolution_max", "640p")
