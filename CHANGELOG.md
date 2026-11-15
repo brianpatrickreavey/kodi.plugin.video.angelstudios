@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.11.0] - 2026-11-15
+- Watch a Guild torch, vote, and replay a finished one.
+
 ## [0.10.0] - 2026-11-11
 - Show the signed-in watchlist and add or remove movies, series, and specials.
 
