@@ -7,7 +7,7 @@ PACKAGE_DIR := auth0-ciam-client/
 TEST_DIRS := tests/
 ADDON_MODULES := plugin.video.angelstudios
 
-.PHONY: lint black flake8 format format-and-lint unittest unittest-with-coverage coverage kodi-test kodi-test-look kodi-test-watchlist kodi-test-guild zip
+.PHONY: lint black flake8 format format-and-lint unittest unittest-with-coverage coverage kodi-test kodi-test-look kodi-test-watchlist kodi-test-guild kodi-test-catalog kodi-test-folders kodi-test-continue kodi-test-playback kodi-test-playback-look kodi-test-tags kodi-test-maintenance kodi-test-auth kodi-test-signed-out zip
 .PHONY: lint-all test-all clean-all help
 
 # === HELP ===
@@ -24,6 +24,15 @@ help:
 	@echo "  kodi-test-look    - Same, and leave each play on screen for a person to watch"
 	@echo "  kodi-test-watchlist - Read the signed-in watchlist in Kodi. One check adds a title and removes it"
 	@echo "  kodi-test-guild   - Read Guild Voting in Kodi. Does not open a torch or send a vote"
+	@echo "  kodi-test-catalog - Open Movies, Series, and Dry Bar. Does not play"
+	@echo "  kodi-test-folders - Show and hide each folder setting, then put the settings back"
+	@echo "  kodi-test-continue - Read Continue Watching, then resume one in-progress title"
+	@echo "  kodi-test-playback - Play Kensuke's Kingdom from the start, then stop"
+	@echo "  kodi-test-playback-look - Same, and leave the picture up for a person"
+	@echo "  kodi-test-tags    - Read watch-page tags on a movie, a series, and a special"
+	@echo "  kodi-test-maintenance - Clear the cache and the debug data"
+	@echo "  kodi-test-auth    - Clear the saved token, open Movies, and sign in again"
+	@echo "  kodi-test-signed-out - Sign out, check Guild Voting is gone, then sign back in"
 	@echo "  zip               - Create addon zip"
 	@echo "  clean-all         - Clean all build artifacts"
 	@echo "  help              - Show this help"
@@ -59,6 +68,14 @@ unittest:
 KODI_CAPTION_TEST ?= all
 KODI_WATCHLIST_TEST ?= watchlist
 KODI_GUILD_TEST ?= guild
+KODI_CATALOG_TEST ?= catalog
+KODI_FOLDERS_TEST ?= folders
+KODI_CONTINUE_TEST ?= continue
+KODI_PLAYBACK_TEST ?= playback
+KODI_TAGS_TEST ?= title-tags
+KODI_MAINTENANCE_TEST ?= maintenance
+KODI_AUTH_TEST ?= auth
+KODI_SIGNED_OUT_TEST ?= signed-out
 
 kodi-test:
 	KODI_CAPTION_TEST="$(KODI_CAPTION_TEST)" pytest $(TEST_DIRS)kodi/test_event_packet.py $(TEST_DIRS)kodi/test_kodi_app.py $(TEST_DIRS)kodi/test_playlist.py $(TEST_DIRS)kodi/test_notices.py $(TEST_DIRS)kodi/test_captions_live.py -v
@@ -76,6 +93,43 @@ kodi-test-watchlist:
 # An empty ballot list still opens and shows Already voted on. Not part of unittest.
 kodi-test-guild:
 	KODI_GUILD_TEST="$(KODI_GUILD_TEST)" pytest $(TEST_DIRS)kodi/test_notices.py $(TEST_DIRS)kodi/test_guild_expect.py $(TEST_DIRS)kodi/test_guild_live.py -v
+
+# Opens Movies, Series, and Dry Bar Comedy Specials, then the first title in each.
+# Does not play. Not part of unittest.
+kodi-test-catalog:
+	KODI_CATALOG_TEST="$(KODI_CATALOG_TEST)" pytest $(TEST_DIRS)kodi/test_notices.py $(TEST_DIRS)kodi/test_catalog_live.py -v
+
+# Shows and hides each folder setting, then puts every setting back. Not part of unittest.
+kodi-test-folders:
+	KODI_FOLDERS_TEST="$(KODI_FOLDERS_TEST)" pytest $(TEST_DIRS)kodi/test_notices.py $(TEST_DIRS)kodi/test_folders_live.py -v
+
+# Reads Continue Watching, then resumes one in-progress title and stops. Not part of unittest.
+kodi-test-continue:
+	KODI_CONTINUE_TEST="$(KODI_CONTINUE_TEST)" pytest $(TEST_DIRS)kodi/test_notices.py $(TEST_DIRS)kodi/test_continue_live.py -v
+
+# Plays Kensuke's Kingdom from the start and stops. Does not install Widevine.
+kodi-test-playback:
+	KODI_PLAYBACK_TEST="$(KODI_PLAYBACK_TEST)" pytest $(TEST_DIRS)kodi/test_notices.py $(TEST_DIRS)kodi/test_playback_live.py -v
+
+# Same play, and the picture stays up. Not part of unittest.
+kodi-test-playback-look:
+	KODI_PLAYBACK_LOOK=1 KODI_PLAYBACK_TEST="$(KODI_PLAYBACK_TEST)" pytest $(TEST_DIRS)kodi/test_notices.py $(TEST_DIRS)kodi/test_playback_live.py -v
+
+# Reads watch-page tags from the three catalog folders. Does not play.
+kodi-test-tags:
+	KODI_TAGS_TEST="$(KODI_TAGS_TEST)" pytest $(TEST_DIRS)kodi/test_notices.py $(TEST_DIRS)kodi/test_tags_live.py -v
+
+# Clears the addon cache and the debug trace files. Does not sign out.
+kodi-test-maintenance:
+	KODI_MAINTENANCE_TEST="$(KODI_MAINTENANCE_TEST)" pytest $(TEST_DIRS)kodi/test_notices.py $(TEST_DIRS)kodi/test_maintenance_live.py -v
+
+# Clears the saved token, opens Movies, and leaves the new token in place.
+kodi-test-auth:
+	KODI_AUTH_TEST="$(KODI_AUTH_TEST)" pytest $(TEST_DIRS)kodi/test_notices.py $(TEST_DIRS)kodi/test_auth_live.py -v
+
+# Signs out and signs back in. Press OK on Force Logout. Not part of unittest.
+kodi-test-signed-out:
+	KODI_SIGNED_OUT_TEST="$(KODI_SIGNED_OUT_TEST)" pytest $(TEST_DIRS)kodi/test_notices.py $(TEST_DIRS)kodi/test_signed_out_live.py -v
 
 unittest-with-coverage:
 	python -m pytest --cov=$(ADDON_MODULES) --cov-report=term-missing --cov-fail-under=90 $(TEST_DIRS)unit

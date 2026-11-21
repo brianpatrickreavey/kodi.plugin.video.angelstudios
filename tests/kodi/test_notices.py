@@ -8,7 +8,21 @@ sys.path.insert(
 )
 
 from notices import step_notice  # noqa: E402
-from selection import GUILD, LEAVES, WATCHLIST, expand, run_order  # noqa: E402
+from selection import (  # noqa: E402
+    AUTH,
+    CATALOG,
+    CONTINUE,
+    FOLDERS,
+    GUILD,
+    LEAVES,
+    MAINTENANCE,
+    PLAYBACK,
+    SIGNED_OUT,
+    TITLE_TAGS,
+    WATCHLIST,
+    expand,
+    run_order,
+)
 
 
 def test_one_condition_is_that_condition_only():
@@ -68,6 +82,26 @@ def test_guild_is_not_part_of_the_caption_run():
     assert expand("guild-menu") == ["guild-menu"]
     assert "guild-menu" not in expand("all")
     assert "guild-list" not in expand("all")
+
+
+def test_other_bundles_are_not_part_of_the_caption_run():
+    bundles = {
+        "catalog": CATALOG,
+        "folders": FOLDERS,
+        "continue": CONTINUE,
+        "playback": PLAYBACK,
+        "title-tags": TITLE_TAGS,
+        "maintenance": MAINTENANCE,
+        "auth": AUTH,
+        "signed-out": SIGNED_OUT,
+    }
+    caption_run = expand("all")
+    for name, leaves in bundles.items():
+        assert expand(name) == list(leaves)
+        assert run_order(name) == ["sign-in"] + list(leaves)
+        for leaf in leaves:
+            assert leaf not in caption_run
+            assert expand(leaf) == [leaf]
 
 
 def test_step_notice_counts_this_run():
