@@ -173,8 +173,23 @@ class KodiSession:
         self.rpc("Player.Stop", {"playerid": state["playerid"]})
         self.wait(lambda: not self.player()["playing"], 15)
 
-    def open_video(self, url):
-        self.rpc("Player.Open", {"item": {"file": url}, "options": {"resume": False}})
+    def open_video(self, url, resume=False):
+        """Start a plugin URL. resume True seeks to the saved position."""
+        self.rpc("Player.Open", {"item": {"file": url}, "options": {"resume": bool(resume)}})
+
+    def blocking_dialog(self):
+        """Return True when a question or an OK dialog is on screen.
+
+        A progress dialog is not included. Playback can show one while it buffers.
+        """
+        import xbmc  # type: ignore
+
+        windows = (
+            "Window.IsActive(yesnodialog)",
+            "Window.IsActive(okdialog)",
+            "Window.IsActive(selectdialog)",
+        )
+        return any(xbmc.getCondVisibility(item) for item in windows)
 
     def seek(self, seconds):
         """Move to a time in the current video. Return False when the player cannot."""

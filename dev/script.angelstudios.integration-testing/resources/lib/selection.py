@@ -1,8 +1,7 @@
 """Names for one check, a bundle of them, or every caption check.
 
 A leaf is one check. A bundle runs its leaves in order. all runs every caption
-leaf once. The watchlist bundle and the Guild Voting bundle are separate, so
-all does not open the watchlist or Guild Voting.
+leaf once. The other bundles are separate, so all does not open them.
 sign-in runs first on every selection and is not one of the watched plays.
 The leaf names here match the @register names in resources/lib/tests.
 """
@@ -35,10 +34,39 @@ GUILD = (
     "guild-list",
 )
 
+# Not part of LEAVES. These bundles do not play a torch or install Widevine.
+CATALOG = (
+    "catalog-movies",
+    "catalog-series",
+    "catalog-specials",
+)
+FOLDERS = ("folders-toggles",)
+CONTINUE = (
+    "continue-list",
+    "resume-saved",
+)
+PLAYBACK = ("playback-movie",)
+TITLE_TAGS = ("title-tags",)
+MAINTENANCE = (
+    "clear-cache",
+    "clear-debug",
+)
+AUTH = ("auth-refresh",)
+# Signs out, then signs back in. Not part of the caption run.
+SIGNED_OUT = ("signed-out",)
+
 GROUPS = {
     "all": LEAVES,
     "watchlist": WATCHLIST,
     "guild": GUILD,
+    "catalog": CATALOG,
+    "folders": FOLDERS,
+    "continue": CONTINUE,
+    "playback": PLAYBACK,
+    "title-tags": TITLE_TAGS,
+    "maintenance": MAINTENANCE,
+    "auth": AUTH,
+    "signed-out": SIGNED_OUT,
     "captions": (
         "captions-english",
         "captions-off",
