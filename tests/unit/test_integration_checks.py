@@ -3,6 +3,9 @@
 These do not start Kodi. The live runs are the make kodi-test-* targets.
 """
 
+import json
+import os
+import stat
 import sys
 from pathlib import Path
 
@@ -10,6 +13,7 @@ _LIB = Path(__file__).resolve().parents[2] / "dev/script.angelstudios.integratio
 sys.path.insert(0, str(_LIB))
 
 from listing import has_entry, rows, tag_summary  # noqa: E402
+from recovery_file import write_recovery  # noqa: E402
 from resume_expect import parse_resume, resume_candidate  # noqa: E402
 from selection import LEAVES, expand  # noqa: E402
 
@@ -94,3 +98,39 @@ def test_resume_candidate_is_none_when_nothing_qualifies():
     assert resume_candidate([]) is None
     assert parse_resume({}) is None
     assert parse_resume({"resumeWatching": {"edges": []}}) == []
+
+
+def _mode(path):
+    return stat.S_IMODE(os.stat(path).st_mode)
+
+
+def test_recovery_file_is_private_even_with_a_loose_umask(tmp_path):
+    path = tmp_path / "login-recovery.json"
+    previous = os.umask(0)
+    try:
+        write_recovery(str(path), "viewer", "pw")
+    finally:
+        os.umask(previous)
+    assert _mode(path) == 0o600
+    assert json.loads(path.read_text()) == {"username": "viewer", "password": "pw"}
+
+
+def test_recovery_file_replaces_a_readable_file(tmp_path):
+    path = tmp_path / "login-recovery.json"
+    path.write_text("old")
+    os.chmod(path, 0o644)
+    write_recovery(str(path), "viewer", "pw")
+    assert _mode(path) == 0o600
+    assert json.loads(path.read_text())["username"] == "viewer"
+
+
+def test_recovery_file_replaces_a_symlink_without_writing_the_target(tmp_path):
+    target = tmp_path / "other-file"
+    target.write_text("keep")
+    link = tmp_path / "login-recovery.json"
+    link.symlink_to(target)
+    write_recovery(str(link), "viewer", "pw")
+    assert target.read_text() == "keep"
+    assert not link.is_symlink()
+    assert _mode(link) == 0o600
+    assert json.loads(link.read_text())["username"] == "viewer"

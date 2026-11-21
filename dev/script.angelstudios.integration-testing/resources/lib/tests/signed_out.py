@@ -10,6 +10,7 @@ import json
 import os
 
 from listing import directory, has_entry, public_error, rows, video_addon
+from recovery_file import write_recovery
 from runner import register
 from tests.sign_in import _refresh
 
@@ -89,9 +90,7 @@ def _sign_back_in(kodi, addon, username, password):
 
 
 def _write_recovery(username, password):
-    fd = os.open(_RECOVERY, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as handle:
-        json.dump({"username": username, "password": password}, handle)
+    write_recovery(_RECOVERY, username, password)
 
 
 def _restore_file(addon):
